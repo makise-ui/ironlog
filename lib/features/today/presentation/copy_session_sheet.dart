@@ -107,7 +107,6 @@ class _CopySessionSheetState extends ConsumerState<CopySessionSheet> {
                       )
                     : ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                        cacheExtent: 600,
                         padding: const EdgeInsets.all(AppSpacing.md),
                         itemCount: _pastWorkouts.length,
                         itemBuilder: (context, index) {

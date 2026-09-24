@@ -113,7 +113,7 @@ class WorkoutRepository {
     try {
       final wData = await (_db.select(_db.workouts)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (wData == null) return null;
-      return getWorkoutById(id);
+      return await getWorkoutById(id);
     } catch (_) {
       return null;
     }

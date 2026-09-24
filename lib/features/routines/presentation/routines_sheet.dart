@@ -294,7 +294,6 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
                 ? Center(child: CircularProgressIndicator(color: context.accent))
                 : ListView(
                     physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                    cacheExtent: 600,
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
                       // Custom Presets Section
