@@ -1,0 +1,112 @@
+name: Build & Release IronLog APKs
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APKs and App Bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Static Analysis
+        run: flutter analyze lib/
+
+      - name: Run Unit & Widget Tests
+        run: flutter test test/core/ test/domain/ test/presentation/
+
+      # 1. Build Universal APK (All ABIs combined)
+      - name: Build Universal Release APK
+        run: |
+          flutter build apk --release
+          mkdir -p release-artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk release-artifacts/IronLog-universal-release.apk
+
+      # 2. Build Split per-ABI APKs (arm64-v8a: ~21MB, armeabi-v7a: ~18MB, x86_64: ~22MB)
+      - name: Build Split per-ABI Release APKs
+        run: |
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-artifacts/IronLog-arm64-v8a-release.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-artifacts/IronLog-armeabi-v7a-release.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk release-artifacts/IronLog-x86_64-release.apk
+
+      # 3. Build Google Play App Bundle (.aab)
+      - name: Build Google Play App Bundle (AAB)
+        run: |
+          flutter build appbundle --release
+          cp build/app/outputs/bundle/release/app-release.aab release-artifacts/IronLog-release.aab
+
+      # 4. Generate SHA-256 Checksums
+      - name: Generate Checksums
+        run: |
+          cd release-artifacts
+          sha256sum * > SHA256SUMS.txt
+          ls -lh
+
+      # 5. Upload Artifacts for Workflow Run
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironlog-release-builds
+          path: release-artifacts/
+
+      # 6. Publish GitHub Release (When Tagged or on Workflow Dispatch / Main)
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          name: IronLog Release ${{ github.event.inputs.release_tag || github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release-artifacts/IronLog-arm64-v8a-release.apk
+            release-artifacts/IronLog-universal-release.apk
+            release-artifacts/IronLog-armeabi-v7a-release.apk
+            release-artifacts/IronLog-x86_64-release.apk
+            release-artifacts/IronLog-release.aab
+            release-artifacts/SHA256SUMS.txt
+          body: |
+            ## 🚀 IronLog Release
+
+            ### 📱 Which APK should I install?
+            * **⚡ Recommended (99% of Android phones):** `IronLog-arm64-v8a-release.apk` (**~21 MB** — fastest and smallest!)
+            * **🌐 Universal (Works on any Android phone):** `IronLog-universal-release.apk` (~80 MB)
+            * **📦 Google Play Store upload:** `IronLog-release.aab`
+            * **Old 32-bit devices:** `IronLog-armeabi-v7a-release.apk`
+            * **PC Emulators / Chromebooks:** `IronLog-x86_64-release.apk`
+
+            Verify file integrity with `SHA256SUMS.txt`.

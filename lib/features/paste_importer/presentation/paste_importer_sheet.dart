@@ -58,16 +58,24 @@ Tricep Rope Pushdown: 25/12, 30/10''';
       lastDate: DateTime.now().add(const Duration(days: 30)),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AppColors.accentCyan,
-              surface: AppColors.backgroundCard,
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme(
+              brightness: Theme.of(context).brightness,
+              primary: context.accent,
+              onPrimary: context.onAccent,
+              secondary: context.accent,
+              onSecondary: context.onAccent,
+              error: AppColors.error,
+              onError: Colors.white,
+              surface: context.cardElevated,
+              onSurface: context.textPrimary,
             ),
           ),
           child: child!,
         );
       },
     );
+    if (!mounted) return;
     if (picked != null) {
       AppHaptics.step();
       setState(() => _selectedDate = picked);
@@ -108,11 +116,11 @@ Tricep Rope Pushdown: 25/12, 30/10''';
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.90,
-      decoration: const BoxDecoration(
-        color: Color(0xF00D0F18),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+      decoration: BoxDecoration(
+        color: context.sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
         border: Border(
-          top: BorderSide(color: AppColors.glassBorderLight, width: 1.5),
+          top: BorderSide(color: context.sheetBorder, width: 1.5),
         ),
       ),
       child: Column(
@@ -123,7 +131,7 @@ Tricep Rope Pushdown: 25/12, 30/10''';
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: context.handleBar,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -136,24 +144,32 @@ Tricep Rope Pushdown: 25/12, 30/10''';
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Paste-to-Log Importer', style: AppTypography.titleLarge),
-                    Text('Free-text multi-set parser', style: AppTypography.labelSmall),
+                    Text(
+                      'Paste-to-Log Importer',
+                      style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                    ),
+                    Text(
+                      'Free-text multi-set parser',
+                      style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
+                    ),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                  icon: Icon(Icons.close_rounded, color: context.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.glassBorderDim),
+          Divider(height: 1, color: context.cardBorder),
 
           Expanded(
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.all(AppSpacing.md),
               children: [
                 // Date picker row + Load Example button
@@ -165,21 +181,21 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.glassFillActive,
+                          color: context.chipBg,
                           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          border: Border.all(color: AppColors.glassBorderLight),
+                          border: Border.all(color: context.chipBorder),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.accentCyan),
+                            Icon(Icons.calendar_today_rounded, size: 16, color: context.accent),
                             const SizedBox(width: AppSpacing.xs),
                             Text(
                               AppDateUtils.formatFullDate(_selectedDate),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: AppTypography.fontFamily,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                                color: context.textPrimary,
                               ),
                             ),
                           ],
@@ -188,8 +204,8 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                     ),
                     TextButton.icon(
                       onPressed: _loadSample,
-                      icon: const Icon(Icons.auto_fix_high_rounded, size: 16, color: AppColors.accentCyan),
-                      label: const Text('Load Example', style: TextStyle(color: AppColors.accentCyan, fontSize: 13)),
+                      icon: Icon(Icons.auto_fix_high_rounded, size: 16, color: context.accent),
+                      label: Text('Load Example', style: TextStyle(color: context.accent, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -198,24 +214,24 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                 // Free Text Input Box
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.glassFillActive,
+                    color: context.inputBg,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    border: Border.all(color: AppColors.glassBorderLight),
+                    border: Border.all(color: context.inputBorder),
                   ),
                   child: TextField(
                     controller: _textController,
                     maxLines: 5,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: AppTypography.fontFamily,
                       fontSize: 14,
-                      color: AppColors.textPrimary,
+                      color: context.textPrimary,
                       height: 1.5,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Paste workout notes here...\n\nExample:\nBENCH PRESS: 7.5/15, 10/13, 10/15\nIncline DB Press: 32kg x 8, 30kg x 10',
-                      hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                      hintStyle: TextStyle(color: context.textTertiary, fontSize: 13),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.all(AppSpacing.md),
+                      contentPadding: const EdgeInsets.all(AppSpacing.md),
                     ),
                   ),
                 ),
@@ -224,22 +240,25 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                 // Preview section
                 Row(
                   children: [
-                    const Text('PARSED PREVIEW', style: AppTypography.labelMedium),
+                    Text(
+                      'PARSED PREVIEW',
+                      style: AppTypography.labelMedium.copyWith(color: context.textSecondary),
+                    ),
                     const SizedBox(width: AppSpacing.xs),
                     if (_parsedBlocks.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.accentCyan.withValues(alpha: 0.2),
+                          color: context.accent.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                         ),
                         child: Text(
                           '${_parsedBlocks.length} exercises',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTypography.fontFamily,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.accentCyan,
+                            color: context.accent,
                           ),
                         ),
                       ),
@@ -251,14 +270,14 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     decoration: BoxDecoration(
-                      color: AppColors.glassTileFill,
+                      color: context.cardBg,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      border: Border.all(color: AppColors.glassBorderDim),
+                      border: Border.all(color: context.cardBorder),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         'Type or paste workout text above to see the interactive preview.',
-                        style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                        style: TextStyle(color: context.textTertiary, fontSize: 13),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -275,16 +294,16 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                             children: [
                               Text(
                                 block.exerciseName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: AppTypography.fontFamily,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
+                                  color: context.textPrimary,
                                 ),
                               ),
                               Text(
                                 '${block.sets.length} sets',
-                                style: AppTypography.labelSmall,
+                                style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
                               ),
                             ],
                           ),
@@ -296,18 +315,18 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                               return Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: AppColors.accentCyan.withValues(alpha: 0.12),
+                                  color: context.accent.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                                  border: Border.all(color: AppColors.accentCyan.withValues(alpha: 0.3)),
+                                  border: Border.all(color: context.accent.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
                                   '${s.weight} ${unit.name} × ${s.reps}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: AppTypography.fontFamily,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                    fontFeatures: [FontFeature.tabularFigures()],
+                                    color: context.textPrimary,
+                                    fontFeatures: const [FontFeature.tabularFigures()],
                                   ),
                                 ),
                               );

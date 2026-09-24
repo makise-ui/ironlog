@@ -57,11 +57,11 @@ class _CopySessionSheetState extends ConsumerState<CopySessionSheet> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Color(0xF00D0F18),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+      decoration: BoxDecoration(
+        color: context.sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
         border: Border(
-          top: BorderSide(color: AppColors.glassBorderLight, width: 1.5),
+          top: BorderSide(color: context.sheetBorder, width: 1.5),
         ),
       ),
       child: Column(
@@ -72,7 +72,7 @@ class _CopySessionSheetState extends ConsumerState<CopySessionSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: context.handleBar,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -83,26 +83,31 @@ class _CopySessionSheetState extends ConsumerState<CopySessionSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Copy Previous Session', style: AppTypography.titleLarge),
+                Text(
+                  'Copy Previous Session',
+                  style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                  icon: Icon(Icons.close_rounded, color: context.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.glassBorderDim),
+          Divider(height: 1, color: context.cardBorder),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.accentCyan))
+                ? Center(child: CircularProgressIndicator(color: context.accent))
                 : _pastWorkouts.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No previous workouts found to copy.',
-                          style: TextStyle(color: AppColors.textTertiary),
+                          style: TextStyle(color: context.textTertiary),
                         ),
                       )
                     : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                        cacheExtent: 600,
                         padding: const EdgeInsets.all(AppSpacing.md),
                         itemCount: _pastWorkouts.length,
                         itemBuilder: (context, index) {
@@ -129,26 +134,26 @@ class _CopySessionSheetState extends ConsumerState<CopySessionSheet> {
                                     children: [
                                       Text(
                                         w.title,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontFamily: AppTypography.fontFamily,
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary,
+                                          color: context.textPrimary,
                                         ),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         '${AppDateUtils.formatFullDate(w.date)} • ${w.exercises.length} exercises • ${w.totalSetsCount} sets',
-                                        style: AppTypography.labelSmall,
+                                        style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
                                       ),
                                       if (exNames.isNotEmpty) ...[
                                         const SizedBox(height: 2),
                                         Text(
                                           exNames + (w.exercises.length > 3 ? '...' : ''),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontFamily: AppTypography.fontFamily,
                                             fontSize: 11,
-                                            color: AppColors.textTertiary,
+                                            color: context.textTertiary,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -157,7 +162,7 @@ class _CopySessionSheetState extends ConsumerState<CopySessionSheet> {
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textTertiary),
+                                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textTertiary),
                               ],
                             ),
                           );

@@ -10,6 +10,8 @@ class E1rmCalculator {
     return weight * (1.0 + (reps / 30.0));
   }
 
+  static double calculate(double weight, int reps) => calculateEpley(weight, reps);
+
   /// Calculates session volume = sum(weight * reps)
   /// If [isPerHand] is true, multiplies load x 2.
   static double calculateSetVolume(double weight, int reps, {bool isPerHand = false}) {

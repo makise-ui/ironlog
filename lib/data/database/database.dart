@@ -35,10 +35,56 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON;');
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_we_workout_id ON workout_exercises(workout_id);',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_sets_we_id ON sets(workout_exercise_id);',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_sets_exercise_date ON sets(exercise_id, date);',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_sets_muscle_group_date ON sets(muscle_group_id, date);',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);',
+          );
+
+          // Ensure all seed exercises exist in database (supports newly added defaults)
+          for (final ex in SeedData.exercises) {
+            await into(exercises).insert(
+              ExercisesCompanion.insert(
+                id: ex.id,
+                name: ex.name,
+                muscleGroupId: ex.muscleGroupId,
+                secondaryGroups: Value(ex.secondaryGroups),
+                equipment: ex.equipment,
+                loadMode: Value(ex.loadMode),
+                isUnilateral: Value(ex.isUnilateral),
+                weightStep: Value(ex.weightStep),
+                repMin: Value(ex.repMin),
+                repMax: Value(ex.repMax),
+                restSeconds: Value(ex.restSeconds),
+                isCustom: const Value(false),
+                archived: const Value(false),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
+          }
+        },
         onCreate: (m) async {
           await m.createAll();
 
           // Create explicit indexes for performance
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_we_workout_id ON workout_exercises(workout_id);',
+          );
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_sets_we_id ON sets(workout_exercise_id);',
+          );
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_sets_exercise_date ON sets(exercise_id, date);',
           );

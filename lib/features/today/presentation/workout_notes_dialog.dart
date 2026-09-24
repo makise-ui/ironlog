@@ -27,7 +27,13 @@ class _WorkoutNotesDialogState extends State<WorkoutNotesDialog> {
   late TextEditingController _noteController;
   int? _selectedFeel;
 
-  final List<String> _feelEmojis = ['😫', '😕', '😐', '🙂', '🔥'];
+  final List<IconData> _feelIcons = [
+    Icons.sentiment_very_dissatisfied_rounded,
+    Icons.sentiment_dissatisfied_rounded,
+    Icons.sentiment_neutral_rounded,
+    Icons.sentiment_satisfied_rounded,
+    Icons.local_fire_department_rounded,
+  ];
   final List<String> _feelLabels = ['Exhausted', 'Tough', 'Decent', 'Strong', 'Unstoppable'];
 
   @override
@@ -48,10 +54,10 @@ class _WorkoutNotesDialogState extends State<WorkoutNotesDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: const Color(0xF0121626),
+      backgroundColor: context.cardBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        side: const BorderSide(color: AppColors.glassBorderLight),
+        side: BorderSide(color: context.cardBorder),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
@@ -59,21 +65,28 @@ class _WorkoutNotesDialogState extends State<WorkoutNotesDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Workout Details & Feel', style: AppTypography.titleLarge),
+            Text(
+              'Workout Details & Feel',
+              style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+            ),
             const SizedBox(height: AppSpacing.md),
 
             // Title
             TextField(
               controller: _titleController,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: context.textPrimary),
               decoration: InputDecoration(
                 labelText: 'Session Title',
-                labelStyle: const TextStyle(color: AppColors.textTertiary),
+                labelStyle: TextStyle(color: context.textTertiary),
                 filled: true,
-                fillColor: AppColors.glassFillActive,
+                fillColor: context.inputBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  borderSide: const BorderSide(color: AppColors.glassBorderDim),
+                  borderSide: BorderSide(color: context.inputBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  borderSide: BorderSide(color: context.inputBorder),
                 ),
               ),
             ),
@@ -83,62 +96,80 @@ class _WorkoutNotesDialogState extends State<WorkoutNotesDialog> {
             TextField(
               controller: _noteController,
               maxLines: 3,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: context.textPrimary),
               decoration: InputDecoration(
                 labelText: 'Notes (energy, injuries, form notes)',
-                labelStyle: const TextStyle(color: AppColors.textTertiary),
+                labelStyle: TextStyle(color: context.textTertiary),
                 filled: true,
-                fillColor: AppColors.glassFillActive,
+                fillColor: context.inputBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  borderSide: const BorderSide(color: AppColors.glassBorderDim),
+                  borderSide: BorderSide(color: context.inputBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  borderSide: BorderSide(color: context.inputBorder),
                 ),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
 
             // Feel selector (1 to 5)
-            const Text('How did this session feel?', style: AppTypography.labelMedium),
+            Text(
+              'How did this session feel?',
+              style: AppTypography.labelMedium.copyWith(color: context.textSecondary),
+            ),
             const SizedBox(height: AppSpacing.xs),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(5, (index) {
                 final feelValue = index + 1;
                 final isSelected = _selectedFeel == feelValue;
-                return GestureDetector(
-                  onTap: () {
-                    AppHaptics.step();
-                    setState(() => _selectedFeel = feelValue);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.accentCyan.withValues(alpha: 0.2)
-                          : AppColors.glassTileFill,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      border: Border.all(
-                        color: isSelected ? AppColors.accentCyan : AppColors.glassBorderDim,
-                        width: 1.5,
-                      ),
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: index == 0 ? 0 : 3,
+                      right: index == 4 ? 0 : 3,
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          _feelEmojis[index],
-                          style: const TextStyle(fontSize: 22),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _feelLabels[index],
-                          style: TextStyle(
-                            fontFamily: AppTypography.fontFamily,
-                            fontSize: 9,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                            color: isSelected ? AppColors.accentCyan : AppColors.textTertiary,
+                    child: GestureDetector(
+                      onTap: () {
+                        AppHaptics.step();
+                        setState(() => _selectedFeel = feelValue);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? context.accent.withValues(alpha: context.isDark ? 0.20 : 0.12)
+                              : context.chipBg,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? context.accent : context.chipBorder,
+                            width: isSelected ? 1.5 : 1.0,
                           ),
                         ),
-                      ],
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _feelIcons[index],
+                              size: 20,
+                              color: isSelected ? context.accent : context.textSecondary,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _feelLabels[index],
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 8.5,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                                color: isSelected ? context.textPrimary : context.textTertiary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 );

@@ -80,6 +80,10 @@ class SeedData {
     SeedExercise(id: 'ex_c_18', name: 'Chest Dips', muscleGroupId: 'chest', secondaryGroups: 'triceps,shoulders', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 2.5, repMin: 6, repMax: 12, restSeconds: 90),
     SeedExercise(id: 'ex_c_19', name: 'Assisted Chest Dips', muscleGroupId: 'chest', secondaryGroups: 'triceps', equipment: 'assisted', loadMode: 'assisted', weightStep: 5.0, repMin: 8, repMax: 12, restSeconds: 75),
     SeedExercise(id: 'ex_c_20', name: 'Svend Press', muscleGroupId: 'chest', equipment: 'dumbbell', weightStep: 2.5, repMin: 12, repMax: 20, restSeconds: 60),
+    SeedExercise(id: 'ex_c_21', name: 'Incline Push-Ups', muscleGroupId: 'chest', secondaryGroups: 'triceps,shoulders', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 12, repMax: 20, restSeconds: 60),
+    SeedExercise(id: 'ex_c_22', name: 'Decline Push-Ups', muscleGroupId: 'chest', secondaryGroups: 'shoulders,triceps', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 10, repMax: 20, restSeconds: 60),
+    SeedExercise(id: 'ex_c_23', name: 'Knee Push-Ups', muscleGroupId: 'chest', secondaryGroups: 'triceps', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 10, repMax: 20, restSeconds: 45),
+    SeedExercise(id: 'ex_c_24', name: 'Wide-Grip Push-Ups', muscleGroupId: 'chest', secondaryGroups: 'shoulders', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 10, repMax: 20, restSeconds: 60),
 
     // --- BACK (22) ---
     SeedExercise(id: 'ex_b_01', name: 'Conventional Deadlift', muscleGroupId: 'back', secondaryGroups: 'legs,glutes,core', equipment: 'barbell', weightStep: 5.0, repMin: 4, repMax: 8, restSeconds: 180),
@@ -104,8 +108,9 @@ class SeedData {
     SeedExercise(id: 'ex_b_20', name: 'Barbell Shrugs', muscleGroupId: 'back', secondaryGroups: 'forearms', equipment: 'barbell', weightStep: 5.0, repMin: 10, repMax: 15, restSeconds: 60),
     SeedExercise(id: 'ex_b_21', name: 'Dumbbell Shrugs', muscleGroupId: 'back', secondaryGroups: 'forearms', equipment: 'dumbbell', loadMode: 'per_hand', weightStep: 2.5, repMin: 10, repMax: 15, restSeconds: 60),
     SeedExercise(id: 'ex_b_22', name: 'Incline Dumbbell Row', muscleGroupId: 'back', secondaryGroups: 'biceps', equipment: 'dumbbell', loadMode: 'per_hand', weightStep: 2.5, repMin: 8, repMax: 12, restSeconds: 75),
+    SeedExercise(id: 'ex_b_23', name: 'Inverted Rows (Australian Pull-Ups)', muscleGroupId: 'back', secondaryGroups: 'biceps,core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 8, repMax: 15, restSeconds: 60),
 
-    // --- SHOULDERS (18) ---
+    // --- SHOULDERS (20) ---
     SeedExercise(id: 'ex_s_01', name: 'Overhead Barbell Press (OHP)', muscleGroupId: 'shoulders', secondaryGroups: 'triceps,core', equipment: 'barbell', weightStep: 2.5, repMin: 5, repMax: 8, restSeconds: 120),
     SeedExercise(id: 'ex_s_02', name: 'Seated Barbell Overhead Press', muscleGroupId: 'shoulders', secondaryGroups: 'triceps', equipment: 'barbell', weightStep: 2.5, repMin: 6, repMax: 10, restSeconds: 90),
     SeedExercise(id: 'ex_s_03', name: 'Standing Dumbbell Shoulder Press', muscleGroupId: 'shoulders', secondaryGroups: 'triceps', equipment: 'dumbbell', loadMode: 'per_hand', weightStep: 2.5, repMin: 8, repMax: 12, restSeconds: 90),
@@ -124,6 +129,8 @@ class SeedData {
     SeedExercise(id: 'ex_s_16', name: 'Dumbbell Upright Row', muscleGroupId: 'shoulders', equipment: 'dumbbell', loadMode: 'per_hand', weightStep: 2.5, repMin: 8, repMax: 12, restSeconds: 60),
     SeedExercise(id: 'ex_s_17', name: 'Landmine Press', muscleGroupId: 'shoulders', secondaryGroups: 'triceps,chest', equipment: 'barbell', isUnilateral: true, weightStep: 2.5, repMin: 8, repMax: 12, restSeconds: 60),
     SeedExercise(id: 'ex_s_18', name: 'Shoulder Press Machine', muscleGroupId: 'shoulders', secondaryGroups: 'triceps', equipment: 'machine', weightStep: 5.0, repMin: 8, repMax: 12, restSeconds: 75),
+    SeedExercise(id: 'ex_s_19', name: 'Pike Push-Ups', muscleGroupId: 'shoulders', secondaryGroups: 'triceps,core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 8, repMax: 15, restSeconds: 60),
+    SeedExercise(id: 'ex_s_20', name: 'Handstand Push-Ups', muscleGroupId: 'shoulders', secondaryGroups: 'triceps,core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 4, repMax: 10, restSeconds: 90),
 
     // --- BICEPS (14) ---
     SeedExercise(id: 'ex_bi_01', name: 'Barbell Bicep Curl', muscleGroupId: 'biceps', secondaryGroups: 'forearms', equipment: 'barbell', weightStep: 2.5, repMin: 8, repMax: 12, restSeconds: 75),
@@ -182,6 +189,10 @@ class SeedData {
     SeedExercise(id: 'ex_l_20', name: 'Step-Ups', muscleGroupId: 'legs', secondaryGroups: 'glutes', equipment: 'dumbbell', loadMode: 'per_hand', isUnilateral: true, weightStep: 2.5, repMin: 10, repMax: 14, restSeconds: 60),
     SeedExercise(id: 'ex_l_21', name: 'Box Squat', muscleGroupId: 'legs', secondaryGroups: 'glutes', equipment: 'barbell', weightStep: 5.0, repMin: 6, repMax: 10, restSeconds: 120),
     SeedExercise(id: 'ex_l_22', name: 'Nordic Hamstring Curl', muscleGroupId: 'legs', secondaryGroups: 'glutes', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 4, repMax: 8, restSeconds: 90),
+    SeedExercise(id: 'ex_l_23', name: 'Bodyweight Squats (Air Squats)', muscleGroupId: 'legs', secondaryGroups: 'glutes,core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 15, repMax: 30, restSeconds: 45),
+    SeedExercise(id: 'ex_l_24', name: 'Bodyweight Walking Lunges', muscleGroupId: 'legs', secondaryGroups: 'glutes', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 12, repMax: 20, restSeconds: 45),
+    SeedExercise(id: 'ex_l_25', name: 'Bodyweight Calf Raises', muscleGroupId: 'legs', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 20, repMax: 35, restSeconds: 30),
+    SeedExercise(id: 'ex_l_26', name: 'Jump Squats', muscleGroupId: 'legs', secondaryGroups: 'glutes,cardio', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 10, repMax: 20, restSeconds: 60),
 
     // --- GLUTES (14) ---
     SeedExercise(id: 'ex_g_01', name: 'Barbell Hip Thrust', muscleGroupId: 'glutes', secondaryGroups: 'legs', equipment: 'barbell', weightStep: 5.0, repMin: 8, repMax: 12, restSeconds: 120),
@@ -216,6 +227,9 @@ class SeedData {
     SeedExercise(id: 'ex_cr_14', name: 'Captain\'s Chair Knee Raise', muscleGroupId: 'core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 12, repMax: 20, restSeconds: 45),
     SeedExercise(id: 'ex_cr_15', name: 'Mountain Climbers', muscleGroupId: 'core', secondaryGroups: 'cardio', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 20, repMax: 40, restSeconds: 30),
     SeedExercise(id: 'ex_cr_16', name: 'L-Sit', muscleGroupId: 'core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 15, repMax: 30, restSeconds: 60),
+    SeedExercise(id: 'ex_cr_17', name: 'Bodyweight Crunches', muscleGroupId: 'core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 15, repMax: 30, restSeconds: 30),
+    SeedExercise(id: 'ex_cr_18', name: 'Sit-Ups', muscleGroupId: 'core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 15, repMax: 25, restSeconds: 45),
+    SeedExercise(id: 'ex_cr_19', name: 'Flutter Kicks', muscleGroupId: 'core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 20, repMax: 40, restSeconds: 30),
 
     // --- FOREARMS (10) ---
     SeedExercise(id: 'ex_fa_01', name: 'Barbell Wrist Curl', muscleGroupId: 'forearms', equipment: 'barbell', weightStep: 2.5, repMin: 12, repMax: 20, restSeconds: 45),
@@ -240,6 +254,8 @@ class SeedData {
     SeedExercise(id: 'ex_cd_08', name: 'Battle Ropes', muscleGroupId: 'cardio', secondaryGroups: 'shoulders,core', equipment: 'other', weightStep: 0.0, repMin: 30, repMax: 60, restSeconds: 45),
     SeedExercise(id: 'ex_cd_09', name: 'Assault AirBike', muscleGroupId: 'cardio', secondaryGroups: 'legs', equipment: 'machine', weightStep: 0.0, repMin: 10, repMax: 20, restSeconds: 60),
     SeedExercise(id: 'ex_cd_10', name: 'Burpees', muscleGroupId: 'cardio', secondaryGroups: 'chest,legs,core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 10, repMax: 25, restSeconds: 45),
+    SeedExercise(id: 'ex_cd_11', name: 'Jumping Jacks', muscleGroupId: 'cardio', secondaryGroups: 'legs,shoulders', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 30, repMax: 60, restSeconds: 30),
+    SeedExercise(id: 'ex_cd_12', name: 'High Knees', muscleGroupId: 'cardio', secondaryGroups: 'legs,core', equipment: 'bodyweight', loadMode: 'bodyweight', weightStep: 0.0, repMin: 30, repMax: 60, restSeconds: 30),
   ];
 
   static const List<Map<String, dynamic>> defaultRoutines = [

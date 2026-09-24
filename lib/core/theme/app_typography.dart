@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 
 class AppTypography {
   AppTypography._();
 
   static const String fontFamily = 'Inter';
+  static const String fontFamilyDisplay = 'Manrope';
 
-  // Headings
+  // Headings (Inherits theme ambient color: #0F172A in light mode, #F4F6FA in dark mode)
   static const TextStyle displayLarge = TextStyle(
     fontFamily: fontFamily,
     fontSize: 32,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.8,
-    color: AppColors.textPrimary,
     height: 1.2,
   );
 
@@ -21,7 +20,6 @@ class AppTypography {
     fontSize: 26,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.5,
-    color: AppColors.textPrimary,
     height: 1.25,
   );
 
@@ -30,7 +28,6 @@ class AppTypography {
     fontSize: 20,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.3,
-    color: AppColors.textPrimary,
     height: 1.3,
   );
 
@@ -39,7 +36,6 @@ class AppTypography {
     fontSize: 16,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.2,
-    color: AppColors.textPrimary,
     height: 1.35,
   );
 
@@ -47,7 +43,6 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 15,
     fontWeight: FontWeight.w400,
-    color: AppColors.textPrimary,
     height: 1.4,
   );
 
@@ -55,7 +50,6 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 13,
     fontWeight: FontWeight.w400,
-    color: AppColors.textSecondary,
     height: 1.4,
   );
 
@@ -64,7 +58,6 @@ class AppTypography {
     fontSize: 12,
     fontWeight: FontWeight.w500,
     letterSpacing: 0.2,
-    color: AppColors.textSecondary,
   );
 
   static const TextStyle labelSmall = TextStyle(
@@ -72,7 +65,6 @@ class AppTypography {
     fontSize: 11,
     fontWeight: FontWeight.w500,
     letterSpacing: 0.3,
-    color: AppColors.textTertiary,
   );
 
   // Tabular Numbers for weights, reps, timers, metrics
@@ -81,7 +73,6 @@ class AppTypography {
     fontSize: 48,
     fontWeight: FontWeight.w700,
     letterSpacing: -1.0,
-    color: AppColors.textPrimary,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
@@ -90,7 +81,6 @@ class AppTypography {
     fontSize: 36,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.5,
-    color: AppColors.textPrimary,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
@@ -99,7 +89,6 @@ class AppTypography {
     fontSize: 24,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.2,
-    color: AppColors.textPrimary,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
@@ -107,7 +96,6 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 16,
     fontWeight: FontWeight.w500,
-    color: AppColors.textPrimary,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 
@@ -115,7 +103,6 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 13,
     fontWeight: FontWeight.w500,
-    color: AppColors.textSecondary,
     fontFeatures: [FontFeature.tabularFigures()],
   );
 }

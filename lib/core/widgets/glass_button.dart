@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'scale_tap.dart';
 
 enum GlassButtonStyle { primary, secondary, danger, ghost }
 
@@ -27,109 +27,107 @@ class GlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Decoration decoration;
-    Color textColor = AppColors.textPrimary;
+    Color textColor;
 
     switch (style) {
       case GlassButtonStyle.primary:
         decoration = BoxDecoration(
-          gradient: AppColors.accentGradientHorizontal,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          color: context.accent,
+          borderRadius: BorderRadius.circular(14.0),
           boxShadow: [
             BoxShadow(
-              color: AppColors.accentViolet.withValues(alpha: 0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: context.accent.withValues(alpha: isDark ? 0.22 : 0.18),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         );
-        textColor = Colors.white;
+        textColor = context.onAccent;
         break;
 
       case GlassButtonStyle.secondary:
         decoration = BoxDecoration(
-          color: AppColors.glassFillActive,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          color: context.cardElevated,
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(
             width: 1.0,
-            color: AppColors.glassBorderLight,
+            color: context.cardBorder,
           ),
         );
-        textColor = AppColors.textPrimary;
+        textColor = context.textPrimary;
         break;
 
       case GlassButtonStyle.danger:
         decoration = BoxDecoration(
-          color: AppColors.error.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          color: AppColors.error.withValues(alpha: isDark ? 0.16 : 0.08),
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(
             width: 1.0,
-            color: AppColors.error.withValues(alpha: 0.4),
+            color: AppColors.error.withValues(alpha: isDark ? 0.40 : 0.25),
           ),
         );
-        textColor = AppColors.error;
+        textColor = isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
         break;
 
       case GlassButtonStyle.ghost:
         decoration = BoxDecoration(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          borderRadius: BorderRadius.circular(12.0),
         );
-        textColor = AppColors.textSecondary;
+        textColor = context.textSecondary;
         break;
     }
+
+    final buttonContent = Container(
+      width: width,
+      height: height,
+      decoration: decoration,
+      child: Center(
+        child: isLoading
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(textColor),
+                ),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 18, color: textColor),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
+                  Text(
+                    text,
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
 
     return ConstrainedBox(
       constraints: BoxConstraints(
         minWidth: width ?? 0,
         minHeight: height,
       ),
-      child: Container(
-        width: width,
-        height: height,
-        decoration: decoration,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed != null && !isLoading
-                ? () {
-                    HapticFeedback.lightImpact();
-                    onPressed!();
-                  }
-                : null,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            child: Center(
-              child: isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (icon != null) ...[
-                          Icon(icon, size: 18, color: textColor),
-                          const SizedBox(width: AppSpacing.xs),
-                        ],
-                        Text(
-                          text,
-                          style: TextStyle(
-                            fontFamily: AppTypography.fontFamily,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ),
+      child: onPressed != null && !isLoading
+          ? ScaleTap(
+              onPressed: onPressed,
+              scaleDown: 0.97,
+              child: buttonContent,
+            )
+          : buttonContent,
     );
   }
 }

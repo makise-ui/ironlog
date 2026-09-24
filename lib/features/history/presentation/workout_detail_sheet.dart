@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/date_utils.dart';
@@ -28,11 +29,11 @@ class WorkoutDetailSheet extends ConsumerWidget {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Color(0xF00D0F18),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+      decoration: BoxDecoration(
+        color: context.sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
         border: Border(
-          top: BorderSide(color: AppColors.glassBorderLight, width: 1.5),
+          top: BorderSide(color: context.sheetBorder, width: 1.5),
         ),
       ),
       child: Column(
@@ -43,7 +44,7 @@ class WorkoutDetailSheet extends ConsumerWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: context.handleBar,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -60,27 +61,34 @@ class WorkoutDetailSheet extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(workout.title, style: AppTypography.titleLarge),
+                      Text(
+                        workout.title,
+                        style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                      ),
                       const SizedBox(height: 2),
                       Text(
                         '${AppDateUtils.formatFullDate(workout.date)} • ${UnitConverter.formatWeight(workout.totalVolume, unit: unit)} • ${workout.totalSetsCount} sets',
-                        style: AppTypography.labelSmall,
+                        style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                  icon: Icon(Icons.close_rounded, color: context.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.glassBorderDim),
+          Divider(height: 1, color: context.cardBorder),
 
           // Exercises & sets breakdown
           Expanded(
             child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              cacheExtent: 600,
               padding: const EdgeInsets.all(AppSpacing.md),
               itemCount: activeExercises.length,
               itemBuilder: (context, index) {
@@ -95,18 +103,23 @@ class WorkoutDetailSheet extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            exItem.exercise.name,
-                            style: const TextStyle(
-                              fontFamily: AppTypography.fontFamily,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                          Expanded(
+                            child: Text(
+                              exItem.exercise.name,
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: context.textPrimary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             '${activeSets.length} sets',
-                            style: AppTypography.labelSmall,
+                            style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
                           ),
                         ],
                       ),
@@ -119,12 +132,12 @@ class WorkoutDetailSheet extends ConsumerWidget {
                           3: FlexColumnWidth(),
                         },
                         children: [
-                          const TableRow(
+                          TableRow(
                             children: [
-                              Text('SET', style: AppTypography.labelSmall),
-                              Text('WEIGHT', style: AppTypography.labelSmall),
-                              Text('REPS', style: AppTypography.labelSmall),
-                              Text('e1RM', style: AppTypography.labelSmall),
+                              Text('SET', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
+                              Text('WEIGHT', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
+                              Text('REPS', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
+                              Text('e1RM', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
                             ],
                           ),
                           ...activeSets.map((s) {
@@ -139,7 +152,7 @@ class WorkoutDetailSheet extends ConsumerWidget {
                                       fontWeight: FontWeight.w700,
                                       color: s.setType == SetType.warmup
                                           ? AppColors.warmupSet
-                                          : AppColors.textSecondary,
+                                          : context.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -147,10 +160,10 @@ class WorkoutDetailSheet extends ConsumerWidget {
                                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Text(
                                     UnitConverter.formatWeight(s.weight, unit: unit),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: AppTypography.fontFamily,
-                                      color: AppColors.textPrimary,
-                                      fontFeatures: [FontFeature.tabularFigures()],
+                                      color: context.textPrimary,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
                                     ),
                                   ),
                                 ),
@@ -158,10 +171,10 @@ class WorkoutDetailSheet extends ConsumerWidget {
                                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Text(
                                     '${s.reps}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: AppTypography.fontFamily,
-                                      color: AppColors.textPrimary,
-                                      fontFeatures: [FontFeature.tabularFigures()],
+                                      color: context.textPrimary,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
                                     ),
                                   ),
                                 ),
@@ -169,10 +182,10 @@ class WorkoutDetailSheet extends ConsumerWidget {
                                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Text(
                                     UnitConverter.formatWeight(s.e1rm, unit: unit),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: AppTypography.fontFamily,
-                                      color: AppColors.accentCyan,
-                                      fontFeatures: [FontFeature.tabularFigures()],
+                                      color: context.accent,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
                                     ),
                                   ),
                                 ),
@@ -188,29 +201,47 @@ class WorkoutDetailSheet extends ConsumerWidget {
             ),
           ),
 
-          // Delete session button
+          // Actions: Edit / Log Sets & Delete
           Padding(
             padding: EdgeInsets.only(
               left: AppSpacing.md,
               right: AppSpacing.md,
               bottom: MediaQuery.of(context).padding.bottom + AppSpacing.md,
             ),
-            child: GlassButton(
-              text: 'Delete Workout',
-              icon: Icons.delete_outline_rounded,
-              style: GlassButtonStyle.danger,
-              onPressed: () async {
-                AppHaptics.warning();
-                final repo = ref.read(workoutRepositoryProvider);
-                await repo.updateWorkoutMeta(workoutId: workout.id, title: workout.title);
-                // Soft delete by setting archived = true
-                await ref.read(databaseProvider).customStatement(
-                  'UPDATE workouts SET archived = 1 WHERE id = ?;',
-                  [workout.id],
-                );
-                onWorkoutModified();
-                if (context.mounted) Navigator.of(context).pop();
-              },
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: GlassButton(
+                    text: 'Edit / Log Sets',
+                    icon: Icons.edit_note_rounded,
+                    style: GlassButtonStyle.primary,
+                    onPressed: () {
+                      AppHaptics.tap();
+                      ref.read(selectedWorkoutDateProvider.notifier).state =
+                          AppDateUtils.normalizeDate(workout.date);
+                      Navigator.of(context).pop();
+                      context.go('/today');
+                    },
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  flex: 2,
+                  child: GlassButton(
+                    text: 'Delete',
+                    icon: Icons.delete_outline_rounded,
+                    style: GlassButtonStyle.danger,
+                    onPressed: () async {
+                      AppHaptics.warning();
+                      final repo = ref.read(workoutRepositoryProvider);
+                      await repo.deleteWorkout(workout.id);
+                      onWorkoutModified();
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         ],

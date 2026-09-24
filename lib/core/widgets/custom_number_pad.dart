@@ -22,32 +22,33 @@ class CustomNumberPad extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildRow(['1', '2', '3']),
+        _buildRow(context, ['1', '2', '3']),
         const SizedBox(height: AppSpacing.xs),
-        _buildRow(['4', '5', '6']),
+        _buildRow(context, ['4', '5', '6']),
         const SizedBox(height: AppSpacing.xs),
-        _buildRow(['7', '8', '9']),
+        _buildRow(context, ['7', '8', '9']),
         const SizedBox(height: AppSpacing.xs),
-        _buildBottomRow(),
+        _buildBottomRow(context),
       ],
     );
   }
 
-  Widget _buildRow(List<String> digits) {
+  Widget _buildRow(BuildContext context, List<String> digits) {
     return Row(
       children: digits.map((digit) {
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: _buildKey(
+              context: context,
               child: Text(
                 digit,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppTypography.fontFamily,
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  color: context.textPrimary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               onTap: () {
@@ -61,7 +62,7 @@ class CustomNumberPad extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomRow() {
+  Widget _buildBottomRow(BuildContext context) {
     return Row(
       children: [
         // Decimal button
@@ -70,13 +71,14 @@ class CustomNumberPad extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: showDecimal
                 ? _buildKey(
-                    child: const Text(
+                    context: context,
+                    child: Text(
                       '.',
                       style: TextStyle(
                         fontFamily: AppTypography.fontFamily,
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: context.textPrimary,
                       ),
                     ),
                     onTap: () {
@@ -92,14 +94,15 @@ class CustomNumberPad extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: _buildKey(
-              child: const Text(
+              context: context,
+              child: Text(
                 '0',
                 style: TextStyle(
                   fontFamily: AppTypography.fontFamily,
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  color: context.textPrimary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               onTap: () {
@@ -114,10 +117,11 @@ class CustomNumberPad extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
             child: _buildKey(
-              child: const Icon(
+              context: context,
+              child: Icon(
                 Icons.backspace_outlined,
                 size: 22,
-                color: AppColors.textPrimary,
+                color: context.textPrimary,
               ),
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -137,6 +141,7 @@ class CustomNumberPad extends StatelessWidget {
   }
 
   Widget _buildKey({
+    required BuildContext context,
     required Widget child,
     required VoidCallback onTap,
     VoidCallback? onLongPress,
@@ -144,11 +149,11 @@ class CustomNumberPad extends StatelessWidget {
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        color: AppColors.glassFillActive,
+        color: context.keypadBg,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(
           width: 1.0,
-          color: AppColors.glassBorderDim,
+          color: context.keypadBorder,
         ),
       ),
       child: Material(
@@ -157,8 +162,8 @@ class CustomNumberPad extends StatelessWidget {
           onTap: onTap,
           onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          splashColor: AppColors.accentCyan.withValues(alpha: 0.15),
-          highlightColor: Colors.white.withValues(alpha: 0.05),
+          splashColor: context.accent.withValues(alpha: 0.15),
+          highlightColor: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
           child: Center(child: child),
         ),
       ),
