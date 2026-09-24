@@ -11,9 +11,11 @@ void main() {
     expect(data['prs_count'], greaterThan(0));
 
     final jsonStr = const JsonEncoder.withIndent('  ').convert(data);
-    final file = File('/home/kurisu/gym-app/sample_growth_timeline_90days.json');
+    final tempDir = await Directory.systemTemp.createTemp('ironlog_test');
+    final file = File('${tempDir.path}/sample_growth_timeline_90days.json');
     await file.writeAsString(jsonStr);
     expect(file.existsSync(), isTrue);
-    print('Sample file successfully generated at: ${file.path} (${file.lengthSync()} bytes)');
+    expect(file.lengthSync(), greaterThan(100));
+    await tempDir.delete(recursive: true);
   });
 }
