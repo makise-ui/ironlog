@@ -36,4 +36,38 @@ class SettingsRepository {
   Future<void> setIncludeWarmupInVolume(bool value) async {
     await setSetting('include_warmup_volume', value.toString());
   }
+
+  Future<String> getThemeMode() async {
+    return await getSetting('theme_mode') ?? 'dark';
+  }
+
+  Future<void> setThemeMode(String mode) async {
+    await setSetting('theme_mode', mode);
+  }
+
+  Future<String> getAccentPreset() async {
+    return await getSetting('accent_preset') ?? 'cobalt';
+  }
+
+  Future<void> setAccentPreset(String preset) async {
+    await setSetting('accent_preset', preset);
+  }
+
+  Future<bool> getAiNotificationsEnabled() async {
+    final val = await getSetting('ai_notifications_enabled');
+    return val != 'false'; // default true
+  }
+
+  Future<void> setAiNotificationsEnabled(bool value) async {
+    await setSetting('ai_notifications_enabled', value.toString());
+  }
+
+  Future<bool> getAiSuggestionsEnabled() async {
+    final val = await getSetting('ai_suggestions_enabled');
+    return val != 'false'; // default true
+  }
+
+  Future<void> setAiSuggestionsEnabled(bool value) async {
+    await setSetting('ai_suggestions_enabled', value.toString());
+  }
 }

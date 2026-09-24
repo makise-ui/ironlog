@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/haptics.dart';
+import '../../../core/widgets/bouncy_pressable.dart';
 import '../../../data/providers.dart';
 
 class RestTimerOverlay extends ConsumerWidget {
@@ -22,6 +23,7 @@ class RestTimerOverlay extends ConsumerWidget {
     final mins = rem ~/ 60;
     final secs = rem % 60;
     final timeStr = '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
@@ -31,19 +33,19 @@ class RestTimerOverlay extends ConsumerWidget {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Container(
-              height: 58,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              height: 60,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: const Color(0xDD121626),
+                color: isDark ? const Color(0xF5141620) : Colors.white.withValues(alpha: 0.96),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                 border: Border.all(
-                  color: AppColors.accentCyan.withValues(alpha: 0.5),
-                  width: 1.2,
+                  color: isDark ? const Color(0xFF262B3B) : const Color(0xFFE2E4EE),
+                  width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.accentCyan.withValues(alpha: 0.2),
-                    blurRadius: 20,
+                    color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -60,14 +62,14 @@ class RestTimerOverlay extends ConsumerWidget {
                         child: CircularProgressIndicator(
                           value: state.progress,
                           strokeWidth: 3.5,
-                          backgroundColor: Colors.white.withValues(alpha: 0.1),
-                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentCyan),
+                          backgroundColor: isDark ? const Color(0xFF1E212D) : const Color(0xFFE2E4EE),
+                          valueColor: AlwaysStoppedAnimation<Color>(context.accent),
                         ),
                       ),
                       Icon(
-                        state.isPaused ? Icons.pause_rounded : Icons.timer_outlined,
+                        Icons.timer_outlined,
                         size: 18,
-                        color: AppColors.accentCyan,
+                        color: context.accent,
                       ),
                     ],
                   ),
@@ -81,20 +83,22 @@ class RestTimerOverlay extends ConsumerWidget {
                       children: [
                         Text(
                           timeStr,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTypography.fontFamily,
                             fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                            fontFeatures: [FontFeature.tabularFigures()],
+                            fontWeight: FontWeight.w800,
+                            color: context.textPrimary,
+                            letterSpacing: -0.3,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                         Text(
                           state.exerciseName.isNotEmpty ? state.exerciseName : 'Rest Timer',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: AppTypography.fontFamily,
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                            color: context.textSecondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -104,31 +108,26 @@ class RestTimerOverlay extends ConsumerWidget {
                   ),
 
                   // Controls: -30s, +30s, Pause/Play, Skip
-                  _buildIconButton(
+                  _buildAdjustmentPill(
                     label: '-30s',
+                    context: context,
                     onTap: () {
                       AppHaptics.step();
                       timerService.addSeconds(-30);
                     },
                   ),
-                  const SizedBox(width: 4),
-                  _buildIconButton(
+                  const SizedBox(width: 5),
+                  _buildAdjustmentPill(
                     label: '+30s',
+                    context: context,
                     onTap: () {
                       AppHaptics.step();
                       timerService.addSeconds(30);
                     },
                   ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: Icon(
-                      state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                      color: AppColors.textPrimary,
-                      size: 22,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    onPressed: () {
+                  const SizedBox(width: 6),
+                  BouncyPressable(
+                    onTap: () {
                       AppHaptics.tap();
                       if (state.isPaused) {
                         timerService.resume();
@@ -136,15 +135,47 @@ class RestTimerOverlay extends ConsumerWidget {
                         timerService.pause();
                       }
                     },
+                    scaleDown: 0.88,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.chipBg,
+                        border: Border.all(color: context.chipBorder),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                          color: context.textPrimary,
+                          size: 18,
+                        ),
+                      ),
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    onPressed: () {
+                  const SizedBox(width: 4),
+                  BouncyPressable(
+                    onTap: () {
                       AppHaptics.tap();
                       timerService.stop();
                     },
+                    scaleDown: 0.88,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.chipBg,
+                        border: Border.all(color: context.chipBorder),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: context.textTertiary,
+                          size: 16,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -155,26 +186,28 @@ class RestTimerOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildIconButton({required String label, required VoidCallback onTap}) {
-    return GestureDetector(
+  Widget _buildAdjustmentPill({required String label, required BuildContext context, required VoidCallback onTap}) {
+    return BouncyPressable(
       onTap: onTap,
+      scaleDown: 0.90,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          border: Border.all(color: AppColors.glassBorderDim),
+          color: context.chipBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: context.chipBorder),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: AppTypography.fontFamily,
             fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            color: context.textPrimary,
           ),
         ),
       ),
     );
   }
 }
+

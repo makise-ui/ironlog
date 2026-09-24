@@ -10,6 +10,10 @@ import '../../../core/widgets/glass_button.dart';
 import '../../../domain/models/exercise_model.dart';
 import '../../../domain/services/weight_step_learner.dart';
 import '../../../data/providers.dart';
+import 'custom_exercise_dialog.dart';
+import 'rename_exercise_dialog.dart';
+import 'widgets/exercise_visual_thumbnail.dart';
+import 'widgets/exercise_guide_sheet.dart';
 
 class ExercisePickerSheet extends ConsumerStatefulWidget {
   final String workoutId;
@@ -79,14 +83,84 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
     return results.map((r) => r.item).toList();
   }
 
+  static String _inferMuscleGroup(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('run') || lower.contains('walk') || lower.contains('bike') ||
+        lower.contains('cycl') || lower.contains('swim') || lower.contains('cardio') ||
+        lower.contains('jump') || lower.contains('hiit') || lower.contains('row') ||
+        lower.contains('football') || lower.contains('soccer') || lower.contains('basketball') ||
+        lower.contains('tennis') || lower.contains('badminton') || lower.contains('box') ||
+        lower.contains('game') || lower.contains('sport') || lower.contains('cricket') ||
+        lower.contains('rugby') || lower.contains('volleyball') || lower.contains('padel') ||
+        lower.contains('skat') || lower.contains('aerobic') || lower.contains('jog')) {
+      return 'cardio';
+    }
+    if (lower.contains('bench') || lower.contains('chest') || lower.contains('fly') ||
+        lower.contains('pushup') || lower.contains('push-up') || lower.contains('pec') ||
+        lower.contains('dip')) {
+      return 'chest';
+    }
+    if (lower.contains('squat') || lower.contains('leg') || lower.contains('quad') ||
+        lower.contains('hamstring') || lower.contains('calf') || lower.contains('calves') ||
+        lower.contains('lunge') || lower.contains('hack')) {
+      return 'legs';
+    }
+    if (lower.contains('deadlift') || lower.contains('pull') || lower.contains('lat') ||
+        lower.contains('chin') || lower.contains('back') || lower.contains('shrug')) {
+      return 'back';
+    }
+    if (lower.contains('shoulder') || lower.contains('overhead') || lower.contains('military') ||
+        lower.contains('lateral') || lower.contains('delt') || lower.contains('arnold') ||
+        lower.contains('press')) {
+      return 'shoulders';
+    }
+    if (lower.contains('curl') || lower.contains('bicep')) {
+      return 'biceps';
+    }
+    if (lower.contains('tricep') || lower.contains('skull') || lower.contains('pushdown') ||
+        lower.contains('extension')) {
+      return 'triceps';
+    }
+    if (lower.contains('crunch') || lower.contains('plank') || lower.contains('ab') ||
+        lower.contains('situp') || lower.contains('core')) {
+      return 'core';
+    }
+    if (lower.contains('glute') || lower.contains('hip') || lower.contains('thrust')) {
+      return 'glutes';
+    }
+    if (lower.contains('wrist') || lower.contains('forearm') || lower.contains('grip')) {
+      return 'forearms';
+    }
+    return 'cardio';
+  }
+
+  static EquipmentType _inferEquipment(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('dumbbell') || lower.contains('db')) return EquipmentType.dumbbell;
+    if (lower.contains('barbell') || lower.contains('bb')) return EquipmentType.barbell;
+    if (lower.contains('cable')) return EquipmentType.cable;
+    if (lower.contains('machine') || lower.contains('smith')) return EquipmentType.machine;
+    if (lower.contains('bodyweight') || lower.contains('pushup') || lower.contains('pullup') ||
+        lower.contains('run') || lower.contains('walk') || lower.contains('game') ||
+        lower.contains('football') || lower.contains('basketball')) {
+      return EquipmentType.bodyweight;
+    }
+    return EquipmentType.other;
+  }
+
   Future<void> _createCustomExercise(String name) async {
     AppHaptics.save();
     final newId = const Uuid().v4();
+    final resolvedMuscleGroup = _selectedMuscleGroupId ?? _inferMuscleGroup(name);
+    final resolvedEquipment = _inferEquipment(name);
+    final isBw = resolvedEquipment == EquipmentType.bodyweight;
     final newExercise = ExerciseModel(
       id: newId,
       name: name,
-      muscleGroupId: _selectedMuscleGroupId ?? 'chest',
-      equipment: EquipmentType.other,
+      muscleGroupId: resolvedMuscleGroup,
+      equipment: resolvedEquipment,
+      loadMode: isBw ? LoadMode.bodyweight : LoadMode.total,
+      weightStep: isBw ? 0.0 : 2.5,
       isCustom: true,
     );
 
@@ -104,11 +178,11 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Color(0xF00D0F18),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+      decoration: BoxDecoration(
+        color: context.sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
         border: Border(
-          top: BorderSide(color: AppColors.glassBorderLight, width: 1.5),
+          top: BorderSide(color: context.sheetBorder, width: 1.5),
         ),
       ),
       child: Column(
@@ -120,7 +194,7 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: context.handleBar,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -133,10 +207,41 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Select Exercise', style: AppTypography.titleLarge),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
-                  onPressed: () => Navigator.of(context).pop(),
+                Text(
+                  'Select Exercise',
+                  style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                ),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        AppHaptics.tap();
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => CustomExerciseDialog(
+                            initialMuscleGroupId: _selectedMuscleGroupId,
+                            onCreated: (newEx) {
+                              widget.onExerciseSelected(newEx);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.add_rounded, size: 18, color: context.accent),
+                      label: Text(
+                        'Custom',
+                        style: TextStyle(
+                          color: context.accent,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: context.textSecondary),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -147,25 +252,25 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.glassFillActive,
+                color: context.inputBg,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                border: Border.all(color: AppColors.glassBorderLight),
+                border: Border.all(color: context.inputBorder),
               ),
               child: TextField(
                 controller: _searchController,
                 autofocus: false,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppTypography.fontFamily,
-                  color: AppColors.textPrimary,
+                  color: context.textPrimary,
                   fontSize: 15,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Search or type new exercise...',
-                  hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accentCyan),
+                  hintStyle: TextStyle(color: context.textTertiary, fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: context.accent),
                   suffixIcon: query.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18, color: AppColors.textTertiary),
+                          icon: Icon(Icons.clear_rounded, size: 18, color: context.textTertiary),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {});
@@ -187,6 +292,7 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                 height: 44,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
                   children: [
                     _buildFilterChip('All', null),
@@ -199,13 +305,16 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
             error: (_, _) => const SizedBox(height: 44),
           ),
 
-          const Divider(height: 1, color: AppColors.glassBorderDim),
+          Divider(height: 1, color: context.cardBorder),
 
           // Exercise List
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.accentCyan))
+                ? Center(child: CircularProgressIndicator(color: context.accent))
                 : ListView.builder(
+                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    cacheExtent: 300,
                     padding: const EdgeInsets.all(AppSpacing.md),
                     itemCount: filtered.length + (query.isNotEmpty && !hasExactMatch ? 1 : 0),
                     itemBuilder: (context, index) {
@@ -213,11 +322,30 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                       if (query.isNotEmpty && !hasExactMatch && index == 0) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: GlassButton(
-                            text: 'Create custom exercise "$query"',
-                            icon: Icons.add_circle_outline_rounded,
-                            style: GlassButtonStyle.secondary,
-                            onPressed: () => _createCustomExercise(query),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              GlassButton(
+                                text: 'Create custom exercise / game "$query"',
+                                icon: Icons.add_circle_outline_rounded,
+                                style: GlassButtonStyle.primary,
+                                onPressed: () => _createCustomExercise(query),
+                              ),
+                              if (filtered.isEmpty) ...[
+                                const SizedBox(height: 12),
+                                Center(
+                                  child: Text(
+                                    'No catalog exercise found matching "$query".\nTap above to add it as a custom exercise or game!',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: context.textTertiary,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         );
                       }
@@ -228,50 +356,77 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                       return GlassTile(
                         onTap: () {
                           AppHaptics.tap();
-                          widget.onExerciseSelected(ex);
-                          Navigator.of(context).pop();
+                          ExerciseGuideSheet.show(
+                            context,
+                            ex,
+                            () {
+                              widget.onExerciseSelected(ex);
+                              Navigator.of(context).pop();
+                            },
+                          );
                         },
                         child: Row(
                           children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: AppColors.accentCyan.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                              ),
-                              child: const Icon(
-                                Icons.fitness_center_rounded,
-                                size: 20,
-                                color: AppColors.accentCyan,
-                              ),
+                            ExerciseVisualThumbnail(
+                              exerciseName: ex.name,
+                              muscleGroupId: ex.muscleGroupId,
+                              equipment: ex.equipment.name,
+                              size: 46,
                             ),
-                            const SizedBox(width: AppSpacing.md),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    ex.name,
-                                    style: const TextStyle(
-                                      fontFamily: AppTypography.fontFamily,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          ex.name,
+                                          style: TextStyle(
+                                            fontFamily: AppTypography.fontFamily,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: context.textPrimary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${ex.equipment.name.toUpperCase()} • ${ex.repMin}-${ex.repMax} reps • ${ex.restSeconds}s rest',
-                                    style: AppTypography.labelSmall,
+                                    style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
                                   ),
                                 ],
                               ),
                             ),
-                            const Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              size: 14,
-                              color: AppColors.textTertiary,
+                            // Quick Add button for experienced users
+                            IconButton(
+                              icon: Icon(Icons.add_circle_outline_rounded, size: 22, color: context.accent),
+                              tooltip: 'Quick Add to Session',
+                              onPressed: () {
+                                AppHaptics.tap();
+                                widget.onExerciseSelected(ex);
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                            // Rename button
+                            IconButton(
+                              icon: Icon(Icons.edit_outlined, size: 16, color: context.textTertiary),
+                              tooltip: 'Rename / Custom Name',
+                              onPressed: () {
+                                AppHaptics.tap();
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => RenameExerciseDialog(
+                                    exercise: ex,
+                                    onRenamed: _loadExercises,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -293,13 +448,17 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
           AppHaptics.step();
           setState(() => _selectedMuscleGroupId = id);
         },
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.accentCyan.withValues(alpha: 0.2) : AppColors.glassTileFill,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+            color: isSelected
+                ? context.accent.withValues(alpha: context.isDark ? 0.20 : 0.12)
+                : context.chipBg,
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? AppColors.accentCyan : AppColors.glassBorderDim,
+              color: isSelected ? context.accent : context.chipBorder,
               width: 1.0,
             ),
           ),
@@ -308,8 +467,8 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
             style: TextStyle(
               fontFamily: AppTypography.fontFamily,
               fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? AppColors.accentCyan : AppColors.textSecondary,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? context.accent : context.textSecondary,
             ),
           ),
         ),

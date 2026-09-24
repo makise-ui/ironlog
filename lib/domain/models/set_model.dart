@@ -26,6 +26,8 @@ enum SetType {
     }
   }
 
+  String get label => displayName;
+
   String get shortCode {
     switch (this) {
       case SetType.warmup:

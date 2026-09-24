@@ -191,6 +191,16 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
     }
   }
 
+  Future<void> _deleteExistingSet() async {
+    if (widget.existingSetToEdit == null) return;
+    AppHaptics.warning();
+    final repo = ref.read(workoutRepositoryProvider);
+    await repo.deleteSet(widget.existingSetToEdit!.id);
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final unit = ref.watch(weightUnitNotifierProvider);
@@ -206,11 +216,11 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
     final isRepsGhost = _repsInput.isEmpty;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xF00D0F18),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+      decoration: BoxDecoration(
+        color: context.sheetBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
         border: Border(
-          top: BorderSide(color: AppColors.glassBorderLight, width: 1.5),
+          top: BorderSide(color: context.sheetBorder, width: 1.5),
         ),
       ),
       padding: EdgeInsets.only(
@@ -229,7 +239,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: context.handleBar,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -245,14 +255,14 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
                   children: [
                     Text(
                       widget.exercise.name,
-                      style: AppTypography.titleMedium,
+                      style: AppTypography.titleMedium.copyWith(color: context.textPrimary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Set ${widget.existingSetToEdit?.setIndex ?? widget.nextSetIndex} • Step ${_weightStep.toStringAsFixed(1)} ${unit.name}',
-                      style: AppTypography.labelSmall,
+                      style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
                     ),
                   ],
                 ),
@@ -318,13 +328,38 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
           ),
           const SizedBox(height: AppSpacing.md),
 
-          // Action Save Button
-          GlassButton(
-            text: widget.existingSetToEdit != null ? 'Update Set' : 'Log Set (Save)',
-            icon: Icons.check_circle_outline_rounded,
-            height: 52,
-            onPressed: _saveSet,
-          ),
+          // Action Save / Delete Buttons
+          if (widget.existingSetToEdit != null)
+            Row(
+              children: [
+                Expanded(
+                  child: GlassButton(
+                    text: 'Delete Set',
+                    icon: Icons.delete_outline_rounded,
+                    style: GlassButtonStyle.danger,
+                    height: 52,
+                    onPressed: _deleteExistingSet,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  flex: 2,
+                  child: GlassButton(
+                    text: 'Update Set',
+                    icon: Icons.check_circle_outline_rounded,
+                    height: 52,
+                    onPressed: _saveSet,
+                  ),
+                ),
+              ],
+            )
+          else
+            GlassButton(
+              text: 'Log Set (Save)',
+              icon: Icons.check_circle_outline_rounded,
+              height: 52,
+              onPressed: _saveSet,
+            ),
         ],
       ),
     );
@@ -353,7 +388,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
             fontFamily: AppTypography.fontFamily,
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? color : AppColors.textTertiary,
+            color: isSelected ? color : context.textTertiary,
           ),
         ),
       ),
@@ -375,11 +410,13 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.glassFillActive : AppColors.glassFill,
+          color: isActive
+              ? (context.isDark ? AppColors.glassFillActive : const Color(0xFFF1F5F9))
+              : context.inputBg,
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           border: Border.all(
             width: 1.5,
-            color: isActive ? AppColors.accentCyan : AppColors.glassBorderLight,
+            color: isActive ? context.accent : context.inputBorder,
           ),
         ),
         child: Column(
@@ -390,7 +427,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
                 fontFamily: AppTypography.fontFamily,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: isActive ? AppColors.accentCyan : AppColors.textTertiary,
+                color: isActive ? context.accent : context.textTertiary,
                 letterSpacing: 0.5,
               ),
             ),
@@ -398,7 +435,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
             Text(
               displayValue.isEmpty ? '0' : displayValue,
               style: AppTypography.numberDisplay.copyWith(
-                color: isGhost ? AppColors.textTertiary : AppColors.textPrimary,
+                color: isGhost ? context.textTertiary : context.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
@@ -436,22 +473,22 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: context.isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            border: Border.all(color: AppColors.glassBorderDim),
+            border: Border.all(color: context.cardBorder),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: AppColors.textPrimary),
+              Icon(icon, size: 14, color: context.textPrimary),
               const SizedBox(width: 2),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppTypography.fontFamily,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: context.textPrimary,
                 ),
               ),
             ],

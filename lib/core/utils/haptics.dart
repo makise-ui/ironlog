@@ -7,12 +7,32 @@ class AppHaptics {
     HapticFeedback.selectionClick();
   }
 
+  static void selection() {
+    HapticFeedback.selectionClick();
+  }
+
   static void tap() {
     HapticFeedback.lightImpact();
   }
 
   static void save() {
     HapticFeedback.mediumImpact();
+  }
+
+  static void mediumImpact() {
+    HapticFeedback.mediumImpact();
+  }
+
+  static void success() {
+    HapticFeedback.mediumImpact();
+  }
+
+  static void heavy() {
+    HapticFeedback.heavyImpact();
+  }
+
+  static void pr() {
+    HapticFeedback.heavyImpact();
   }
 
   static void prCelebration() {

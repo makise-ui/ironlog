@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/tokens.dart';
+import 'data/providers.dart';
 import 'domain/services/rest_timer_service.dart';
+import 'domain/services/app_notification_service.dart';
+import 'domain/services/home_widget_service.dart';
 import 'routes/app_router.dart';
+
+import 'features/intro/presentation/intro_3d_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,11 +27,14 @@ void main() async {
     ),
   );
 
-  // Initialize notifications gracefully
+  // Initialize notifications & Android home screen widgets gracefully
   try {
     await RestTimerService.instance.initialize();
+    await AppNotificationService.instance.initialize();
+    await AppNotificationService.instance.requestPermissions();
+    await HomeWidgetService.init();
   } catch (e) {
-    debugPrint('RestTimer init warning: $e');
+    debugPrint('Service init warning: $e');
   }
 
   runApp(
@@ -41,14 +50,39 @@ class IronLogApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    // Watch accent preset so MaterialApp updates when accent changes
+    ref.watch(accentPresetProvider);
+
+    final platformBrightness = MediaQuery.platformBrightnessOf(context);
+    C.isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system && platformBrightness == Brightness.dark);
 
     return MaterialApp.router(
       title: 'IronLog',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      scrollBehavior: const AppScrollBehavior(),
+      theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) {
+        return Intro3DOverlay(child: child ?? const SizedBox.shrink());
+      },
     );
+  }
+}
+
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) {
+    return child;
   }
 }

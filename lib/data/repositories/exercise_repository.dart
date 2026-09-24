@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import '../database/database.dart';
 import '../../domain/models/exercise_model.dart';
 import '../../domain/services/weight_step_learner.dart';
+import '../../domain/services/backup_service.dart';
 
 class ExerciseRepository {
   final AppDatabase _db;
@@ -109,6 +110,7 @@ class ExerciseRepository {
         archived: Value(model.archived),
       ),
     );
+    BackupService.scheduleAutoBackup(_db);
   }
 
   Future<void> updateExercise(ExerciseModel model) async {
@@ -127,12 +129,14 @@ class ExerciseRepository {
         archived: Value(model.archived),
       ),
     );
+    BackupService.scheduleAutoBackup(_db);
   }
 
   Future<void> archiveExercise(String id, bool archive) async {
     await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
       ExercisesCompanion(archived: Value(archive)),
     );
+    BackupService.scheduleAutoBackup(_db);
   }
 
   /// Retrieves past logged weights for an exercise to learn weight_step
@@ -142,5 +146,50 @@ class ExerciseRepository {
       ..orderBy([(t) => OrderingTerm(expression: t.date)]);
     final list = await query.get();
     return list.map((s) => s.weight).toList();
+  }
+
+  /// Sets a custom name or renames an exercise
+  Future<void> renameExercise(String id, String newName) async {
+    if (newName.trim().isEmpty) return;
+    await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
+      ExercisesCompanion(
+        name: Value(newName.trim()),
+      ),
+    );
+    BackupService.scheduleAutoBackup(_db);
+  }
+
+  /// Creates and persists a custom exercise
+  Future<ExerciseModel> createCustomExercise({
+    required String name,
+    required String muscleGroupId,
+    EquipmentType equipment = EquipmentType.barbell,
+    LoadMode? loadMode,
+    double? weightStep,
+    int repMin = 8,
+    int repMax = 12,
+    int restSeconds = 90,
+  }) async {
+    final newId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+    final isBw = equipment == EquipmentType.bodyweight;
+    final resolvedLoadMode = loadMode ?? (isBw ? LoadMode.bodyweight : LoadMode.total);
+    final resolvedWeightStep = weightStep ?? (isBw ? 0.0 : 2.5);
+    final model = ExerciseModel(
+      id: newId,
+      name: name.trim(),
+      muscleGroupId: muscleGroupId,
+      secondaryGroups: const [],
+      equipment: equipment,
+      loadMode: resolvedLoadMode,
+      isUnilateral: false,
+      weightStep: resolvedWeightStep,
+      repMin: repMin,
+      repMax: repMax,
+      restSeconds: restSeconds,
+      isCustom: true,
+      archived: false,
+    );
+    await createExercise(model);
+    return model;
   }
 }

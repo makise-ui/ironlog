@@ -107,6 +107,10 @@ class WorkoutModel {
     return endedAt!.difference(startedAt!);
   }
 
+  bool get isRestDay =>
+      title.toLowerCase().contains('rest') &&
+      !title.toLowerCase().contains('restart');
+
   WorkoutModel copyWith({
     String? id,
     DateTime? date,

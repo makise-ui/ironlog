@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'scale_tap.dart';
 
 class GlassTile extends StatelessWidget {
   final Widget child;
@@ -32,13 +33,17 @@ class GlassTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final effectiveBorderColor = borderColor ??
         (isSelected
-            ? AppColors.accentCyan.withValues(alpha: 0.6)
-            : AppColors.glassBorderDim);
+            ? context.accent
+            : context.cardBorder);
 
     final effectiveFillColor = fillColor ??
-        (isSelected ? AppColors.glassFillActive : AppColors.glassTileFill);
+        (isSelected
+            ? context.accent.withValues(alpha: isDark ? 0.12 : 0.08)
+            : context.cardBg);
 
     Widget content = Container(
       width: width,
@@ -48,24 +53,38 @@ class GlassTile extends StatelessWidget {
         color: effectiveFillColor,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          width: 1.0,
+          width: isSelected ? 1.2 : 1.0,
           color: effectiveBorderColor,
         ),
+        boxShadow: isDark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [
+                const BoxShadow(
+                  color: Color(0x06000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
+              ],
       ),
       child: child,
     );
 
-    if (onTap != null || onLongPress != null) {
-      content = Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(radius),
-          splashColor: AppColors.accentCyan.withValues(alpha: 0.12),
-          highlightColor: Colors.white.withValues(alpha: 0.04),
-          child: content,
-        ),
+    if (onTap != null) {
+      content = ScaleTap(
+        onPressed: onTap,
+        scaleDown: 0.98,
+        child: content,
+      );
+    } else if (onLongPress != null) {
+      content = GestureDetector(
+        onLongPress: onLongPress,
+        child: content,
       );
     }
 

@@ -1,4 +1,9 @@
-enum WeightUnit { kg, lb }
+enum WeightUnit {
+  kg,
+  lb;
+
+  String get label => name;
+}
 
 class UnitConverter {
   UnitConverter._();

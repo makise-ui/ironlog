@@ -1,9 +1,11 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../database/database.dart';
+import '../database/seed_data.dart';
 import '../../domain/models/exercise_model.dart';
 import '../../domain/models/routine_model.dart';
 import '../../domain/services/weight_step_learner.dart';
+import '../../domain/services/backup_service.dart';
 
 class RoutineRepository {
   final AppDatabase _db;
@@ -105,6 +107,60 @@ class RoutineRepository {
       );
     }
 
+    BackupService.scheduleAutoBackup(_db);
     return routineId;
+  }
+
+  Future<void> updateRoutine({
+    required String routineId,
+    String? name,
+    String? description,
+    List<String>? exerciseIds,
+  }) async {
+    if (name != null || description != null) {
+      await (_db.update(_db.routines)..where((t) => t.id.equals(routineId))).write(
+        RoutinesCompanion(
+          name: name != null ? Value(name) : const Value.absent(),
+          description: description != null ? Value(description) : const Value.absent(),
+        ),
+      );
+    }
+
+    if (exerciseIds != null) {
+      await (_db.delete(_db.routineItems)..where((t) => t.routineId.equals(routineId))).go();
+      for (int i = 0; i < exerciseIds.length; i++) {
+        await _db.into(_db.routineItems).insert(
+          RoutineItemsCompanion.insert(
+            id: '${routineId}_item_${DateTime.now().millisecondsSinceEpoch}_$i',
+            routineId: routineId,
+            exerciseId: exerciseIds[i],
+            position: i,
+          ),
+        );
+      }
+    }
+    BackupService.scheduleAutoBackup(_db);
+  }
+
+  Future<void> deleteRoutine(String routineId) async {
+    await (_db.update(_db.routines)..where((t) => t.id.equals(routineId))).write(
+      const RoutinesCompanion(archived: Value(true)),
+    );
+    BackupService.scheduleAutoBackup(_db);
+  }
+
+  Future<void> restoreDefaultRoutines() async {
+    for (final routine in SeedData.defaultRoutines) {
+      final routineId = routine['id'] as String;
+      await (_db.update(_db.routines)..where((t) => t.id.equals(routineId))).write(
+        const RoutinesCompanion(archived: Value(false)),
+      );
+    }
+  }
+
+  Stream<List<RoutineModel>> watchRoutines() {
+    return (_db.select(_db.routines)..where((t) => t.archived.equals(false)))
+        .watch()
+        .asyncMap((_) => getRoutines());
   }
 }

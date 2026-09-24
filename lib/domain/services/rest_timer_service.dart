@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class RestTimerState {
@@ -53,7 +53,7 @@ class RestTimerState {
   }
 }
 
-class RestTimerService extends ChangeNotifier {
+class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
   static final RestTimerService instance = RestTimerService._();
   RestTimerService._();
 
@@ -61,8 +61,10 @@ class RestTimerService extends ChangeNotifier {
   bool _initialized = false;
   Timer? _ticker;
   RestTimerState _state = const RestTimerState();
+  bool _isAppInBackground = false;
 
   RestTimerState get state => _state;
+  bool get isAppInBackground => _isAppInBackground;
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -73,8 +75,26 @@ class RestTimerService extends ChangeNotifier {
     try {
       await _notifications.initialize(initSettings);
       _initialized = true;
+      WidgetsBinding.instance.addObserver(this);
     } catch (e) {
       debugPrint('Notification init warning: $e');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppInBackground = state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden;
+
+    if (_isAppInBackground) {
+      // If user minimized or switched away while resting, show status notification
+      if (_state.isActive && _state.endsAt != null && !_state.isPaused) {
+        _showBackgroundNotification(_state.endsAt!, _state.exerciseName);
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      // When user is back inside the app, suppress system notification
+      _cancelNotification();
     }
   }
 
@@ -101,7 +121,14 @@ class RestTimerService extends ChangeNotifier {
       isPaused: false,
     );
 
-    _scheduleNotification(endsAt, exerciseName);
+    // Never trigger a push notification when the user is inside the app logging sets.
+    // The in-app overlay handles the timer visually without interruptions.
+    if (_isAppInBackground) {
+      _showBackgroundNotification(endsAt, exerciseName);
+    } else {
+      _cancelNotification();
+    }
+
     _startTicker();
     notifyListeners();
   }
@@ -124,7 +151,9 @@ class RestTimerService extends ChangeNotifier {
         endsAt: newEndsAt,
         totalDurationSeconds: math.max(_state.totalDurationSeconds, newRemaining),
       );
-      _scheduleNotification(newEndsAt, _state.exerciseName);
+      if (_isAppInBackground) {
+        _showBackgroundNotification(newEndsAt, _state.exerciseName);
+      }
     }
 
     notifyListeners();
@@ -159,7 +188,9 @@ class RestTimerService extends ChangeNotifier {
       pausedRemainingSeconds: null,
     );
 
-    _scheduleNotification(newEndsAt, _state.exerciseName);
+    if (_isAppInBackground) {
+      _showBackgroundNotification(newEndsAt, _state.exerciseName);
+    }
     _startTicker();
     notifyListeners();
   }
@@ -176,7 +207,11 @@ class RestTimerService extends ChangeNotifier {
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_state.endsAt != null) {
         if (_state.endsAt!.isBefore(DateTime.now())) {
+          final finishedEx = _state.exerciseName;
           stop();
+          if (_isAppInBackground) {
+            _showRestFinishedNotification(finishedEx);
+          }
         } else {
           notifyListeners();
         }
@@ -184,10 +219,40 @@ class RestTimerService extends ChangeNotifier {
     });
   }
 
-  Future<void> _scheduleNotification(DateTime endsAt, String exerciseName) async {
+  Future<void> _showBackgroundNotification(DateTime endsAt, String exerciseName) async {
     if (!_initialized) return;
 
     try {
+      final name = exerciseName.isEmpty ? 'Exercise' : exerciseName;
+      final timeStr = '${endsAt.hour}:${endsAt.minute.toString().padLeft(2, '0')}';
+      const androidDetails = AndroidNotificationDetails(
+        'rest_timer_channel',
+        'Rest Timer',
+        channelDescription: 'Alerts when your rest interval is complete',
+        importance: Importance.low,
+        priority: Priority.low,
+        ongoing: true,
+        autoCancel: false,
+        showWhen: true,
+      );
+      const notificationDetails = NotificationDetails(android: androidDetails);
+
+      await _notifications.show(
+        1001,
+        'Resting for $name',
+        'Timer finishes at $timeStr',
+        notificationDetails,
+      );
+    } catch (e) {
+      debugPrint('Background notification error: $e');
+    }
+  }
+
+  Future<void> _showRestFinishedNotification(String exerciseName) async {
+    if (!_initialized) return;
+
+    try {
+      final name = exerciseName.isEmpty ? 'Your rest interval' : 'Rest for $exerciseName';
       const androidDetails = AndroidNotificationDetails(
         'rest_timer_channel',
         'Rest Timer',
@@ -196,18 +261,18 @@ class RestTimerService extends ChangeNotifier {
         priority: Priority.high,
         enableVibration: true,
         playSound: true,
+        autoCancel: true,
       );
       const notificationDetails = NotificationDetails(android: androidDetails);
 
-      // Show immediate rest started notification with countdown title
       await _notifications.show(
         1001,
-        'Resting for $exerciseName',
-        'Timer finishes at ${endsAt.hour}:${endsAt.minute.toString().padLeft(2, '0')}',
+        'Rest Complete!',
+        '$name is finished. Time for your next set!',
         notificationDetails,
       );
     } catch (e) {
-      debugPrint('Schedule notification error: $e');
+      debugPrint('Rest finished notification error: $e');
     }
   }
 
@@ -220,6 +285,7 @@ class RestTimerService extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     super.dispose();
   }

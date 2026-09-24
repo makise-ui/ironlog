@@ -20,26 +20,26 @@ class UndoSnackbar {
       SnackBar(
         duration: duration,
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xEE1E2433),
+        backgroundColor: context.cardElevated,
         elevation: 10,
         margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          side: const BorderSide(color: AppColors.glassBorderLight),
+          side: BorderSide(color: context.cardBorder),
         ),
         content: Row(
           children: [
-            const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.accentCyan),
+            Icon(Icons.info_outline_rounded, size: 20, color: context.accent),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AppTypography.fontFamily,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
+                  color: context.textPrimary,
                 ),
               ),
             ),
@@ -47,7 +47,7 @@ class UndoSnackbar {
         ),
         action: SnackBarAction(
           label: 'UNDO',
-          textColor: AppColors.accentCyan,
+          textColor: context.accent,
           onPressed: () {
             HapticFeedback.mediumImpact();
             onUndo();

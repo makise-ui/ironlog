@@ -5,30 +5,29 @@ import 'app_typography.dart';
 class GlassDecorations {
   GlassDecorations._();
 
-  static const double defaultBlur = 20.0;
-  static const double defaultRadius = AppSpacing.radiusLg; // 24
+  static const double defaultBlur = 16.0;
+  static const double defaultRadius = AppSpacing.radiusMd; // 16
 
   static BoxDecoration glassContainer({
     double radius = defaultRadius,
-    Color fillColor = AppColors.glassFill,
-    Color borderColorLight = AppColors.glassBorderLight,
-    Color borderColorDim = AppColors.glassBorderDim,
+    Color? fillColor,
+    Color? borderColor,
     double borderWidth = 1.0,
     List<BoxShadow>? shadows,
   }) {
     return BoxDecoration(
-      color: fillColor,
+      color: fillColor ?? AppColors.backgroundCard,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
         width: borderWidth,
-        color: borderColorLight,
+        color: borderColor ?? AppColors.glassBorderLight,
       ),
       boxShadow: shadows ??
           [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
     );
@@ -36,51 +35,55 @@ class GlassDecorations {
 
   static BoxDecoration glassTile({
     double radius = AppSpacing.radiusMd,
-    Color fillColor = AppColors.glassTileFill,
+    Color? fillColor,
     bool isSelected = false,
+    Color? selectedColor,
   }) {
+    final active = selectedColor ?? AppColors.activeAccentDark;
     return BoxDecoration(
-      color: isSelected ? AppColors.glassFillActive : fillColor,
+      color: isSelected
+          ? active.withValues(alpha: 0.12)
+          : (fillColor ?? AppColors.backgroundCard),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
         width: 1.0,
-        color: isSelected
-            ? AppColors.accentCyan.withValues(alpha: 0.5)
-            : AppColors.glassBorderDim,
+        color: isSelected ? active : AppColors.glassBorderLight,
       ),
     );
   }
 
   static BoxDecoration accentButton({
-    double radius = AppSpacing.radiusMd,
+    double radius = 12.0,
+    Color? color,
   }) {
+    final btnColor = color ?? AppColors.activeAccentDark;
     return BoxDecoration(
-      gradient: AppColors.accentGradientHorizontal,
+      color: btnColor,
       borderRadius: BorderRadius.circular(radius),
       boxShadow: [
         BoxShadow(
-          color: AppColors.accentViolet.withValues(alpha: 0.35),
-          blurRadius: 16,
-          offset: const Offset(0, 6),
+          color: btnColor.withValues(alpha: 0.25),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
         ),
       ],
     );
   }
 
-  static BoxDecoration pillNav() {
+  static BoxDecoration pillNav({bool isDark = true}) {
     return BoxDecoration(
-      color: const Color(0x220E121E),
+      color: isDark ? const Color(0xF2121520) : Colors.white.withValues(alpha: 0.95),
       borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
       border: Border.all(
         width: 1.0,
-        color: AppColors.glassBorderLight,
+        color: isDark ? AppColors.glassBorderLight : AppColors.lightBorder,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.6),
-          blurRadius: 32,
-          spreadRadius: 2,
-          offset: const Offset(0, 12),
+          color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+          blurRadius: 24,
+          spreadRadius: 0,
+          offset: const Offset(0, 8),
         ),
       ],
     );

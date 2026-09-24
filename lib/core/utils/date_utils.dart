@@ -17,6 +17,10 @@ class AppDateUtils {
     return DateTime(dt.year, dt.month, dt.day);
   }
 
+  static bool isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   static bool isToday(DateTime dt) {
     final now = DateTime.now();
     return dt.year == now.year && dt.month == now.month && dt.day == now.day;

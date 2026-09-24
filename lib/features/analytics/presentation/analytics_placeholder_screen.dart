@@ -15,9 +15,15 @@ class AnalyticsPlaceholderScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Analytics', style: AppTypography.displayMedium),
+            Text(
+              'Analytics',
+              style: AppTypography.displayMedium.copyWith(color: context.textPrimary),
+            ),
             const SizedBox(height: 2),
-            const Text('Deep charts, balance radar, and progression', style: AppTypography.labelSmall),
+            Text(
+              'Deep charts, balance radar, and progression',
+              style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
+            ),
             const SizedBox(height: AppSpacing.xl),
             Expanded(
               child: Center(
@@ -31,21 +37,24 @@ class AnalyticsPlaceholderScreen extends StatelessWidget {
                         height: 64,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.accentCyan.withValues(alpha: 0.15),
-                          border: Border.all(color: AppColors.accentCyan.withValues(alpha: 0.3)),
+                          color: context.accent.withValues(alpha: 0.15),
+                          border: Border.all(color: context.accent.withValues(alpha: 0.3)),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.insights_rounded,
                           size: 32,
-                          color: AppColors.accentCyan,
+                          color: context.accent,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      const Text('Deep Analytics', style: AppTypography.titleLarge),
+                      Text(
+                        'Deep Analytics',
+                        style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                      ),
                       const SizedBox(height: AppSpacing.xs),
-                      const Text(
+                      Text(
                         'Scheduled for Phase 2: e1RM trends, muscle split donut, balance radar, weekly heatmap, PR timeline & isolate processing.',
-                        style: AppTypography.bodyMedium,
+                        style: AppTypography.bodyMedium.copyWith(color: context.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                     ],
