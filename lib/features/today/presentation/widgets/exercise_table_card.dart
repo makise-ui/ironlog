@@ -984,47 +984,16 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           // Card Footer: + Add Set, Match Last Session, Warmup Ramp
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              children: [
-                BouncyPressable(
-                  onTap: () {
-                    AppHaptics.tap();
-                    setState(() {
-                      _customPlannedCount = _effectivePlannedCount + 1;
-                    });
-                  },
-                  scaleDown: 0.94,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_rounded, size: 16, color: context.accent),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Add Set',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: context.accent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (_prevSets.isNotEmpty) ...[
-                  const SizedBox(width: 4),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
                   BouncyPressable(
                     onTap: () {
-                      AppHaptics.selection();
+                      AppHaptics.tap();
                       setState(() {
-                        _customPlannedCount = _prevSets.length;
-                        for (int i = 0; i < _prevSets.length; i++) {
-                          _customGhostWeights[i + 1] = _prevSets[i].weight;
-                          _customGhostReps[i + 1] = _prevSets[i].reps;
-                          _customGhostTypes[i + 1] = _prevSets[i].setType;
-                        }
+                        _customPlannedCount = _effectivePlannedCount + 1;
                       });
                     },
                     scaleDown: 0.94,
@@ -1033,14 +1002,98 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.history_rounded, size: 14, color: context.textSecondary),
+                          Icon(Icons.add_rounded, size: 16, color: context.accent),
                           const SizedBox(width: 4),
                           Text(
-                            'Match Previous',
+                            'Add Set',
                             style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: context.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: context.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_prevSets.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    BouncyPressable(
+                      onTap: () {
+                        AppHaptics.selection();
+                        setState(() {
+                          _customPlannedCount = _prevSets.length;
+                          for (int i = 0; i < _prevSets.length; i++) {
+                            _customGhostWeights[i + 1] = _prevSets[i].weight;
+                            _customGhostReps[i + 1] = _prevSets[i].reps;
+                            _customGhostTypes[i + 1] = _prevSets[i].setType;
+                          }
+                        });
+                      },
+                      scaleDown: 0.94,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.history_rounded, size: 14, color: context.textSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Match Previous',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 6),
+                  BouncyPressable(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => WarmupCalculatorSheet(
+                          exercise: ex,
+                          targetWorkingWeight: nextGhostWeight,
+                          unit: widget.unit,
+                          onAddWarmupSets: (rampSets) async {
+                            final repo = ref.read(workoutRepositoryProvider);
+                            for (final rs in rampSets) {
+                              await repo.logSet(
+                                workoutExerciseId: widget.item.id,
+                                exerciseId: ex.id,
+                                muscleGroupId: ex.muscleGroupId,
+                                date: DateTime.now(),
+                                weight: rs.weight,
+                                reps: rs.reps,
+                                setType: SetType.warmup,
+                              );
+                            }
+                            widget.onRefresh();
+                          },
+                        ),
+                      );
+                    },
+                    scaleDown: 0.94,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.warmupSet),
+                          SizedBox(width: 4),
+                          Text(
+                            'Warmup Ramp',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.warmupSet,
                             ),
                           ),
                         ],
@@ -1048,56 +1101,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     ),
                   ),
                 ],
-                const Spacer(),
-                BouncyPressable(
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (ctx) => WarmupCalculatorSheet(
-                        exercise: ex,
-                        targetWorkingWeight: nextGhostWeight,
-                        unit: widget.unit,
-                        onAddWarmupSets: (rampSets) async {
-                          final repo = ref.read(workoutRepositoryProvider);
-                          for (final rs in rampSets) {
-                            await repo.logSet(
-                              workoutExerciseId: widget.item.id,
-                              exerciseId: ex.id,
-                              muscleGroupId: ex.muscleGroupId,
-                              date: DateTime.now(),
-                              weight: rs.weight,
-                              reps: rs.reps,
-                              setType: SetType.warmup,
-                            );
-                          }
-                          widget.onRefresh();
-                        },
-                      ),
-                    );
-                  },
-                  scaleDown: 0.94,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.warmupSet),
-                        SizedBox(width: 4),
-                        Text(
-                          'Warmup Ramp',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.warmupSet,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],

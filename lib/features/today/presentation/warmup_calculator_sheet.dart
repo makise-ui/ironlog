@@ -133,10 +133,12 @@ class _WarmupCalculatorSheetState extends State<WarmupCalculatorSheet> {
           top: BorderSide(color: context.sheetBorder, width: 1.5),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Drag handle
           Center(
             child: Container(
@@ -312,6 +314,7 @@ class _WarmupCalculatorSheetState extends State<WarmupCalculatorSheet> {
             },
           ),
         ],
+      ),
       ),
     );
   }

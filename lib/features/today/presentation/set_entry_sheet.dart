@@ -229,55 +229,67 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
         top: AppSpacing.md,
         bottom: MediaQuery.of(context).padding.bottom + AppSpacing.md,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.handleBar,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-
-          // Header
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.exercise.name,
-                      style: AppTypography.titleMedium.copyWith(color: context.textPrimary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Set ${widget.existingSetToEdit?.setIndex ?? widget.nextSetIndex} • Step ${_weightStep.toStringAsFixed(1)} ${unit.name}',
-                      style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
-                    ),
-                  ],
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.handleBar,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              // Set type selector
-              _buildSetTypeChip(SetType.warmup, 'Warmup', AppColors.warmupSet),
-              const SizedBox(width: 4),
-              _buildSetTypeChip(SetType.working, 'Working', AppColors.workingSet),
-              const SizedBox(width: 4),
-              _buildSetTypeChip(SetType.drop, 'Drop', AppColors.dropSet),
-              const SizedBox(width: 4),
-              _buildSetTypeChip(SetType.failure, 'Fail', AppColors.failureSet),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // Header
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.exercise.name,
+                        style: AppTypography.titleMedium.copyWith(color: context.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Set ${widget.existingSetToEdit?.setIndex ?? widget.nextSetIndex} • Step ${_weightStep.toStringAsFixed(1)} ${unit.name}',
+                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Set type selector
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildSetTypeChip(SetType.warmup, 'Warmup', AppColors.warmupSet),
+                      const SizedBox(width: 4),
+                      _buildSetTypeChip(SetType.working, 'Working', AppColors.workingSet),
+                      const SizedBox(width: 4),
+                      _buildSetTypeChip(SetType.drop, 'Drop', AppColors.dropSet),
+                      const SizedBox(width: 4),
+                      _buildSetTypeChip(SetType.failure, 'Fail', AppColors.failureSet),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
 
           // Dual Input Cards (Weight & Reps)
           Row(
@@ -361,6 +373,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
               onPressed: _saveSet,
             ),
         ],
+        ),
       ),
     );
   }

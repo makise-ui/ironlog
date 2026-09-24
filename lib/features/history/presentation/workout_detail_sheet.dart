@@ -64,6 +64,8 @@ class WorkoutDetailSheet extends ConsumerWidget {
                       Text(
                         workout.title,
                         style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(

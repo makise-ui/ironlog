@@ -97,13 +97,17 @@ class _CustomExerciseDialogState extends ConsumerState<CustomExerciseDialog> {
                     child: Icon(Icons.add_box_rounded, color: context.accent, size: 22),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    'Create Custom Exercise',
-                    style: TextStyle(
-                      fontFamily: AppTypography.fontFamilyDisplay,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: context.textPrimary,
+                  Expanded(
+                    child: Text(
+                      'Create Custom Exercise',
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamilyDisplay,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
