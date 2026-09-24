@@ -260,9 +260,13 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Workout Presets',
-                  style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                Expanded(
+                  child: Text(
+                    'Workout Presets',
+                    style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 Row(
                   mainAxisSize: MainAxisSize.min,

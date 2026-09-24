@@ -1806,15 +1806,19 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                'Daily Fuel & Nutrition',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: C.text1,
+                              Expanded(
+                                child: Text(
+                                  'Daily Fuel & Nutrition',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: C.text1,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 8),
                               Text(
                                 'AI Calibrated →',
                                 style: TextStyle(
@@ -2023,14 +2027,17 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                   color: _workout?.startedAt != null ? C.accent : C.text2,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  _workout?.startedAt != null ? _formatTimer(_elapsedDuration) : 'Ready',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: _workout?.startedAt != null ? C.accent : C.text2,
-                                    fontFeatures: const [FontFeature.tabularFigures()],
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _workout?.startedAt != null ? _formatTimer(_elapsedDuration) : 'Ready',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: _workout?.startedAt != null ? C.accent : C.text2,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
                                   ),
                                 ),
                               ],

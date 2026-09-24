@@ -217,17 +217,22 @@ class TodayHeroSessionCard extends StatelessWidget {
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    isFinished
-                        ? 'Reopen Workout Session'
-                        : (isActive
-                            ? (isPaused ? 'Resume Workout' : 'Continue Workout')
-                            : (isRestDay ? 'Log Workout Anyway' : 'Start Workout')),
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: C.onAccent,
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        isFinished
+                            ? 'Reopen Workout Session'
+                            : (isActive
+                                ? (isPaused ? 'Resume Workout' : 'Continue Workout')
+                                : (isRestDay ? 'Log Workout Anyway' : 'Start Workout')),
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: C.onAccent,
+                        ),
+                      ),
                     ),
                   ),
                 ],

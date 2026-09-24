@@ -67,7 +67,14 @@ class IronLogApp extends ConsumerWidget {
       themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) {
-        return Intro3DOverlay(child: child ?? const SizedBox.shrink());
+        final mq = MediaQuery.of(context);
+        final clampedData = mq.copyWith(
+          textScaler: mq.textScaler.clamp(minScaleFactor: 0.85, maxScaleFactor: 1.20),
+        );
+        return MediaQuery(
+          data: clampedData,
+          child: Intro3DOverlay(child: child ?? const SizedBox.shrink()),
+        );
       },
     );
   }

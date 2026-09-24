@@ -207,9 +207,13 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Select Exercise',
-                  style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                Expanded(
+                  child: Text(
+                    'Select Exercise',
+                    style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 Row(
                   children: [
