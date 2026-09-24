@@ -88,7 +88,6 @@ class WorkoutDetailSheet extends ConsumerWidget {
           Expanded(
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-              cacheExtent: 600,
               padding: const EdgeInsets.all(AppSpacing.md),
               itemCount: activeExercises.length,
               itemBuilder: (context, index) {

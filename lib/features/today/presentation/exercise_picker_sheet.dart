@@ -314,7 +314,6 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                 : ListView.builder(
                     physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                     keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                    cacheExtent: 300,
                     padding: const EdgeInsets.all(AppSpacing.md),
                     itemCount: filtered.length + (query.isNotEmpty && !hasExactMatch ? 1 : 0),
                     itemBuilder: (context, index) {
