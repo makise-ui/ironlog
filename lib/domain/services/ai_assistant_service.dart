@@ -375,7 +375,7 @@ TODAY'S WORKOUT LOG ($dateFormatted):
         } else {
           final setsDetail = activeSets.map((s) {
             final typeTag = s.setType.name != 'working' ? ' [${s.setType.name}]' : '';
-            return 'Set ${s.setIndex}: ${UnitConverter.formatWeight(s.weight, unit: unit)} × ${s.reps}$typeTag';
+            return 'Set ${s.setIndex}: ${s.formatPerformance(we.exercise.trackingType, unit: unit)}$typeTag';
           }).join(' | ');
           buffer.writeln("  • ${we.exercise.name}: $setsDetail");
         }
@@ -591,7 +591,10 @@ CRITICAL RULES FOR LOGGING WORKOUTS:
 5. Never log the same exercise twice in one session. If add_exercise says the exercise is already in the session, skip it and proceed.
 6. When starting a workout, call start_workout once, then call log_set for each set.
 7. You have real-time access to TODAY'S WORKOUT LOG injected below, as well as the `get_today_workout` tool. When the athlete asks what they did today, what is logged, their current volume/sets, or references their current session, inspect the injected TODAY'S WORKOUT LOG or call `get_today_workout`.
-8. BODYWEIGHT EXERCISES & SPORTS/GAMES: The app fully supports Push-Ups, Pull-Ups, Calisthenics, Bodyweight Squats, Dips, Planks, and non-equipment sports/games (e.g., Football, Basketball, Boxing, Running). For unweighted bodyweight exercises (like standard push-ups), set weight to 0.0 and reps to completed repetitions. If the user mentions added weight (e.g. "+10kg weighted push-ups"), set weight to 10.0. For sports and games (e.g., "played football for 45 mins"), call log_set with the sport/game name, weight 0.0, and reps (e.g. minutes played or sets completed) — it will automatically be created under CARDIO / BODYWEIGHT.
+8. ADAPTIVE EXERCISE TRACKING (BODYWEIGHT, ISOMETRIC HOLDS, SPORTS/GAMES):
+- Bodyweight Calisthenics (Push-Ups, Pull-Ups, Dips, Crunches): Set weight to 0.0 (or specify added load if weighted, e.g. 10.0 for "+10kg weighted dips") and reps to completed repetitions.
+- Timed Isometric Holds (Plank, Side Plank, Dead Hang, Wall Sit, L-Sit): Pass durationSeconds (or reps) in exact hold seconds (e.g. 60 for 60 seconds) and weight 0.0 (or added plate load).
+- Sports, Games & Cardio (Football, Basketball, Boxing, Running, Cycling, Swimming): Pass durationMinutes (or reps) representing session duration in minutes and weight 0.0. The app automatically creates the activity under CARDIO.
 9. HISTORICAL WORKOUTS & MUSCLE GROUP SEARCH: When asked about past workouts, previous sessions, or which sessions included specific muscle groups (e.g., "which sessions did I train Glutes?", "show my leg days", "what was my last back workout"), ALWAYS call query_workout_history(muscleGroup: "...", limit: 10). NEVER say "Let me check..." and pause — execute query_workout_history immediately so you can deliver the complete answer in a single turn.
 
 When asked to delete a logged workout, always inform the athlete that deleting a workout requires their explicit confirmation before it is removed.

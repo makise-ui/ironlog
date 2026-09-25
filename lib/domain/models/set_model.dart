@@ -1,4 +1,6 @@
+import '../../core/utils/unit_converter.dart';
 import '../services/e1rm_calculator.dart';
+import 'exercise_model.dart';
 
 enum SetType {
   warmup,
@@ -78,6 +80,40 @@ class SetModel {
 
   double get e1rm => E1rmCalculator.calculateEpley(weight, reps);
   double get volume => weight * reps;
+
+  /// Formats seconds into human-readable duration like '45s' or '1:15'
+  static String formatDuration(int seconds) {
+    if (seconds < 60) {
+      return '${seconds}s';
+    }
+    final mins = seconds ~/ 60;
+    final remSecs = seconds % 60;
+    return '$mins:${remSecs.toString().padLeft(2, '0')}';
+  }
+
+  /// Formatted duration string for hold-based or timed sets
+  String get formattedDuration => formatDuration(reps);
+
+  /// Formats performance representation based on the exercise's tracking type
+  String formatPerformance(ExerciseTrackingType trackingType, {WeightUnit unit = WeightUnit.kg}) {
+    switch (trackingType) {
+      case ExerciseTrackingType.duration:
+        final durStr = formatDuration(reps);
+        if (weight > 0) {
+          return '$durStr (+${UnitConverter.formatWeight(weight, unit: unit)})';
+        }
+        return durStr;
+      case ExerciseTrackingType.cardioTime:
+        return '$reps min';
+      case ExerciseTrackingType.bodyweightReps:
+        if (weight > 0) {
+          return '$reps reps (+${UnitConverter.formatWeight(weight, unit: unit)})';
+        }
+        return '$reps reps';
+      case ExerciseTrackingType.weightAndReps:
+        return '${UnitConverter.formatWeight(weight, unit: unit, includeUnit: false)} × $reps';
+    }
+  }
 
   SetModel copyWith({
     String? id,

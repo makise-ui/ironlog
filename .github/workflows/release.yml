@@ -98,13 +98,13 @@ jobs:
             release-artifacts/IronLog-release.aab
             release-artifacts/SHA256SUMS.txt
           body: |
-            ## 🚀 IronLog Release
+            ## IronLog Release
 
-            ### 📱 Which APK should I install?
-            * **⚡ Recommended (99% of Android phones):** `IronLog-arm64-v8a-release.apk` (**~21 MB** — fastest and smallest!)
-            * **🌐 Universal (Works on any Android phone):** `IronLog-universal-release.apk` (~80 MB)
-            * **📦 Google Play Store upload:** `IronLog-release.aab`
-            * **Old 32-bit devices:** `IronLog-armeabi-v7a-release.apk`
-            * **PC Emulators / Chromebooks:** `IronLog-x86_64-release.apk`
+            ### Android Packages
+            * **Recommended (64-bit ARM Android devices):** `IronLog-arm64-v8a-release.apk`
+            * **Universal (Compatible with all Android devices):** `IronLog-universal-release.apk`
+            * **Google Play Bundle:** `IronLog-release.aab`
+            * **Legacy 32-bit ARM devices:** `IronLog-armeabi-v7a-release.apk`
+            * **x86_64 Emulators and Chromebooks:** `IronLog-x86_64-release.apk`
 
-            Verify file integrity with `SHA256SUMS.txt`.
+            Package checksums are provided in `SHA256SUMS.txt`.

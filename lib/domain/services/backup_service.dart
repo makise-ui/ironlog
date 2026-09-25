@@ -12,6 +12,7 @@ import '../../data/database/database.dart';
 class BackupFileInfo {
   final String path;
   final DateTime modifiedAt;
+  final DateTime exportedAt;
   final int workoutCount;
   final int setCount;
   final String? athleteName;
@@ -22,13 +23,15 @@ class BackupFileInfo {
   BackupFileInfo({
     required this.path,
     required this.modifiedAt,
+    DateTime? exportedAt,
     required this.workoutCount,
     required this.setCount,
     this.athleteName,
     this.athleteWeight,
     this.weightUnit,
     String? displayDirectory,
-  }) : displayDirectory = displayDirectory ??
+  })  : exportedAt = exportedAt ?? modifiedAt,
+        displayDirectory = displayDirectory ??
             (path.contains('/') ? path.substring(0, path.lastIndexOf('/')) : path);
 }
 
@@ -132,6 +135,8 @@ class BackupService {
 
   /// Get primary user-visible persistent backup directory path for display in UI
   static Future<String> getPrimaryBackupDirectoryPath() async {
+    final existing = await findExistingBackup();
+    if (existing != null) return existing.displayDirectory;
     final dirs = await getPersistentDirectories();
     for (final dir in dirs) {
       if (dir.path.contains('/Documents/IronLog') || dir.path.contains('/Download/IronLog')) {
@@ -142,7 +147,10 @@ class BackupService {
   }
 
   /// Exports the entire database & user preferences to a JSON structure
-  static Future<Map<String, dynamic>> createBackupJson(AppDatabase db) async {
+  static Future<Map<String, dynamic>> createBackupJson(
+    AppDatabase db, {
+    bool stripSecrets = false,
+  }) async {
     final workouts = await db.select(db.workouts).get();
     final workoutExercises = await db.select(db.workoutExercises).get();
     final sets = await db.select(db.sets).get();
@@ -151,40 +159,45 @@ class BackupService {
     final routineItems = await db.select(db.routineItems).get();
     final settingsRows = await db.select(db.settings).get();
     final customExercises = await (db.select(db.exercises)..where((e) => e.isCustom.equals(true))).get();
+    final bodyMetrics = await db.select(db.bodyMetrics).get();
+    final achievements = await db.select(db.achievements).get();
+    final photos = await db.select(db.photos).get();
 
     final settingsMap = <String, String>{};
     for (final s in settingsRows) {
-      // Security: Strip live API keys and tokens from export to protect user secrets
-      if (s.k == 'ai_profiles_json') {
-        try {
-          final decoded = jsonDecode(s.v);
-          if (decoded is List) {
-            final sanitizedList = decoded.map((item) {
-              if (item is Map<String, dynamic>) {
-                final copy = Map<String, dynamic>.from(item);
-                copy['apiKey'] = ''; // Redact apiKey
-                return copy;
-              }
-              return item;
-            }).toList();
-            settingsMap[s.k] = jsonEncode(sanitizedList);
-            continue;
-          }
-        } catch (_) {}
-      } else if (s.k == 'ai_config_json') {
-        try {
-          final decoded = jsonDecode(s.v);
-          if (decoded is Map<String, dynamic>) {
-            final copy = Map<String, dynamic>.from(decoded);
-            copy['apiKey'] = ''; // Redact apiKey
-            settingsMap[s.k] = jsonEncode(copy);
-            continue;
-          }
-        } catch (_) {}
-      } else if (s.k.toLowerCase().contains('key') ||
-          s.k.toLowerCase().contains('secret') ||
-          s.k.toLowerCase().contains('token')) {
-        continue; // Skip any other sensitive tokens
+      if (stripSecrets) {
+        // Redact live API keys and tokens if requested for anonymous sharing
+        if (s.k == 'ai_profiles_json') {
+          try {
+            final decoded = jsonDecode(s.v);
+            if (decoded is List) {
+              final sanitizedList = decoded.map((item) {
+                if (item is Map<String, dynamic>) {
+                  final copy = Map<String, dynamic>.from(item);
+                  copy['apiKey'] = '';
+                  return copy;
+                }
+                return item;
+              }).toList();
+              settingsMap[s.k] = jsonEncode(sanitizedList);
+              continue;
+            }
+          } catch (_) {}
+        } else if (s.k == 'ai_config_json') {
+          try {
+            final decoded = jsonDecode(s.v);
+            if (decoded is Map<String, dynamic>) {
+              final copy = Map<String, dynamic>.from(decoded);
+              copy['apiKey'] = '';
+              settingsMap[s.k] = jsonEncode(copy);
+              continue;
+            }
+          } catch (_) {}
+        } else if (s.k.toLowerCase().contains('key') ||
+            s.k.toLowerCase().contains('secret') ||
+            s.k.toLowerCase().contains('token')) {
+          continue;
+        }
       }
       settingsMap[s.k] = s.v;
     }
@@ -242,6 +255,7 @@ class BackupService {
         'ended_at': w.endedAt?.toIso8601String(),
         'feel': w.feel,
         'note': w.note,
+        'routine_id': w.routineId,
         'archived': w.archived,
       }).toList(),
       'workout_exercises': workoutExercises.map((we) => {
@@ -291,6 +305,29 @@ class BackupService {
         'rep_max': ri.repMax,
         'rest_seconds': ri.restSeconds,
       }).toList(),
+      'body_metrics': bodyMetrics.map((b) => {
+        'id': b.id,
+        'date': b.date.toIso8601String(),
+        'metric_type': b.metricType,
+        'value': b.value,
+        'unit': b.unit,
+      }).toList(),
+      'achievements': achievements.map((a) => {
+        'id': a.id,
+        'code': a.code,
+        'title': a.title,
+        'description': a.description,
+        'unlocked_at': a.unlockedAt?.toIso8601String(),
+        'badge_icon': a.badgeIcon,
+      }).toList(),
+      'photos': photos.map((p) => {
+        'id': p.id,
+        'date': p.date.toIso8601String(),
+        'file_path': p.filePath,
+        'thumbnail_path': p.thumbnailPath,
+        'pose': p.pose,
+        'note': p.note,
+      }).toList(),
     };
   }
 
@@ -304,6 +341,12 @@ class BackupService {
         debugPrint('Scheduled auto-backup error: $e');
       }
     });
+  }
+
+  /// Cancels any pending scheduled debounced auto-backup
+  static void cancelPendingAutoBackup() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
   }
 
   /// Automatically backs up progress into phone storage (survives app uninstall)
@@ -361,9 +404,12 @@ class BackupService {
                 double.tryParse(settings['user_weight']?.toString() ?? '');
             final weightUnit = profile['weight_unit'] ?? settings['weight_unit'] ?? 'kg';
 
+            final exportedAt = DateTime.tryParse(data['exported_at']?.toString() ?? '') ?? stat.modified;
+
             final info = BackupFileInfo(
               path: file.path,
               modifiedAt: stat.modified,
+              exportedAt: exportedAt,
               workoutCount: workouts,
               setCount: sets,
               athleteName: athleteName?.toString(),
@@ -374,10 +420,10 @@ class BackupService {
 
             if (bestCandidate == null) {
               bestCandidate = info;
-            } else if (info.workoutCount > bestCandidate.workoutCount) {
+            } else if (info.exportedAt.isAfter(bestCandidate.exportedAt)) {
               bestCandidate = info;
-            } else if (info.workoutCount == bestCandidate.workoutCount &&
-                info.modifiedAt.isAfter(bestCandidate.modifiedAt)) {
+            } else if (info.exportedAt.isAtSameMomentAs(bestCandidate.exportedAt) &&
+                info.workoutCount > bestCandidate.workoutCount) {
               bestCandidate = info;
             }
           } catch (e) {
@@ -453,6 +499,9 @@ class BackupService {
       await db.delete(db.workoutExercises).go();
       await db.delete(db.workouts).go();
       await db.delete(db.prs).go();
+      await db.delete(db.bodyMetrics).go();
+      await db.delete(db.achievements).go();
+      await db.delete(db.photos).go();
 
       // 0. Custom Exercises if present
       for (final ex in customExList) {
@@ -478,6 +527,7 @@ class BackupService {
             endedAt: Value(w['ended_at'] != null ? DateTime.parse(w['ended_at']) : null),
             feel: Value(w['feel']),
             note: Value(w['note'] ?? w['notes']),
+            routineId: Value(w['routine_id']),
             archived: Value(w['archived'] ?? false),
           ),
         );
@@ -593,6 +643,50 @@ class BackupService {
           SettingsCompanion.insert(k: entry.key, v: val),
         );
       }
+      // 7. Body Metrics if present
+      final bodyMetricsList = (data['body_metrics'] as List? ?? []);
+      for (final b in bodyMetricsList) {
+        await db.into(db.bodyMetrics).insertOnConflictUpdate(
+          BodyMetricsCompanion.insert(
+            id: b['id'],
+            date: DateTime.parse(b['date']),
+            metricType: b['metric_type'],
+            value: (b['value'] as num).toDouble(),
+            unit: b['unit'] ?? 'kg',
+          ),
+        );
+      }
+
+      // 8. Achievements if present
+      final achievementsList = (data['achievements'] as List? ?? []);
+      for (final a in achievementsList) {
+        await db.into(db.achievements).insertOnConflictUpdate(
+          AchievementsCompanion.insert(
+            id: a['id'],
+            code: a['code'],
+            title: a['title'] ?? 'Achievement',
+            description: a['description'] ?? '',
+            unlockedAt: Value(a['unlocked_at'] != null ? DateTime.parse(a['unlocked_at']) : null),
+            badgeIcon: a['badge_icon'] ?? 'emoji_events',
+          ),
+        );
+      }
+
+      // 9. Photos if present
+      final photosList = (data['photos'] as List? ?? []);
+      for (final p in photosList) {
+        await db.into(db.photos).insertOnConflictUpdate(
+          PhotosCompanion.insert(
+            id: p['id'],
+            date: DateTime.parse(p['date']),
+            filePath: p['file_path'],
+            thumbnailPath: Value(p['thumbnail_path']),
+            pose: p['pose'] ?? 'front',
+            note: Value(p['note']),
+          ),
+        );
+      }
+
       // Ensure user is marked onboarded and initial restore checked
       await db.into(db.settings).insertOnConflictUpdate(
         SettingsCompanion.insert(k: 'user_onboarded', v: 'true'),
@@ -607,7 +701,7 @@ class BackupService {
 
   /// Export backup file using SharePlus sheet (save to Files, Google Drive, WhatsApp, etc.)
   static Future<void> exportBackupFile(AppDatabase db) async {
-    final jsonMap = await createBackupJson(db);
+    final jsonMap = await createBackupJson(db, stripSecrets: false);
     final jsonStr = jsonEncode(jsonMap);
 
     final tempDir = await getTemporaryDirectory();

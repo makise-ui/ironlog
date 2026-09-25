@@ -42,4 +42,19 @@ class AppHaptics {
   static void warning() {
     HapticFeedback.vibrate();
   }
+
+  static Future<void> timerWarning() async {
+    HapticFeedback.mediumImpact();
+    await Future.delayed(const Duration(milliseconds: 140));
+    HapticFeedback.mediumImpact();
+  }
+
+  static Future<void> timerFinished() async {
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 160));
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 160));
+    HapticFeedback.heavyImpact();
+  }
 }
+

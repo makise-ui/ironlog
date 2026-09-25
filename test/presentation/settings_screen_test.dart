@@ -8,10 +8,16 @@ import 'package:ironlog/data/providers.dart';
 import 'package:ironlog/data/database/database.dart';
 import 'package:drift/native.dart';
 
+import 'package:ironlog/domain/services/backup_service.dart';
+
 void main() {
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
+  });
+
+  tearDown(() {
+    BackupService.cancelPendingAutoBackup();
   });
 
   testWidgets('pump SettingsScreen and verify sections', (tester) async {
@@ -41,6 +47,7 @@ void main() {
     expect(find.text('APPEARANCE & THEME'), findsOneWidget);
     expect(find.text('DATABASE & PERFORMANCE'), findsOneWidget);
     expect(find.text('ABOUT IRONLOG'), findsOneWidget);
+    BackupService.cancelPendingAutoBackup();
   });
 
   testWidgets('pump AiSettingsScreen and verify profiles list', (tester) async {
@@ -70,7 +77,8 @@ void main() {
     expect(find.text('ACTIVE PROFILE'), findsOneWidget);
     expect(find.text('Add Profile'), findsWidgets);
     expect(find.textContaining('AVAILABLE PROFILES'), findsOneWidget);
-    expect(find.text('Default AI Coach'), findsWidgets);
+    expect(find.textContaining('Default AI Coach'), findsWidgets);
+    BackupService.cancelPendingAutoBackup();
   });
 }
 

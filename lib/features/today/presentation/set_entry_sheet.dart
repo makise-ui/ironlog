@@ -75,6 +75,10 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
         _setType = SetType.working;
       }
     }
+
+    if (widget.exercise.trackingType != ExerciseTrackingType.weightAndReps) {
+      _activeMode = ActiveInputMode.reps;
+    }
   }
 
   double get _effectiveWeight {
@@ -317,50 +321,68 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
             ),
             const SizedBox(height: AppSpacing.md),
 
-          // Dual Input Cards (Weight & Reps)
-          Row(
-            children: [
-              // Weight Box
-              Expanded(
-                child: _buildInputBox(
-                  title: 'WEIGHT (${unit.name})',
-                  displayValue: isWeightGhost ? ghostWeight : _weightInput,
-                  isGhost: isWeightGhost,
-                  isActive: _activeMode == ActiveInputMode.weight,
-                  onTap: () {
-                    AppHaptics.tap();
-                    setState(() {
-                      _activeMode = ActiveInputMode.weight;
-                      _replaceWeightOnInput = true;
-                    });
-                  },
-                  onMinus: () => _stepWeight(-_weightStep),
-                  onPlus: () => _stepWeight(_weightStep),
-                  stepLabel: _weightStep.toStringAsFixed(1),
+          // Dual Input Cards (Weight & Reps / Duration)
+          () {
+            final trackingType = widget.exercise.trackingType;
+            final isHold = trackingType == ExerciseTrackingType.duration;
+            final isCardio = trackingType == ExerciseTrackingType.cardioTime;
+            final isBodyweight = trackingType == ExerciseTrackingType.bodyweightReps;
+
+            final weightTitle = (isBodyweight || isHold || isCardio)
+                ? '+WEIGHT (${unit.name})'
+                : 'WEIGHT (${unit.name})';
+
+            final repsTitle = isHold
+                ? 'HOLD TIME (SEC)'
+                : (isCardio ? 'DURATION (MIN)' : 'REPS');
+
+            final repsStep = (isHold || isCardio) ? 5 : 1;
+            final repsStepLabel = (isHold || isCardio) ? '5' : '1';
+
+            return Row(
+              children: [
+                // Weight Box
+                Expanded(
+                  child: _buildInputBox(
+                    title: weightTitle,
+                    displayValue: isWeightGhost ? ghostWeight : _weightInput,
+                    isGhost: isWeightGhost,
+                    isActive: _activeMode == ActiveInputMode.weight,
+                    onTap: () {
+                      AppHaptics.tap();
+                      setState(() {
+                        _activeMode = ActiveInputMode.weight;
+                        _replaceWeightOnInput = true;
+                      });
+                    },
+                    onMinus: () => _stepWeight(-_weightStep),
+                    onPlus: () => _stepWeight(_weightStep),
+                    stepLabel: _weightStep.toStringAsFixed(1),
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              // Reps Box
-              Expanded(
-                child: _buildInputBox(
-                  title: 'REPS',
-                  displayValue: isRepsGhost ? ghostReps : _repsInput,
-                  isGhost: isRepsGhost,
-                  isActive: _activeMode == ActiveInputMode.reps,
-                  onTap: () {
-                    AppHaptics.tap();
-                    setState(() {
-                      _activeMode = ActiveInputMode.reps;
-                      _replaceRepsOnInput = true;
-                    });
-                  },
-                  onMinus: () => _stepReps(-1),
-                  onPlus: () => _stepReps(1),
-                  stepLabel: '1',
+                const SizedBox(width: AppSpacing.sm),
+                // Reps / Duration Box
+                Expanded(
+                  child: _buildInputBox(
+                    title: repsTitle,
+                    displayValue: isRepsGhost ? ghostReps : _repsInput,
+                    isGhost: isRepsGhost,
+                    isActive: _activeMode == ActiveInputMode.reps,
+                    onTap: () {
+                      AppHaptics.tap();
+                      setState(() {
+                        _activeMode = ActiveInputMode.reps;
+                        _replaceRepsOnInput = true;
+                      });
+                    },
+                    onMinus: () => _stepReps(-repsStep),
+                    onPlus: () => _stepReps(repsStep),
+                    stepLabel: repsStepLabel,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          }(),
           const SizedBox(height: AppSpacing.md),
 
           // Custom Numeric Keypad

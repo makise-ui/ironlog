@@ -1,5 +1,6 @@
 import '../database/database.dart';
 import '../../core/utils/unit_converter.dart';
+import '../../domain/services/backup_service.dart';
 
 class SettingsRepository {
   final AppDatabase _db;
@@ -16,6 +17,7 @@ class SettingsRepository {
     await _db.into(_db.settings).insertOnConflictUpdate(
       SettingsCompanion.insert(k: key, v: value),
     );
+    BackupService.scheduleAutoBackup(_db);
   }
 
   Future<WeightUnit> getWeightUnit() async {

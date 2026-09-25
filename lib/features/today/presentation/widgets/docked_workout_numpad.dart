@@ -6,6 +6,7 @@ import '../../../../core/utils/haptics.dart';
 import '../../../../core/utils/unit_converter.dart';
 import '../../../../core/widgets/bouncy_pressable.dart';
 import '../../../../domain/models/active_workout_input.dart';
+import '../../../../domain/models/exercise_model.dart';
 import '../../../../domain/models/set_model.dart';
 import 'plate_calculator_sheet.dart';
 
@@ -31,6 +32,35 @@ class DockedWorkoutNumpad extends ConsumerWidget {
         return AppColors.failureSet;
       case SetType.working:
         return AppColors.workingSet;
+    }
+  }
+
+  Color _getPlateColor(double weight, WeightUnit unit) {
+    if (unit == WeightUnit.kg) {
+      if (weight >= 25.0) return const Color(0xFFEF4444);
+      if (weight >= 20.0) return const Color(0xFF2563EB);
+      if (weight >= 15.0) return const Color(0xFFEAB308);
+      if (weight >= 10.0) return const Color(0xFF16A34A);
+      if (weight >= 5.0) return const Color(0xFFF1F5F9);
+      if (weight >= 2.5) return const Color(0xFF334155);
+      return const Color(0xFF64748B);
+    } else {
+      if (weight >= 45.0) return const Color(0xFF2563EB);
+      if (weight >= 35.0) return const Color(0xFFEAB308);
+      if (weight >= 25.0) return const Color(0xFF16A34A);
+      if (weight >= 10.0) return const Color(0xFFF1F5F9);
+      if (weight >= 5.0) return const Color(0xFF334155);
+      return const Color(0xFF64748B);
+    }
+  }
+
+  Color _getPlateTextColor(double weight, WeightUnit unit) {
+    if (unit == WeightUnit.kg) {
+      if (weight == 15.0 || weight == 5.0) return Colors.black;
+      return Colors.white;
+    } else {
+      if (weight == 35.0 || weight == 10.0) return Colors.black;
+      return Colors.white;
     }
   }
 
@@ -127,7 +157,7 @@ class DockedWorkoutNumpad extends ConsumerWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (inputState.plateBreakdownSummary != null)
+                          if (inputState.plateBreakdownEntries != null)
                             GestureDetector(
                               onTap: () {
                                 PlateCalculatorSheet.show(
@@ -141,6 +171,7 @@ class DockedWorkoutNumpad extends ConsumerWidget {
                                       exerciseId: inputState.exerciseId,
                                       exerciseName: inputState.exerciseName,
                                       equipment: inputState.equipment,
+                                      trackingType: inputState.trackingType,
                                       setIndex: inputState.setIndex,
                                       existingSetId: inputState.existingSetId,
                                       setType: inputState.setType,
@@ -149,148 +180,251 @@ class DockedWorkoutNumpad extends ConsumerWidget {
                                       initialReps: inputState.effectiveReps,
                                       unit: inputState.unit,
                                       isCompleted: inputState.isCompleted,
+                                      targetWeight: inputState.targetWeight,
+                                      targetReps: inputState.targetReps,
                                     );
                                   },
                                 );
                               },
-                              child: Text(
-                                'Plates/side: ${inputState.plateBreakdownSummary!}',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: context.accent,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Side: ',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.textTertiary,
+                                      ),
+                                    ),
+                                    for (final entry in inputState.plateBreakdownEntries!) ...[
+                                      Container(
+                                        margin: const EdgeInsets.only(right: 3),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: _getPlateColor(entry.key, inputState.unit),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: Colors.black.withValues(alpha: 0.15),
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          entry.value > 1
+                                              ? '${entry.value}×${entry.key == entry.key.roundToDouble() ? entry.key.toInt() : entry.key}'
+                                              : '${entry.key == entry.key.roundToDouble() ? entry.key.toInt() : entry.key}',
+                                          style: TextStyle(
+                                            fontFamily: AppTypography.fontFamily,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            color: _getPlateTextColor(entry.key, inputState.unit),
+                                            fontFeatures: const [FontFeature.tabularFigures()],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(width: 2),
+                                    Icon(Icons.tune_rounded, size: 10, color: context.accent),
+                                  ],
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
+                            )
+                          else if (inputState.targetWeight != null || inputState.targetReps != null)
+                            Text(
+                              'Target: ${inputState.targetWeight != null ? '${inputState.targetWeight!.toStringAsFixed(inputState.targetWeight! == inputState.targetWeight!.roundToDouble() ? 0 : 1)} ${inputState.unit.label}' : ''} ${inputState.targetReps != null ? '× ${inputState.targetReps}' : ''}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: context.accent,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          else
+                            Text(
+                              inputState.equipment.name.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: context.textTertiary,
+                                letterSpacing: 0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                         ],
                       ),
                     ),
 
+
                     // Active Value Display Tabs
-                    Row(
-                      children: [
-                        // Weight Pill
-                        BouncyPressable(
-                          onTap: () {
-                            AppHaptics.tap();
-                            ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
-                          },
-                          scaleDown: 0.94,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: isEditingWeight
-                                  ? context.accent.withValues(alpha: 0.18)
-                                  : (isDark ? const Color(0xFF1B1E2B) : const Color(0xFFF1F5F9)),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
+                    () {
+                      final trackingType = inputState.trackingType;
+                      final isHold = trackingType == ExerciseTrackingType.duration;
+                      final isCardio = trackingType == ExerciseTrackingType.cardioTime;
+                      final isBodyweight = trackingType == ExerciseTrackingType.bodyweightReps;
+
+                      final repsDisplay = isHold
+                          ? '${inputState.repsInput.isEmpty ? '0' : inputState.repsInput}s'
+                          : (isCardio
+                              ? '${inputState.repsInput.isEmpty ? '0' : inputState.repsInput} min'
+                              : '${inputState.repsInput.isEmpty ? '0' : inputState.repsInput} reps');
+
+                      final weightDisplay = isBodyweight
+                          ? (inputState.effectiveWeight > 0
+                              ? '+${inputState.weightInput} ${inputState.unit.label}'
+                              : 'BW')
+                          : (isHold
+                              ? (inputState.effectiveWeight > 0
+                                  ? '+${inputState.weightInput} ${inputState.unit.label}'
+                                  : '+0 ${inputState.unit.label}')
+                              : '${inputState.weightInput.isEmpty ? '0' : inputState.weightInput} ${inputState.unit.label}');
+
+                      return Row(
+                        children: [
+                          // Weight / Added Load Pill
+                          BouncyPressable(
+                            onTap: () {
+                              AppHaptics.tap();
+                              ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
+                            },
+                            scaleDown: 0.94,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
                                 color: isEditingWeight
-                                    ? context.accent
-                                    : (isDark ? const Color(0xFF2B3045) : const Color(0xFFE2E8F0)),
-                                width: isEditingWeight ? 1.5 : 1.0,
+                                    ? context.accent.withValues(alpha: 0.18)
+                                    : (isDark ? const Color(0xFF1B1E2B) : const Color(0xFFF1F5F9)),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isEditingWeight
+                                      ? context.accent
+                                      : (isDark ? const Color(0xFF2B3045) : const Color(0xFFE2E8F0)),
+                                  width: isEditingWeight ? 1.5 : 1.0,
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              '${inputState.weightInput.isEmpty ? '0' : inputState.weightInput} ${inputState.unit.label}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: isEditingWeight ? context.accent : context.textPrimary,
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                              child: Text(
+                                weightDisplay,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: isEditingWeight ? context.accent : context.textPrimary,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
+                          const SizedBox(width: 6),
 
-                        // Reps Pill
-                        BouncyPressable(
-                          onTap: () {
-                            AppHaptics.tap();
-                            ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
-                          },
-                          scaleDown: 0.94,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: !isEditingWeight
-                                  ? context.accent.withValues(alpha: 0.18)
-                                  : (isDark ? const Color(0xFF1B1E2B) : const Color(0xFFF1F5F9)),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
+                          // Reps / Duration Pill
+                          BouncyPressable(
+                            onTap: () {
+                              AppHaptics.tap();
+                              ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                            },
+                            scaleDown: 0.94,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
                                 color: !isEditingWeight
-                                    ? context.accent
-                                    : (isDark ? const Color(0xFF2B3045) : const Color(0xFFE2E8F0)),
-                                width: !isEditingWeight ? 1.5 : 1.0,
+                                    ? context.accent.withValues(alpha: 0.18)
+                                    : (isDark ? const Color(0xFF1B1E2B) : const Color(0xFFF1F5F9)),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: !isEditingWeight
+                                      ? context.accent
+                                      : (isDark ? const Color(0xFF2B3045) : const Color(0xFFE2E8F0)),
+                                  width: !isEditingWeight ? 1.5 : 1.0,
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              '${inputState.repsInput.isEmpty ? '0' : inputState.repsInput} reps',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: !isEditingWeight ? context.accent : context.textPrimary,
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                              child: Text(
+                                repsDisplay,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: !isEditingWeight ? context.accent : context.textPrimary,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
+                          const SizedBox(width: 6),
 
-                        // Dismiss button
-                        BouncyPressable(
-                          onTap: () {
-                            AppHaptics.tap();
-                            ref.read(activeWorkoutInputProvider.notifier).close();
-                          },
-                          scaleDown: 0.88,
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E2232) : const Color(0xFFF1F5F9),
-                              shape: BoxShape.circle,
+                          // Dismiss button
+                          BouncyPressable(
+                            onTap: () {
+                              AppHaptics.tap();
+                              ref.read(activeWorkoutInputProvider.notifier).close();
+                            },
+                            scaleDown: 0.88,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E2232) : const Color(0xFFF1F5F9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.close_rounded, size: 16, color: context.textTertiary),
                             ),
-                            child: Icon(Icons.close_rounded, size: 16, color: context.textTertiary),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              Divider(height: 1, color: isDark ? const Color(0xFF23283A) : const Color(0xFFE8EAF2)),
-
-              // 2. Quick Increment Steppers Row
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                color: isDark ? const Color(0xFF10131D) : const Color(0xFFF8FAFC),
-                child: Row(
-                  children: isEditingWeight
-                      ? [
-                          _buildStepPill(context, ref, isKg ? -5.0 : -10.0, isKg ? '-5' : '-10', true),
-                          const SizedBox(width: 8),
-                          _buildStepPill(context, ref, isKg ? -2.5 : -5.0, isKg ? '-2.5' : '-5', true),
-                          const SizedBox(width: 8),
-                          _buildStepPill(context, ref, isKg ? 2.5 : 5.0, isKg ? '+2.5' : '+5', true),
-                          const SizedBox(width: 8),
-                          _buildStepPill(context, ref, isKg ? 5.0 : 10.0, isKg ? '+5' : '+10', true),
-                        ]
-                      : [
-                          _buildRepStepPill(context, ref, -2, '-2'),
-                          const SizedBox(width: 8),
-                          _buildRepStepPill(context, ref, -1, '-1'),
-                          const SizedBox(width: 8),
-                          _buildRepStepPill(context, ref, 1, '+1'),
-                          const SizedBox(width: 8),
-                          _buildRepStepPill(context, ref, 2, '+2'),
                         ],
+                      );
+                    }(),
+                    ],
+                  ),
                 ),
-              ),
 
-              Divider(height: 1, color: isDark ? const Color(0xFF23283A) : const Color(0xFFE8EAF2)),
+                Divider(height: 1, color: isDark ? const Color(0xFF23283A) : const Color(0xFFE8EAF2)),
+
+                // 2. Quick Increment Steppers Row
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  color: isDark ? const Color(0xFF10131D) : const Color(0xFFF8FAFC),
+                  child: Row(
+                    children: isEditingWeight
+                        ? [
+                            _buildStepPill(context, ref, isKg ? -5.0 : -10.0, isKg ? '-5' : '-10', true),
+                            const SizedBox(width: 8),
+                            _buildStepPill(context, ref, isKg ? -2.5 : -5.0, isKg ? '-2.5' : '-5', true),
+                            const SizedBox(width: 8),
+                            _buildStepPill(context, ref, isKg ? 2.5 : 5.0, isKg ? '+2.5' : '+5', true),
+                            const SizedBox(width: 8),
+                            _buildStepPill(context, ref, isKg ? 5.0 : 10.0, isKg ? '+5' : '+10', true),
+                          ]
+                        : (inputState.trackingType == ExerciseTrackingType.duration
+                            ? [
+                                _buildRepStepPill(context, ref, -10, '-10s'),
+                                const SizedBox(width: 8),
+                                _buildRepStepPill(context, ref, -5, '-5s'),
+                                const SizedBox(width: 8),
+                                _buildRepStepPill(context, ref, 5, '+5s'),
+                                const SizedBox(width: 8),
+                                _buildRepStepPill(context, ref, 10, '+10s'),
+                              ]
+                            : (inputState.trackingType == ExerciseTrackingType.cardioTime
+                                ? [
+                                    _buildRepStepPill(context, ref, -10, '-10m'),
+                                    const SizedBox(width: 8),
+                                    _buildRepStepPill(context, ref, -5, '-5m'),
+                                    const SizedBox(width: 8),
+                                    _buildRepStepPill(context, ref, 5, '+5m'),
+                                    const SizedBox(width: 8),
+                                    _buildRepStepPill(context, ref, 10, '+10m'),
+                                  ]
+                                : [
+                                    _buildRepStepPill(context, ref, -2, '-2'),
+                                    const SizedBox(width: 8),
+                                    _buildRepStepPill(context, ref, -1, '-1'),
+                                    const SizedBox(width: 8),
+                                    _buildRepStepPill(context, ref, 1, '+1'),
+                                    const SizedBox(width: 8),
+                                    _buildRepStepPill(context, ref, 2, '+2'),
+                                  ])),
+                  ),
+                ),
+
+                Divider(height: 1, color: isDark ? const Color(0xFF23283A) : const Color(0xFFE8EAF2)),
 
               // 3. Keypad & Actions Layout
               Padding(

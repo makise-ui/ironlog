@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../domain/models/active_workout_input.dart';
+import '../../../../domain/models/exercise_model.dart';
 import '../../../../domain/services/weight_step_learner.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -30,6 +32,7 @@ class ExerciseTableCard extends ConsumerStatefulWidget {
   final VoidCallback onRefresh;
   final Function(PrResult pr) onPrAchieved;
   final VoidCallback onRemoveExercise;
+  final VoidCallback? onExerciseFocused;
 
   const ExerciseTableCard({
     super.key,
@@ -39,6 +42,7 @@ class ExerciseTableCard extends ConsumerStatefulWidget {
     required this.onRefresh,
     required this.onPrAchieved,
     required this.onRemoveExercise,
+    this.onExerciseFocused,
   });
 
   static void setExerciseExpanded(String id, bool expanded) {
@@ -64,6 +68,53 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
   final Set<String> _locallyDeletedCompletedSetIds = <String>{};
   final List<String> _plannedSetKeys = [];
   int _plannedKeySeq = 0;
+
+  Timer? _holdTimer;
+  int _activeHoldSetIndex = -1;
+  int _elapsedHoldSeconds = 0;
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  void _toggleHoldStopwatch(int setIndex, {required double weight, required SetType setType}) async {
+    widget.onExerciseFocused?.call();
+    if (_activeHoldSetIndex == setIndex) {
+      // Stop and save
+      _holdTimer?.cancel();
+      _holdTimer = null;
+      final finalSeconds = math.max(1, _elapsedHoldSeconds);
+      setState(() {
+        _activeHoldSetIndex = -1;
+        _elapsedHoldSeconds = 0;
+      });
+      AppHaptics.success();
+      await _quickLogSet(
+        weight: weight,
+        reps: finalSeconds,
+        setType: setType,
+      );
+    } else {
+      // Start or switch stopwatch to this set
+      _holdTimer?.cancel();
+      AppHaptics.selection();
+      setState(() {
+        _activeHoldSetIndex = setIndex;
+        _elapsedHoldSeconds = 0;
+      });
+      _holdTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        setState(() {
+          _elapsedHoldSeconds++;
+        });
+      });
+    }
+  }
 
   List<SetModel> get _currentActiveSets {
     return widget.item.sets
@@ -223,6 +274,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     required int reps,
     required SetType setType,
   }) async {
+    widget.onExerciseFocused?.call();
     AppHaptics.tap();
     final repo = ref.read(workoutRepositoryProvider);
 
@@ -279,6 +331,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
   }
 
   Future<void> _deleteSet(SetModel set) async {
+    widget.onExerciseFocused?.call();
     AppHaptics.warning();
     final repo = ref.read(workoutRepositoryProvider);
     await repo.deleteSet(set.id);
@@ -291,6 +344,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
   }
 
   void _openSetEditor(SetModel? existingSet, int targetIndex) {
+    widget.onExerciseFocused?.call();
     AppHaptics.tap();
     final prevSet = targetIndex <= _prevSets.length ? _prevSets[targetIndex - 1] : (_prevSets.isNotEmpty ? _prevSets.last : null);
 
@@ -410,8 +464,11 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         : null;
     final bestE1rm = bestSet != null ? E1rmCalculator.calculateEpley(bestSet.weight, bestSet.reps) : 0.0;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTapDown: (_) => widget.onExerciseFocused?.call(),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: context.cardBg,
         borderRadius: BorderRadius.circular(16),
@@ -837,34 +894,121 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           // Set Table Column Headers
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 32,
-                  child: Text('SET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('PREVIOUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
-                ),
-                SizedBox(
-                  width: 72,
-                  child: Text(widget.unit.label.toUpperCase(), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 54,
-                  child: Text('REPS', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 36,
-                  child: Center(
-                    child: Icon(Icons.check_rounded, size: 14, color: context.textTertiary),
-                  ),
-                ),
-              ],
-            ),
+            child: () {
+              final tracking = ex.trackingType;
+              if (tracking == ExerciseTrackingType.duration) {
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      child: Text('SET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('PREVIOUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    SizedBox(
+                      width: 64,
+                      child: Text('TIME', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 62,
+                      child: Text('HOLD', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 36,
+                      child: Center(
+                        child: Icon(Icons.check_rounded, size: 14, color: context.textTertiary),
+                      ),
+                    ),
+                  ],
+                );
+              } else if (tracking == ExerciseTrackingType.bodyweightReps) {
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      child: Text('SET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('PREVIOUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    SizedBox(
+                      width: 64,
+                      child: Text('REPS', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 62,
+                      child: Text('+${widget.unit.label.toUpperCase()}', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 36,
+                      child: Center(
+                        child: Icon(Icons.check_rounded, size: 14, color: context.textTertiary),
+                      ),
+                    ),
+                  ],
+                );
+              } else if (tracking == ExerciseTrackingType.cardioTime) {
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 44,
+                      child: Text('ROUND', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('PREVIOUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    SizedBox(
+                      width: 80,
+                      child: Text('MINUTES', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 36,
+                      child: Center(
+                        child: Icon(Icons.check_rounded, size: 14, color: context.textTertiary),
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      child: Text('SET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('PREVIOUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    SizedBox(
+                      width: 72,
+                      child: Text(widget.unit.label.toUpperCase(), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 54,
+                      child: Text('REPS', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.textTertiary)),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 36,
+                      child: Center(
+                        child: Icon(Icons.check_rounded, size: 14, color: context.textTertiary),
+                      ),
+                    ),
+                  ],
+                );
+              }
+            }(),
           ),
 
           Divider(height: 1, color: context.cardBorder),
@@ -1051,55 +1195,57 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                       ),
                     ),
                   ],
-                  const SizedBox(width: 6),
-                  BouncyPressable(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (ctx) => WarmupCalculatorSheet(
-                          exercise: ex,
-                          targetWorkingWeight: nextGhostWeight,
-                          unit: widget.unit,
-                          onAddWarmupSets: (rampSets) async {
-                            final repo = ref.read(workoutRepositoryProvider);
-                            for (final rs in rampSets) {
-                              await repo.logSet(
-                                workoutExerciseId: widget.item.id,
-                                exerciseId: ex.id,
-                                muscleGroupId: ex.muscleGroupId,
-                                date: DateTime.now(),
-                                weight: rs.weight,
-                                reps: rs.reps,
-                                setType: SetType.warmup,
-                              );
-                            }
-                            widget.onRefresh();
-                          },
-                        ),
-                      );
-                    },
-                    scaleDown: 0.94,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.warmupSet),
-                          SizedBox(width: 4),
-                          Text(
-                            'Warmup Ramp',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.warmupSet,
-                            ),
+                  if (ex.trackingType == ExerciseTrackingType.weightAndReps) ...[
+                    const SizedBox(width: 6),
+                    BouncyPressable(
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (ctx) => WarmupCalculatorSheet(
+                            exercise: ex,
+                            targetWorkingWeight: nextGhostWeight,
+                            unit: widget.unit,
+                            onAddWarmupSets: (rampSets) async {
+                              final repo = ref.read(workoutRepositoryProvider);
+                              for (final rs in rampSets) {
+                                await repo.logSet(
+                                  workoutExerciseId: widget.item.id,
+                                  exerciseId: ex.id,
+                                  muscleGroupId: ex.muscleGroupId,
+                                  date: DateTime.now(),
+                                  weight: rs.weight,
+                                  reps: rs.reps,
+                                  setType: SetType.warmup,
+                                );
+                              }
+                              widget.onRefresh();
+                            },
                           ),
-                        ],
+                        );
+                      },
+                      scaleDown: 0.94,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.fitness_center_rounded, size: 14, color: AppColors.warmupSet),
+                            SizedBox(width: 4),
+                            Text(
+                              'Warmup Ramp',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.warmupSet,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -1107,8 +1253,9 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         ],
       ],
     ),
-  );
-  }
+  ),
+);
+}
 
   // Row for an already logged set
   Widget _buildCompletedSetRow({
@@ -1118,6 +1265,8 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
   }) {
     final typeColor = _getSetTypeColor(set.setType);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ex = widget.item.exercise;
+    final tracking = ex.trackingType;
 
     final activeInput = ref.watch(activeWorkoutInputProvider);
     final isRowActive = activeInput?.workoutExerciseId == widget.item.id &&
@@ -1130,8 +1279,9 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         ? activeInput!.weightInput
         : UnitConverter.formatWeight(set.weight, unit: widget.unit, includeUnit: false);
     final displayedReps = isRowActive ? activeInput!.repsInput : '${set.reps}';
+    final displayedTime = isRowActive ? activeInput!.repsInput : SetModel.formatDuration(set.reps);
 
-    return Container(
+    final rowContent = Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         color: isRowActive ? context.accent.withValues(alpha: isDark ? 0.08 : 0.04) : null,
@@ -1178,7 +1328,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           Expanded(
             child: Text(
               previousSet != null
-                  ? '${UnitConverter.formatWeight(previousSet.weight, unit: widget.unit, includeUnit: false)} × ${previousSet.reps}'
+                  ? previousSet.formatPerformance(tracking, unit: widget.unit)
                   : '—',
               style: TextStyle(
                 fontSize: 12,
@@ -1188,110 +1338,358 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
             ),
           ),
 
-          // Weight Box
-          BouncyPressable(
-            onTap: () {
-              AppHaptics.tap();
-              if (isRowActive) {
-                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
-              } else {
-                ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                  workoutExerciseId: widget.item.id,
-                  exerciseId: widget.item.exercise.id,
-                  exerciseName: widget.item.exercise.name,
-                  equipment: widget.item.exercise.equipment,
-                  setIndex: index,
-                  existingSetId: set.id,
-                  setType: set.setType,
-                  field: WorkoutInputField.weight,
-                  initialWeight: set.weight,
-                  initialReps: set.reps,
-                  unit: widget.unit,
-                  isCompleted: true,
-                );
-              }
-            },
-            scaleDown: 0.96,
-            child: Container(
-              width: 72,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: isWeightActive
-                    ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
-                    : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: isWeightActive
-                      ? context.accent
-                      : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
-                  width: isWeightActive ? 1.5 : 1.0,
-                ),
-              ),
-              child: Text(
-                displayedWeight.isEmpty ? '0' : displayedWeight,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: isWeightActive ? context.accent : context.textPrimary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Reps Box
-          BouncyPressable(
-            onTap: () {
-              AppHaptics.tap();
-              if (isRowActive) {
-                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
-              } else {
-                ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                  workoutExerciseId: widget.item.id,
-                  exerciseId: widget.item.exercise.id,
-                  exerciseName: widget.item.exercise.name,
-                  equipment: widget.item.exercise.equipment,
-                  setIndex: index,
-                  existingSetId: set.id,
-                  setType: set.setType,
-                  field: WorkoutInputField.reps,
-                  initialWeight: set.weight,
-                  initialReps: set.reps,
-                  unit: widget.unit,
-                  isCompleted: true,
-                );
-              }
-            },
-            scaleDown: 0.96,
-            child: Container(
-              width: 54,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: isRepsActive
-                    ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
-                    : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
+          // Adaptive Value Columns
+          if (tracking == ExerciseTrackingType.duration) ...[
+            // Duration Box (Time)
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: index,
+                    existingSetId: set.id,
+                    setType: set.setType,
+                    field: WorkoutInputField.reps,
+                    initialWeight: set.weight,
+                    initialReps: set.reps,
+                    unit: widget.unit,
+                    isCompleted: true,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 64,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
                   color: isRepsActive
-                      ? context.accent
-                      : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
-                  width: isRepsActive ? 1.5 : 1.0,
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
                 ),
-              ),
-              child: Text(
-                displayedReps.isEmpty ? '0' : displayedReps,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: isRepsActive ? context.accent : context.textPrimary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                child: Text(
+                  displayedTime.isEmpty ? '0s' : displayedTime,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: isRepsActive ? context.accent : context.textPrimary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+
+            // Hold Badge
+            Container(
+              width: 62,
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF141722) : const Color(0xFFF1F2F6),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF222636) : const Color(0xFFE2E4EC),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.timer_rounded, size: 12, color: context.accent),
+                  const SizedBox(width: 3),
+                  Text(
+                    '${set.reps}s',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: context.textSecondary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (tracking == ExerciseTrackingType.bodyweightReps) ...[
+            // Reps Box
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: index,
+                    existingSetId: set.id,
+                    setType: set.setType,
+                    field: WorkoutInputField.reps,
+                    initialWeight: set.weight,
+                    initialReps: set.reps,
+                    unit: widget.unit,
+                    isCompleted: true,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 64,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isRepsActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  displayedReps.isEmpty ? '0' : displayedReps,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isRepsActive ? context.accent : context.textPrimary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Added Weight Box (Optional)
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: index,
+                    existingSetId: set.id,
+                    setType: set.setType,
+                    field: WorkoutInputField.weight,
+                    initialWeight: set.weight,
+                    initialReps: set.reps,
+                    unit: widget.unit,
+                    isCompleted: true,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 62,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isWeightActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isWeightActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isWeightActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  set.weight > 0 ? '+${UnitConverter.formatWeight(set.weight, unit: widget.unit, includeUnit: false)}' : 'BW',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: isWeightActive ? context.accent : (set.weight > 0 ? context.textPrimary : context.textSecondary),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ] else if (tracking == ExerciseTrackingType.cardioTime) ...[
+            // Cardio Minutes Box
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: index,
+                    existingSetId: set.id,
+                    setType: set.setType,
+                    field: WorkoutInputField.reps,
+                    initialWeight: set.weight,
+                    initialReps: set.reps,
+                    unit: widget.unit,
+                    isCompleted: true,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 80,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isRepsActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  '${set.reps} min',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: isRepsActive ? context.accent : context.textPrimary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            // Weight Box
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: index,
+                    existingSetId: set.id,
+                    setType: set.setType,
+                    field: WorkoutInputField.weight,
+                    initialWeight: set.weight,
+                    initialReps: set.reps,
+                    unit: widget.unit,
+                    isCompleted: true,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 72,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isWeightActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isWeightActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isWeightActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  displayedWeight.isEmpty ? '0' : displayedWeight,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isWeightActive ? context.accent : context.textPrimary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Reps Box
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: index,
+                    existingSetId: set.id,
+                    setType: set.setType,
+                    field: WorkoutInputField.reps,
+                    initialWeight: set.weight,
+                    initialReps: set.reps,
+                    unit: widget.unit,
+                    isCompleted: true,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 54,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isRepsActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  displayedReps.isEmpty ? '0' : displayedReps,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isRepsActive ? context.accent : context.textPrimary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
 
           // Completed Checkmark Button
@@ -1314,9 +1712,43 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         ],
       ),
     );
+
+    return Dismissible(
+      key: ValueKey('completed_${set.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.endToStart) {
+          await _deleteSet(set);
+        }
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: AppColors.error.withValues(alpha: 0.88),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text(
+              'DELETE',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                letterSpacing: 0.5,
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
+          ],
+        ),
+      ),
+      child: rowContent,
+    );
   }
 
-  // Row for planned / ghost set (1-Tap Checkmark logs it!)
+  // Row for planned / ghost set (1-Tap Checkmark or Live Hold Stopwatch logs it!)
   Widget _buildPlannedSetRow({
     required int setIndex,
     required SetModel? previousSet,
@@ -1326,6 +1758,8 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
   }) {
     final typeColor = _getSetTypeColor(targetType);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ex = widget.item.exercise;
+    final tracking = ex.trackingType;
 
     final activeInput = ref.watch(activeWorkoutInputProvider);
     final isRowActive = activeInput?.workoutExerciseId == widget.item.id &&
@@ -1342,15 +1776,22 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         ? activeInput!.weightInput
         : UnitConverter.formatWeight(targetWeight, unit: widget.unit, includeUnit: false);
     final displayedReps = isRowActive ? activeInput!.repsInput : '$targetReps';
+    final displayedTime = isRowActive ? activeInput!.repsInput : SetModel.formatDuration(effectiveR);
 
-    return Container(
+    final isStopwatchActive = _activeHoldSetIndex == setIndex;
+
+    final rowContent = Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: isRowActive ? context.accent.withValues(alpha: isDark ? 0.08 : 0.04) : null,
+        color: isStopwatchActive
+            ? context.accent.withValues(alpha: isDark ? 0.12 : 0.08)
+            : (isRowActive ? context.accent.withValues(alpha: isDark ? 0.08 : 0.04) : null),
         border: Border(
           bottom: BorderSide(
-            color: context.cardBorder,
-            width: 0.5,
+            color: isStopwatchActive
+                ? context.accent.withValues(alpha: 0.5)
+                : context.cardBorder,
+            width: isStopwatchActive ? 1.0 : 0.5,
           ),
         ),
       ),
@@ -1392,7 +1833,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           Expanded(
             child: Text(
               previousSet != null
-                  ? '${UnitConverter.formatWeight(previousSet.weight, unit: widget.unit, includeUnit: false)} × ${previousSet.reps}'
+                  ? previousSet.formatPerformance(tracking, unit: widget.unit)
                   : 'Target',
               style: TextStyle(
                 fontSize: 12,
@@ -1402,114 +1843,396 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
             ),
           ),
 
-          // Weight (Ghost / editable)
-          BouncyPressable(
-            onTap: () {
-              AppHaptics.tap();
-              if (isRowActive) {
-                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
-              } else {
-                ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                  workoutExerciseId: widget.item.id,
-                  exerciseId: widget.item.exercise.id,
-                  exerciseName: widget.item.exercise.name,
-                  equipment: widget.item.exercise.equipment,
-                  setIndex: setIndex,
-                  existingSetId: null,
-                  setType: effectiveT,
-                  field: WorkoutInputField.weight,
-                  initialWeight: effectiveW,
-                  initialReps: effectiveR,
-                  unit: widget.unit,
-                  isCompleted: false,
-                );
-              }
-            },
-            scaleDown: 0.96,
-            child: Container(
-              width: 72,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: isWeightActive
-                    ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
-                    : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: isWeightActive
-                      ? context.accent
-                      : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
-                  width: isWeightActive ? 1.5 : 1.0,
+          // Adaptive Value Columns
+          if (tracking == ExerciseTrackingType.duration) ...[
+            // Duration Box (Time)
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: setIndex,
+                    existingSetId: null,
+                    setType: effectiveT,
+                    field: WorkoutInputField.reps,
+                    initialWeight: effectiveW,
+                    initialReps: effectiveR,
+                    unit: widget.unit,
+                    isCompleted: false,
+                    targetWeight: targetWeight,
+                    targetReps: targetReps,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 64,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isRepsActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
                 ),
-              ),
-              child: Text(
-                displayedWeight.isEmpty ? '0' : displayedWeight,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isWeightActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isWeightActive
-                      ? context.accent
-                      : context.textSecondary.withValues(alpha: 0.65),
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                child: Text(
+                  displayedTime.isEmpty ? '0s' : displayedTime,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: isRepsActive ? FontWeight.w700 : FontWeight.w500,
+                    color: isRepsActive
+                        ? context.accent
+                        : context.textSecondary.withValues(alpha: 0.65),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
 
-          // Reps (Ghost / editable)
-          BouncyPressable(
-            onTap: () {
-              AppHaptics.tap();
-              if (isRowActive) {
-                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
-              } else {
-                ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                  workoutExerciseId: widget.item.id,
-                  exerciseId: widget.item.exercise.id,
-                  exerciseName: widget.item.exercise.name,
-                  equipment: widget.item.exercise.equipment,
-                  setIndex: setIndex,
-                  existingSetId: null,
-                  setType: effectiveT,
-                  field: WorkoutInputField.reps,
-                  initialWeight: effectiveW,
-                  initialReps: effectiveR,
-                  unit: widget.unit,
-                  isCompleted: false,
-                );
-              }
-            },
-            scaleDown: 0.96,
-            child: Container(
-              width: 54,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: isRepsActive
-                    ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
-                    : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: isRepsActive
-                      ? context.accent
-                      : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
-                  width: isRepsActive ? 1.5 : 1.0,
+            // Live Hold Stopwatch Button!
+            BouncyPressable(
+              onTap: () => _toggleHoldStopwatch(setIndex, weight: effectiveW, setType: effectiveT),
+              scaleDown: 0.90,
+              child: Container(
+                width: 62,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: isStopwatchActive
+                      ? context.accent.withValues(alpha: isDark ? 0.28 : 0.18)
+                      : (isDark ? const Color(0xFF191C28) : const Color(0xFFF4F4F5)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isStopwatchActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isStopwatchActive ? 1.5 : 1.0,
+                  ),
                 ),
-              ),
-              child: Text(
-                displayedReps.isEmpty ? '0' : displayedReps,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isRepsActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isRepsActive
-                      ? context.accent
-                      : context.textSecondary.withValues(alpha: 0.65),
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isStopwatchActive ? Icons.stop_rounded : Icons.timer_outlined,
+                      size: 13,
+                      color: context.accent,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      isStopwatchActive ? SetModel.formatDuration(_elapsedHoldSeconds) : 'HOLD',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: context.accent,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
+          ] else if (tracking == ExerciseTrackingType.bodyweightReps) ...[
+            // Reps Box
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: setIndex,
+                    existingSetId: null,
+                    setType: effectiveT,
+                    field: WorkoutInputField.reps,
+                    initialWeight: effectiveW,
+                    initialReps: effectiveR,
+                    unit: widget.unit,
+                    isCompleted: false,
+                    targetWeight: targetWeight,
+                    targetReps: targetReps,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 64,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isRepsActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  displayedReps.isEmpty ? '0' : displayedReps,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isRepsActive ? FontWeight.w700 : FontWeight.w500,
+                    color: isRepsActive
+                        ? context.accent
+                        : context.textSecondary.withValues(alpha: 0.65),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Added Weight Box
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: setIndex,
+                    existingSetId: null,
+                    setType: effectiveT,
+                    field: WorkoutInputField.weight,
+                    initialWeight: effectiveW,
+                    initialReps: effectiveR,
+                    unit: widget.unit,
+                    isCompleted: false,
+                    targetWeight: targetWeight,
+                    targetReps: targetReps,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 62,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isWeightActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isWeightActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isWeightActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  effectiveW > 0 ? '+${UnitConverter.formatWeight(effectiveW, unit: widget.unit, includeUnit: false)}' : '+0',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isWeightActive ? FontWeight.w700 : FontWeight.w500,
+                    color: isWeightActive
+                        ? context.accent
+                        : context.textSecondary.withValues(alpha: 0.65),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ] else if (tracking == ExerciseTrackingType.cardioTime) ...[
+            // Cardio Minutes Box
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: setIndex,
+                    existingSetId: null,
+                    setType: effectiveT,
+                    field: WorkoutInputField.reps,
+                    initialWeight: effectiveW,
+                    initialReps: effectiveR,
+                    unit: widget.unit,
+                    isCompleted: false,
+                    targetWeight: targetWeight,
+                    targetReps: targetReps,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 80,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isRepsActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  '$effectiveR min',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: isRepsActive ? FontWeight.w700 : FontWeight.w500,
+                    color: isRepsActive
+                        ? context.accent
+                        : context.textSecondary.withValues(alpha: 0.65),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            // Weight (Ghost / editable)
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: setIndex,
+                    existingSetId: null,
+                    setType: effectiveT,
+                    field: WorkoutInputField.weight,
+                    initialWeight: effectiveW,
+                    initialReps: effectiveR,
+                    unit: widget.unit,
+                    isCompleted: false,
+                    targetWeight: targetWeight,
+                    targetReps: targetReps,
+                  );
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 72,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isWeightActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isWeightActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isWeightActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  displayedWeight.isEmpty ? '0' : displayedWeight,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isWeightActive ? FontWeight.w700 : FontWeight.w500,
+                    color: isWeightActive
+                        ? context.accent
+                        : context.textSecondary.withValues(alpha: 0.65),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Reps (Ghost / editable)
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.tap();
+                if (isRowActive) {
+                  ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+                } else {
+                  ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                    workoutExerciseId: widget.item.id,
+                    exerciseId: widget.item.exercise.id,
+                    exerciseName: widget.item.exercise.name,
+                    equipment: widget.item.exercise.equipment,
+                    trackingType: tracking,
+                    setIndex: setIndex,
+                    existingSetId: null,
+                    setType: effectiveT,
+                    field: WorkoutInputField.reps,
+                    initialWeight: effectiveW,
+                    initialReps: effectiveR,
+                    unit: widget.unit,
+                    isCompleted: false,
+                    targetWeight: targetWeight,
+                    targetReps: targetReps,
+                  );
+
+                }
+              },
+              scaleDown: 0.96,
+              child: Container(
+                width: 54,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                decoration: BoxDecoration(
+                  color: isRepsActive
+                      ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
+                      : (isDark ? const Color(0xFF161822) : const Color(0xFFF9FAFB)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: isRepsActive
+                        ? context.accent
+                        : (isDark ? const Color(0xFF262B3B) : const Color(0xFFE5E5E5)),
+                    width: isRepsActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  displayedReps.isEmpty ? '0' : displayedReps,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isRepsActive ? FontWeight.w700 : FontWeight.w500,
+                    color: isRepsActive
+                        ? context.accent
+                        : context.textSecondary.withValues(alpha: 0.65),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
 
           // 1-TAP COMPLETE CHECKMARK BUTTON
@@ -1545,5 +2268,44 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         ],
       ),
     );
+
+    return Dismissible(
+      key: ValueKey('planned_${widget.item.id}_$setIndex'),
+      direction: DismissDirection.startToEnd,
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          AppHaptics.success();
+          await _quickLogSet(
+            weight: effectiveW,
+            reps: effectiveR,
+            setType: effectiveT,
+          );
+        }
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        color: AppColors.success.withValues(alpha: 0.88),
+        child: const Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'COMPLETE SET',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+      child: rowContent,
+    );
   }
 }
+

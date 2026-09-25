@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../../core/utils/url_launcher_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/haptics.dart';
@@ -675,7 +675,6 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
   }
 
   Widget _buildProfileCard(AiConfigModel profile, {required bool isActive}) {
-    final hasNoKey = !profile.requireApiKey;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: GlassTile(
@@ -733,65 +732,15 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: context.chipBg,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          profile.modelName,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: context.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        hasNoKey ? '• Free' : (profile.apiKey.isNotEmpty ? '• Key Set' : '• No Key'),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: hasNoKey
-                              ? AppColors.workingSet
-                              : (profile.apiKey.isNotEmpty ? context.textSecondary : AppColors.error),
-                        ),
-                      ),
-                      if (profile.requireApiKey && profile.apiKey.isEmpty && profile.provider.apiKeyUrl.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        GestureDetector(
-                          onTap: () async {
-                            final uri = Uri.parse(profile.provider.apiKeyUrl);
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: context.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: context.accent.withValues(alpha: 0.35)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Get Key',
-                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.accent),
-                                ),
-                                const SizedBox(width: 2),
-                                Icon(Icons.open_in_new_rounded, size: 9, color: context.accent),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    '${profile.provider.displayName} • ${profile.modelName}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: context.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -1214,10 +1163,7 @@ class _ProfileEditorSheetState extends ConsumerState<_ProfileEditorSheet> {
                       child: BouncyPressable(
                         onTap: () async {
                           AppHaptics.tap();
-                          final uri = Uri.parse(_provider.apiKeyUrl);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
+                          await UrlLauncherUtils.openUrl(_provider.apiKeyUrl);
                         },
                         scaleDown: 0.95,
                         child: Container(
