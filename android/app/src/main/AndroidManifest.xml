@@ -44,6 +44,7 @@
         <!-- Android Home Screen Widgets -->
         <receiver
             android:name=".TodayWorkoutWidgetProvider"
+            android:label="@string/widget_today_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -55,6 +56,7 @@
 
         <receiver
             android:name=".StreakWidgetProvider"
+            android:label="@string/widget_streak_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -66,6 +68,7 @@
 
         <receiver
             android:name=".QuickLogWidgetProvider"
+            android:label="@string/widget_quick_log_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -77,6 +80,7 @@
 
         <receiver
             android:name=".LiveWorkoutWidgetProvider"
+            android:label="@string/widget_live_workout_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
