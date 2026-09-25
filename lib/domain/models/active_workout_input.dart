@@ -18,6 +18,7 @@ class ActiveWorkoutInput {
   final String repsInput;
   final WeightUnit unit;
   final bool isCompleted;
+  final bool replaceOnNextInput;
 
   const ActiveWorkoutInput({
     required this.workoutExerciseId,
@@ -32,6 +33,7 @@ class ActiveWorkoutInput {
     required this.repsInput,
     required this.unit,
     required this.isCompleted,
+    this.replaceOnNextInput = true,
   });
 
   double get effectiveWeight => double.tryParse(weightInput) ?? 0.0;
@@ -92,6 +94,7 @@ class ActiveWorkoutInput {
     String? repsInput,
     WeightUnit? unit,
     bool? isCompleted,
+    bool? replaceOnNextInput,
   }) {
     return ActiveWorkoutInput(
       workoutExerciseId: workoutExerciseId ?? this.workoutExerciseId,
@@ -106,6 +109,7 @@ class ActiveWorkoutInput {
       repsInput: repsInput ?? this.repsInput,
       unit: unit ?? this.unit,
       isCompleted: isCompleted ?? this.isCompleted,
+      replaceOnNextInput: replaceOnNextInput ?? this.replaceOnNextInput,
     );
   }
 }
@@ -140,12 +144,16 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
       repsInput: '$initialReps',
       unit: unit,
       isCompleted: isCompleted,
+      replaceOnNextInput: true,
     );
   }
 
   void switchField(WorkoutInputField field) {
     if (state == null) return;
-    state = state!.copyWith(activeField: field);
+    state = state!.copyWith(
+      activeField: field,
+      replaceOnNextInput: true,
+    );
   }
 
   void toggleField() {
@@ -154,29 +162,60 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
       activeField: state!.activeField == WorkoutInputField.weight
           ? WorkoutInputField.reps
           : WorkoutInputField.weight,
+      replaceOnNextInput: true,
     );
   }
 
   void onDigit(String char) {
     if (state == null) return;
     final currentField = state!.activeField;
+    final replace = state!.replaceOnNextInput;
 
     if (currentField == WorkoutInputField.weight) {
-      if (char == '.' && state!.weightInput.contains('.')) return;
-      if (state!.weightInput.length >= 6) return;
-      final next = state!.weightInput + char;
-      state = state!.copyWith(weightInput: next);
+      if (char == '.' && !replace && state!.weightInput.contains('.')) return;
+
+      String next;
+      if (replace) {
+        next = (char == '.') ? '0.' : char;
+      } else {
+        if (state!.weightInput.length >= 6) return;
+        next = state!.weightInput + char;
+      }
+      state = state!.copyWith(
+        weightInput: next,
+        replaceOnNextInput: false,
+      );
     } else {
       if (char == '.') return; // No decimals in reps
-      if (state!.repsInput.length >= 3) return;
-      final next = state!.repsInput + char;
-      state = state!.copyWith(repsInput: next);
+
+      String next;
+      if (replace) {
+        next = char;
+      } else {
+        if (state!.repsInput.length >= 3) return;
+        next = state!.repsInput + char;
+      }
+      state = state!.copyWith(
+        repsInput: next,
+        replaceOnNextInput: false,
+      );
     }
   }
 
   void onBackspace() {
     if (state == null) return;
     final currentField = state!.activeField;
+    final replace = state!.replaceOnNextInput;
+
+    if (replace) {
+      // First backspace clears the whole field so user starts with a clean slate
+      if (currentField == WorkoutInputField.weight) {
+        state = state!.copyWith(weightInput: '', replaceOnNextInput: false);
+      } else {
+        state = state!.copyWith(repsInput: '', replaceOnNextInput: false);
+      }
+      return;
+    }
 
     if (currentField == WorkoutInputField.weight) {
       if (state!.weightInput.isNotEmpty) {
@@ -196,9 +235,9 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
   void onClear() {
     if (state == null) return;
     if (state!.activeField == WorkoutInputField.weight) {
-      state = state!.copyWith(weightInput: '');
+      state = state!.copyWith(weightInput: '', replaceOnNextInput: false);
     } else {
-      state = state!.copyWith(repsInput: '');
+      state = state!.copyWith(repsInput: '', replaceOnNextInput: false);
     }
   }
 
@@ -208,6 +247,7 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
     final next = (current + delta).clamp(0.0, 999.0);
     state = state!.copyWith(
       weightInput: UnitConverter.formatWeight(next, unit: state!.unit, includeUnit: false),
+      replaceOnNextInput: false,
     );
   }
 
@@ -217,6 +257,7 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
     final next = (current + delta).clamp(1, 999);
     state = state!.copyWith(
       repsInput: '$next',
+      replaceOnNextInput: false,
     );
   }
 

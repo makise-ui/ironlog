@@ -1126,10 +1126,10 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final isWeightActive = isRowActive && activeInput?.activeField == WorkoutInputField.weight;
     final isRepsActive = isRowActive && activeInput?.activeField == WorkoutInputField.reps;
 
-    final displayedWeight = isWeightActive
+    final displayedWeight = isRowActive
         ? activeInput!.weightInput
         : UnitConverter.formatWeight(set.weight, unit: widget.unit, includeUnit: false);
-    final displayedReps = isRepsActive ? activeInput!.repsInput : '${set.reps}';
+    final displayedReps = isRowActive ? activeInput!.repsInput : '${set.reps}';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1192,20 +1192,24 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           BouncyPressable(
             onTap: () {
               AppHaptics.tap();
-              ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                workoutExerciseId: widget.item.id,
-                exerciseId: widget.item.exercise.id,
-                exerciseName: widget.item.exercise.name,
-                equipment: widget.item.exercise.equipment,
-                setIndex: index,
-                existingSetId: set.id,
-                setType: set.setType,
-                field: WorkoutInputField.weight,
-                initialWeight: set.weight,
-                initialReps: set.reps,
-                unit: widget.unit,
-                isCompleted: true,
-              );
+              if (isRowActive) {
+                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
+              } else {
+                ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                  workoutExerciseId: widget.item.id,
+                  exerciseId: widget.item.exercise.id,
+                  exerciseName: widget.item.exercise.name,
+                  equipment: widget.item.exercise.equipment,
+                  setIndex: index,
+                  existingSetId: set.id,
+                  setType: set.setType,
+                  field: WorkoutInputField.weight,
+                  initialWeight: set.weight,
+                  initialReps: set.reps,
+                  unit: widget.unit,
+                  isCompleted: true,
+                );
+              }
             },
             scaleDown: 0.96,
             child: Container(
@@ -1241,20 +1245,24 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           BouncyPressable(
             onTap: () {
               AppHaptics.tap();
-              ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                workoutExerciseId: widget.item.id,
-                exerciseId: widget.item.exercise.id,
-                exerciseName: widget.item.exercise.name,
-                equipment: widget.item.exercise.equipment,
-                setIndex: index,
-                existingSetId: set.id,
-                setType: set.setType,
-                field: WorkoutInputField.reps,
-                initialWeight: set.weight,
-                initialReps: set.reps,
-                unit: widget.unit,
-                isCompleted: true,
-              );
+              if (isRowActive) {
+                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+              } else {
+                ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                  workoutExerciseId: widget.item.id,
+                  exerciseId: widget.item.exercise.id,
+                  exerciseName: widget.item.exercise.name,
+                  equipment: widget.item.exercise.equipment,
+                  setIndex: index,
+                  existingSetId: set.id,
+                  setType: set.setType,
+                  field: WorkoutInputField.reps,
+                  initialWeight: set.weight,
+                  initialReps: set.reps,
+                  unit: widget.unit,
+                  isCompleted: true,
+                );
+              }
             },
             scaleDown: 0.96,
             child: Container(
@@ -1330,10 +1338,10 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final effectiveR = isRowActive ? activeInput!.effectiveReps : targetReps;
     final effectiveT = isRowActive ? activeInput!.setType : targetType;
 
-    final displayedWeight = isWeightActive
+    final displayedWeight = isRowActive
         ? activeInput!.weightInput
         : UnitConverter.formatWeight(targetWeight, unit: widget.unit, includeUnit: false);
-    final displayedReps = isRepsActive ? activeInput!.repsInput : '$targetReps';
+    final displayedReps = isRowActive ? activeInput!.repsInput : '$targetReps';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1398,20 +1406,24 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           BouncyPressable(
             onTap: () {
               AppHaptics.tap();
-              ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                workoutExerciseId: widget.item.id,
-                exerciseId: widget.item.exercise.id,
-                exerciseName: widget.item.exercise.name,
-                equipment: widget.item.exercise.equipment,
-                setIndex: setIndex,
-                existingSetId: null,
-                setType: effectiveT,
-                field: WorkoutInputField.weight,
-                initialWeight: effectiveW,
-                initialReps: effectiveR,
-                unit: widget.unit,
-                isCompleted: false,
-              );
+              if (isRowActive) {
+                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.weight);
+              } else {
+                ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                  workoutExerciseId: widget.item.id,
+                  exerciseId: widget.item.exercise.id,
+                  exerciseName: widget.item.exercise.name,
+                  equipment: widget.item.exercise.equipment,
+                  setIndex: setIndex,
+                  existingSetId: null,
+                  setType: effectiveT,
+                  field: WorkoutInputField.weight,
+                  initialWeight: effectiveW,
+                  initialReps: effectiveR,
+                  unit: widget.unit,
+                  isCompleted: false,
+                );
+              }
             },
             scaleDown: 0.96,
             child: Container(
@@ -1449,20 +1461,24 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
           BouncyPressable(
             onTap: () {
               AppHaptics.tap();
-              ref.read(activeWorkoutInputProvider.notifier).startEditing(
-                workoutExerciseId: widget.item.id,
-                exerciseId: widget.item.exercise.id,
-                exerciseName: widget.item.exercise.name,
-                equipment: widget.item.exercise.equipment,
-                setIndex: setIndex,
-                existingSetId: null,
-                setType: effectiveT,
-                field: WorkoutInputField.reps,
-                initialWeight: effectiveW,
-                initialReps: effectiveR,
-                unit: widget.unit,
-                isCompleted: false,
-              );
+              if (isRowActive) {
+                ref.read(activeWorkoutInputProvider.notifier).switchField(WorkoutInputField.reps);
+              } else {
+                ref.read(activeWorkoutInputProvider.notifier).startEditing(
+                  workoutExerciseId: widget.item.id,
+                  exerciseId: widget.item.exercise.id,
+                  exerciseName: widget.item.exercise.name,
+                  equipment: widget.item.exercise.equipment,
+                  setIndex: setIndex,
+                  existingSetId: null,
+                  setType: effectiveT,
+                  field: WorkoutInputField.reps,
+                  initialWeight: effectiveW,
+                  initialReps: effectiveR,
+                  unit: widget.unit,
+                  isCompleted: false,
+                );
+              }
             },
             scaleDown: 0.96,
             child: Container(

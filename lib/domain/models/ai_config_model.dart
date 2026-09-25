@@ -2,9 +2,12 @@ import 'dart:convert';
 
 enum AiProvider {
   universal,
+  agnes,
   gemini,
   openai,
   anthropic,
+  groq,
+  deepseek,
 }
 
 extension AiProviderExtension on AiProvider {
@@ -12,12 +15,18 @@ extension AiProviderExtension on AiProvider {
     switch (this) {
       case AiProvider.universal:
         return 'Universal (OpenAI-Compatible)';
+      case AiProvider.agnes:
+        return 'Agnes AI';
       case AiProvider.gemini:
         return 'Google Gemini';
       case AiProvider.openai:
         return 'OpenAI (ChatGPT)';
       case AiProvider.anthropic:
         return 'Anthropic (Claude)';
+      case AiProvider.groq:
+        return 'Groq (Ultra-Fast)';
+      case AiProvider.deepseek:
+        return 'DeepSeek';
     }
   }
 
@@ -25,12 +34,18 @@ extension AiProviderExtension on AiProvider {
     switch (this) {
       case AiProvider.universal:
         return 'https://api.kilo.ai/api/gateway';
+      case AiProvider.agnes:
+        return 'https://apihub.agnes-ai.com/v1';
       case AiProvider.gemini:
         return 'https://generativelanguage.googleapis.com/v1beta';
       case AiProvider.openai:
         return 'https://api.openai.com/v1';
       case AiProvider.anthropic:
         return 'https://api.anthropic.com/v1';
+      case AiProvider.groq:
+        return 'https://api.groq.com/openai/v1';
+      case AiProvider.deepseek:
+        return 'https://api.deepseek.com/v1';
     }
   }
 
@@ -38,25 +53,37 @@ extension AiProviderExtension on AiProvider {
     switch (this) {
       case AiProvider.universal:
         return 'kilo-auto/free';
+      case AiProvider.agnes:
+        return 'agnes-3.0-flash';
       case AiProvider.gemini:
-        return 'gemini-1.5-flash';
+        return 'gemini-2.0-flash';
       case AiProvider.openai:
         return 'gpt-4o-mini';
       case AiProvider.anthropic:
-        return 'claude-3-5-haiku-20241022';
+        return 'claude-3-7-sonnet-20250219';
+      case AiProvider.groq:
+        return 'llama-3.3-70b-versatile';
+      case AiProvider.deepseek:
+        return 'deepseek-chat';
     }
   }
 
   String get apiKeyUrl {
     switch (this) {
       case AiProvider.universal:
-        return '';
+        return 'https://kilo.ai';
+      case AiProvider.agnes:
+        return 'https://platform.agnes-ai.com/';
       case AiProvider.gemini:
         return 'https://aistudio.google.com/app/apikey';
       case AiProvider.openai:
         return 'https://platform.openai.com/api-keys';
       case AiProvider.anthropic:
         return 'https://console.anthropic.com/settings/keys';
+      case AiProvider.groq:
+        return 'https://console.groq.com/keys';
+      case AiProvider.deepseek:
+        return 'https://platform.deepseek.com/api_keys';
     }
   }
 }
@@ -86,8 +113,17 @@ class AiConfigModel {
 
   static List<AiConfigModel> get defaultProfiles => const [
     AiConfigModel(
+      id: 'agnes_flash',
+      name: 'Agnes AI (Fast & Smart)',
+      provider: AiProvider.agnes,
+      baseUrl: 'https://apihub.agnes-ai.com/v1',
+      modelName: 'agnes-3.0-flash',
+      apiKey: String.fromEnvironment('AGNES_API_KEY', defaultValue: ''),
+      requireApiKey: true,
+    ),
+    AiConfigModel(
       id: 'kilo_free',
-      name: 'Default AI Coach',
+      name: 'Default AI Coach (Kilo Free)',
       provider: AiProvider.universal,
       baseUrl: 'https://api.kilo.ai/api/gateway',
       modelName: 'kilo-auto/free',
@@ -95,13 +131,22 @@ class AiConfigModel {
       requireApiKey: false,
     ),
     AiConfigModel(
-      id: 'ollama_local',
-      name: 'Ollama (Local)',
-      provider: AiProvider.universal,
-      baseUrl: 'http://localhost:11434/v1',
-      modelName: 'llama3.2',
+      id: 'anthropic_claude',
+      name: 'Anthropic Claude 3.7 Sonnet',
+      provider: AiProvider.anthropic,
+      baseUrl: 'https://api.anthropic.com/v1',
+      modelName: 'claude-3-7-sonnet-20250219',
       apiKey: '',
-      requireApiKey: false,
+      requireApiKey: true,
+    ),
+    AiConfigModel(
+      id: 'gemini_flash',
+      name: 'Google Gemini 2.0 Flash',
+      provider: AiProvider.gemini,
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      modelName: 'gemini-2.0-flash',
+      apiKey: '',
+      requireApiKey: true,
     ),
     AiConfigModel(
       id: 'openai_mini',
@@ -113,22 +158,31 @@ class AiConfigModel {
       requireApiKey: true,
     ),
     AiConfigModel(
-      id: 'gemini_flash',
-      name: 'Google Gemini Flash',
-      provider: AiProvider.gemini,
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-      modelName: 'gemini-1.5-flash',
+      id: 'groq_llama',
+      name: 'Groq Llama 3.3 70B',
+      provider: AiProvider.groq,
+      baseUrl: 'https://api.groq.com/openai/v1',
+      modelName: 'llama-3.3-70b-versatile',
       apiKey: '',
       requireApiKey: true,
     ),
     AiConfigModel(
-      id: 'anthropic_haiku',
-      name: 'Anthropic Claude 3.5 Haiku',
-      provider: AiProvider.anthropic,
-      baseUrl: 'https://api.anthropic.com/v1',
-      modelName: 'claude-3-5-haiku-20241022',
+      id: 'deepseek_chat',
+      name: 'DeepSeek V3 Chat',
+      provider: AiProvider.deepseek,
+      baseUrl: 'https://api.deepseek.com/v1',
+      modelName: 'deepseek-chat',
       apiKey: '',
       requireApiKey: true,
+    ),
+    AiConfigModel(
+      id: 'ollama_local',
+      name: 'Ollama (Local)',
+      provider: AiProvider.universal,
+      baseUrl: 'http://localhost:11434/v1',
+      modelName: 'llama3.2',
+      apiKey: '',
+      requireApiKey: false,
     ),
   ];
 

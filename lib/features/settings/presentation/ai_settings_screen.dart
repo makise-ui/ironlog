@@ -761,6 +761,36 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
                               : (profile.apiKey.isNotEmpty ? context.textSecondary : AppColors.error),
                         ),
                       ),
+                      if (profile.requireApiKey && profile.apiKey.isEmpty && profile.provider.apiKeyUrl.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () async {
+                            final uri = Uri.parse(profile.provider.apiKeyUrl);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: context.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: context.accent.withValues(alpha: 0.35)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Get Key',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.accent),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(Icons.open_in_new_rounded, size: 9, color: context.accent),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -984,15 +1014,87 @@ class _ProfileEditorSheetState extends ConsumerState<_ProfileEditorSheet> {
                     child: Row(
                       children: [
                         _buildPresetChip(
-                          'Kilo Free (Default)',
+                          'Agnes AI (Fast & Smart)',
                           () => _applyPreset(
-                            name: 'Kilo Free',
+                            name: 'Agnes AI (Fast & Smart)',
+                            provider: AiProvider.agnes,
+                            baseUrl: 'https://apihub.agnes-ai.com/v1',
+                            model: 'agnes-3.0-flash',
+                            requireKey: true,
+                          ),
+                          isRecommended: true,
+                          icon: Icons.flash_on_rounded,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildPresetChip(
+                          'Claude 3.7 Sonnet',
+                          () => _applyPreset(
+                            name: 'Anthropic Claude 3.7 Sonnet',
+                            provider: AiProvider.anthropic,
+                            baseUrl: 'https://api.anthropic.com/v1',
+                            model: 'claude-3-7-sonnet-20250219',
+                            requireKey: true,
+                          ),
+                          icon: Icons.psychology_rounded,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildPresetChip(
+                          'Gemini 2.0 Flash',
+                          () => _applyPreset(
+                            name: 'Google Gemini 2.0 Flash',
+                            provider: AiProvider.gemini,
+                            baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+                            model: 'gemini-2.0-flash',
+                            requireKey: true,
+                          ),
+                          icon: Icons.diamond_outlined,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildPresetChip(
+                          'GPT-4o Mini',
+                          () => _applyPreset(
+                            name: 'OpenAI GPT-4o Mini',
+                            provider: AiProvider.openai,
+                            baseUrl: 'https://api.openai.com/v1',
+                            model: 'gpt-4o-mini',
+                            requireKey: true,
+                          ),
+                          icon: Icons.auto_awesome_rounded,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildPresetChip(
+                          'Groq Llama 3.3',
+                          () => _applyPreset(
+                            name: 'Groq Llama 3.3 70B',
+                            provider: AiProvider.groq,
+                            baseUrl: 'https://api.groq.com/openai/v1',
+                            model: 'llama-3.3-70b-versatile',
+                            requireKey: true,
+                          ),
+                          icon: Icons.speed_rounded,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildPresetChip(
+                          'DeepSeek V3',
+                          () => _applyPreset(
+                            name: 'DeepSeek V3 Chat',
+                            provider: AiProvider.deepseek,
+                            baseUrl: 'https://api.deepseek.com/v1',
+                            model: 'deepseek-chat',
+                            requireKey: true,
+                          ),
+                          icon: Icons.hub_rounded,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildPresetChip(
+                          'Kilo Free',
+                          () => _applyPreset(
+                            name: 'Default AI Coach',
                             provider: AiProvider.universal,
                             baseUrl: 'https://api.kilo.ai/api/gateway',
                             model: 'kilo-auto/free',
                             requireKey: false,
                           ),
-                          isRecommended: true,
                           icon: Icons.bolt_rounded,
                         ),
                         const SizedBox(width: 6),
@@ -1018,30 +1120,6 @@ class _ProfileEditorSheetState extends ConsumerState<_ProfileEditorSheet> {
                             requireKey: false,
                           ),
                           icon: Icons.computer_rounded,
-                        ),
-                        const SizedBox(width: 6),
-                        _buildPresetChip(
-                          'OpenAI',
-                          () => _applyPreset(
-                            name: 'OpenAI GPT-4o Mini',
-                            provider: AiProvider.openai,
-                            baseUrl: 'https://api.openai.com/v1',
-                            model: 'gpt-4o-mini',
-                            requireKey: true,
-                          ),
-                          icon: Icons.auto_awesome_rounded,
-                        ),
-                        const SizedBox(width: 6),
-                        _buildPresetChip(
-                          'Gemini',
-                          () => _applyPreset(
-                            name: 'Google Gemini Flash',
-                            provider: AiProvider.gemini,
-                            baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-                            model: 'gemini-1.5-flash',
-                            requireKey: true,
-                          ),
-                          icon: Icons.diamond_outlined,
                         ),
                       ],
                     ),
@@ -1130,17 +1208,43 @@ class _ProfileEditorSheetState extends ConsumerState<_ProfileEditorSheet> {
                     ),
                   ),
                   if (_provider.apiKeyUrl.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    ScaleTap(
-                      onPressed: () async {
-                        final uri = Uri.parse(_provider.apiKeyUrl);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
-                        }
-                      },
-                      child: Text(
-                        'Get API Key: ${_provider.apiKeyUrl}',
-                        style: TextStyle(fontSize: 11, color: context.accent, decoration: TextDecoration.underline),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: BouncyPressable(
+                        onTap: () async {
+                          AppHaptics.tap();
+                          final uri = Uri.parse(_provider.apiKeyUrl);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        scaleDown: 0.95,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: context.accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: context.accent.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.vpn_key_rounded, size: 13, color: context.accent),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Get ${_provider.displayName} API Key',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.accent,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.open_in_new_rounded, size: 11, color: context.accent),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],

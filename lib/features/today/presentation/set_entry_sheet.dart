@@ -41,6 +41,8 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
 
   String _weightInput = '';
   String _repsInput = '';
+  bool _replaceWeightOnInput = true;
+  bool _replaceRepsOnInput = true;
 
   late SetType _setType;
   double? _rpe;
@@ -93,12 +95,22 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
     AppHaptics.step();
     setState(() {
       if (_activeMode == ActiveInputMode.weight) {
+        if (_replaceWeightOnInput) {
+          _replaceWeightOnInput = false;
+          _weightInput = (digit == '.') ? '0.' : digit;
+          return;
+        }
         if (digit == '.' && _weightInput.contains('.')) return;
         if (_weightInput.length < 6) {
           _weightInput += digit;
         }
       } else {
         if (digit == '.') return; // Reps cannot have decimals
+        if (_replaceRepsOnInput) {
+          _replaceRepsOnInput = false;
+          _repsInput = digit;
+          return;
+        }
         if (_repsInput.length < 3) {
           _repsInput += digit;
         }
@@ -110,10 +122,20 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
     AppHaptics.tap();
     setState(() {
       if (_activeMode == ActiveInputMode.weight) {
+        if (_replaceWeightOnInput) {
+          _replaceWeightOnInput = false;
+          _weightInput = '';
+          return;
+        }
         if (_weightInput.isNotEmpty) {
           _weightInput = _weightInput.substring(0, _weightInput.length - 1);
         }
       } else {
+        if (_replaceRepsOnInput) {
+          _replaceRepsOnInput = false;
+          _repsInput = '';
+          return;
+        }
         if (_repsInput.isNotEmpty) {
           _repsInput = _repsInput.substring(0, _repsInput.length - 1);
         }
@@ -126,8 +148,10 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
     setState(() {
       if (_activeMode == ActiveInputMode.weight) {
         _weightInput = '';
+        _replaceWeightOnInput = false;
       } else {
         _repsInput = '';
+        _replaceRepsOnInput = false;
       }
     });
   }
@@ -135,6 +159,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
   void _stepWeight(double delta) {
     AppHaptics.step();
     setState(() {
+      _replaceWeightOnInput = false;
       final current = _effectiveWeight;
       final next = (current + delta).clamp(0.0, 999.0);
       _weightInput = UnitConverter.formatWeight(next, includeUnit: false);
@@ -144,6 +169,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
   void _stepReps(int delta) {
     AppHaptics.step();
     setState(() {
+      _replaceRepsOnInput = false;
       final current = _effectiveReps;
       final next = (current + delta).clamp(1, 999);
       _repsInput = next.toString();
@@ -303,7 +329,10 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
                   isActive: _activeMode == ActiveInputMode.weight,
                   onTap: () {
                     AppHaptics.tap();
-                    setState(() => _activeMode = ActiveInputMode.weight);
+                    setState(() {
+                      _activeMode = ActiveInputMode.weight;
+                      _replaceWeightOnInput = true;
+                    });
                   },
                   onMinus: () => _stepWeight(-_weightStep),
                   onPlus: () => _stepWeight(_weightStep),
@@ -320,7 +349,10 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
                   isActive: _activeMode == ActiveInputMode.reps,
                   onTap: () {
                     AppHaptics.tap();
-                    setState(() => _activeMode = ActiveInputMode.reps);
+                    setState(() {
+                      _activeMode = ActiveInputMode.reps;
+                      _replaceRepsOnInput = true;
+                    });
                   },
                   onMinus: () => _stepReps(-1),
                   onPlus: () => _stepReps(1),
