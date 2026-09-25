@@ -9,6 +9,7 @@ import '../../../core/utils/unit_converter.dart';
 import '../../../core/widgets/glass_button.dart';
 import '../../../core/widgets/glass_tile.dart';
 import '../../../domain/models/workout_model.dart';
+import '../../../domain/models/exercise_model.dart';
 import '../../../domain/models/set_model.dart';
 import '../../../data/providers.dart';
 
@@ -136,12 +137,40 @@ class WorkoutDetailSheet extends ConsumerWidget {
                           TableRow(
                             children: [
                               Text('SET', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
-                              Text('WEIGHT', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
-                              Text('REPS', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
-                              Text('e1RM', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
+                              Text(exItem.exercise.isHoldDuration || exItem.exercise.isBodyweight ? '+LOAD' : 'WEIGHT', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
+                              Text(exItem.exercise.isHoldDuration ? 'TIME' : (exItem.exercise.isCardioTime ? 'MINUTES' : 'REPS'), style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
+                              Text(exItem.exercise.isStandardWeightAndReps ? 'e1RM' : '', style: AppTypography.labelSmall.copyWith(color: context.textTertiary)),
                             ],
                           ),
                           ...activeSets.map((s) {
+                            final tracking = exItem.exercise.trackingType;
+                            String weightStr;
+                            if (tracking == ExerciseTrackingType.duration) {
+                              weightStr = s.weight > 0 ? '+${UnitConverter.formatWeight(s.weight, unit: unit)}' : '—';
+                            } else if (tracking == ExerciseTrackingType.cardioTime) {
+                              weightStr = '—';
+                            } else if (tracking == ExerciseTrackingType.bodyweightReps) {
+                              weightStr = s.weight > 0 ? '+${UnitConverter.formatWeight(s.weight, unit: unit)}' : 'BW';
+                            } else {
+                              weightStr = UnitConverter.formatWeight(s.weight, unit: unit);
+                            }
+
+                            String repsStr;
+                            if (tracking == ExerciseTrackingType.duration) {
+                              repsStr = SetModel.formatDuration(s.reps);
+                            } else if (tracking == ExerciseTrackingType.cardioTime) {
+                              repsStr = '${s.reps}m';
+                            } else {
+                              repsStr = '${s.reps}';
+                            }
+
+                            String e1rmStr;
+                            if (tracking == ExerciseTrackingType.weightAndReps) {
+                              e1rmStr = UnitConverter.formatWeight(s.e1rm, unit: unit);
+                            } else {
+                              e1rmStr = '—';
+                            }
+
                             return TableRow(
                               children: [
                                 Padding(
@@ -160,7 +189,7 @@ class WorkoutDetailSheet extends ConsumerWidget {
                                 Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Text(
-                                    UnitConverter.formatWeight(s.weight, unit: unit),
+                                    weightStr,
                                     style: TextStyle(
                                       fontFamily: AppTypography.fontFamily,
                                       color: context.textPrimary,
@@ -171,7 +200,7 @@ class WorkoutDetailSheet extends ConsumerWidget {
                                 Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Text(
-                                    '${s.reps}',
+                                    repsStr,
                                     style: TextStyle(
                                       fontFamily: AppTypography.fontFamily,
                                       color: context.textPrimary,
@@ -182,7 +211,7 @@ class WorkoutDetailSheet extends ConsumerWidget {
                                 Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Text(
-                                    UnitConverter.formatWeight(s.e1rm, unit: unit),
+                                    e1rmStr,
                                     style: TextStyle(
                                       fontFamily: AppTypography.fontFamily,
                                       color: context.accent,

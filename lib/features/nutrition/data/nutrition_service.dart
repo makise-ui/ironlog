@@ -7,6 +7,7 @@ import '../domain/models/nutrition_model.dart';
 import '../../../domain/models/workout_model.dart';
 import '../../../data/providers.dart';
 import '../../../domain/services/ai_assistant_service.dart';
+import '../../../domain/services/backup_service.dart';
 import '../../../domain/models/ai_chat_message.dart';
 
 final nutritionServiceProvider = Provider<NutritionService>((ref) {
@@ -297,6 +298,10 @@ class NutritionService {
     final prefs = await SharedPreferences.getInstance();
     final key = _dateKey(log.date);
     await prefs.setString(key, jsonEncode(log.toMap()));
+    try {
+      final db = _ref.read(databaseProvider);
+      BackupService.scheduleAutoBackup(db);
+    } catch (_) {}
   }
 
   /// Adds a logged meal to the date

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/unit_converter.dart';
 import '../services/weight_step_learner.dart';
+import 'exercise_model.dart';
 import 'set_model.dart';
 
 enum WorkoutInputField { weight, reps }
@@ -10,6 +11,7 @@ class ActiveWorkoutInput {
   final String exerciseId;
   final String exerciseName;
   final EquipmentType equipment;
+  final ExerciseTrackingType trackingType;
   final int setIndex; // 1-indexed (1, 2, 3...)
   final String? existingSetId; // null if this is an unlogged/planned ghost set
   final SetType setType;
@@ -19,12 +21,15 @@ class ActiveWorkoutInput {
   final WeightUnit unit;
   final bool isCompleted;
   final bool replaceOnNextInput;
+  final double? targetWeight;
+  final int? targetReps;
 
   const ActiveWorkoutInput({
     required this.workoutExerciseId,
     required this.exerciseId,
     required this.exerciseName,
     required this.equipment,
+    this.trackingType = ExerciseTrackingType.weightAndReps,
     required this.setIndex,
     this.existingSetId,
     required this.setType,
@@ -34,6 +39,8 @@ class ActiveWorkoutInput {
     required this.unit,
     required this.isCompleted,
     this.replaceOnNextInput = true,
+    this.targetWeight,
+    this.targetReps,
   });
 
   double get effectiveWeight => double.tryParse(weightInput) ?? 0.0;
@@ -81,11 +88,46 @@ class ActiveWorkoutInput {
     return parts.join(' + ');
   }
 
+  /// List of plate weights and count per side for visual discs
+  List<MapEntry<double, int>>? get plateBreakdownEntries {
+    if (equipment != EquipmentType.barbell) return null;
+    final w = effectiveWeight;
+    final isKg = unit == WeightUnit.kg;
+    final barWeight = isKg ? 20.0 : 45.0;
+
+    if (w <= barWeight) return null;
+
+    final perSide = (w - barWeight) / 2.0;
+    if (perSide <= 0) return null;
+
+    final plates = isKg
+        ? const [25.0, 20.0, 15.0, 10.0, 5.0, 2.5, 1.25]
+        : const [45.0, 35.0, 25.0, 10.0, 5.0, 2.5];
+
+    final counts = <double, int>{};
+    double rem = perSide;
+    const eps = 0.001;
+
+    for (final p in plates) {
+      if (rem + eps >= p) {
+        final c = (rem / p).floor();
+        if (c > 0) {
+          counts[p] = c;
+          rem -= c * p;
+        }
+      }
+    }
+
+    if (counts.isEmpty) return null;
+    return counts.entries.toList();
+  }
+
   ActiveWorkoutInput copyWith({
     String? workoutExerciseId,
     String? exerciseId,
     String? exerciseName,
     EquipmentType? equipment,
+    ExerciseTrackingType? trackingType,
     int? setIndex,
     String? existingSetId,
     SetType? setType,
@@ -95,12 +137,15 @@ class ActiveWorkoutInput {
     WeightUnit? unit,
     bool? isCompleted,
     bool? replaceOnNextInput,
+    double? targetWeight,
+    int? targetReps,
   }) {
     return ActiveWorkoutInput(
       workoutExerciseId: workoutExerciseId ?? this.workoutExerciseId,
       exerciseId: exerciseId ?? this.exerciseId,
       exerciseName: exerciseName ?? this.exerciseName,
       equipment: equipment ?? this.equipment,
+      trackingType: trackingType ?? this.trackingType,
       setIndex: setIndex ?? this.setIndex,
       existingSetId: existingSetId ?? this.existingSetId,
       setType: setType ?? this.setType,
@@ -110,6 +155,8 @@ class ActiveWorkoutInput {
       unit: unit ?? this.unit,
       isCompleted: isCompleted ?? this.isCompleted,
       replaceOnNextInput: replaceOnNextInput ?? this.replaceOnNextInput,
+      targetWeight: targetWeight ?? this.targetWeight,
+      targetReps: targetReps ?? this.targetReps,
     );
   }
 }
@@ -122,6 +169,7 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
     required String exerciseId,
     required String exerciseName,
     required EquipmentType equipment,
+    ExerciseTrackingType trackingType = ExerciseTrackingType.weightAndReps,
     required int setIndex,
     String? existingSetId,
     required SetType setType,
@@ -130,12 +178,15 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
     required int initialReps,
     required WeightUnit unit,
     required bool isCompleted,
+    double? targetWeight,
+    int? targetReps,
   }) {
     state = ActiveWorkoutInput(
       workoutExerciseId: workoutExerciseId,
       exerciseId: exerciseId,
       exerciseName: exerciseName,
       equipment: equipment,
+      trackingType: trackingType,
       setIndex: setIndex,
       existingSetId: existingSetId,
       setType: setType,
@@ -145,6 +196,8 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
       unit: unit,
       isCompleted: isCompleted,
       replaceOnNextInput: true,
+      targetWeight: targetWeight,
+      targetReps: targetReps,
     );
   }
 

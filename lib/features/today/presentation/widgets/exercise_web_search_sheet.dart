@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/haptics.dart';
+import '../../../../core/utils/url_launcher_utils.dart';
 
 /// In-App Google Search & Image Viewer for exercises
 /// Displays live Google Image Search and Web results inside the app
@@ -118,10 +118,7 @@ class _ExerciseWebSearchSheetState extends State<ExerciseWebSearchSheet> {
   Future<void> _openExternal() async {
     AppHaptics.tap();
     final currentUrl = await _controller.currentUrl() ?? _buildUrl(_isImagesTab);
-    final uri = Uri.parse(currentUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await UrlLauncherUtils.openUrl(currentUrl);
   }
 
   @override

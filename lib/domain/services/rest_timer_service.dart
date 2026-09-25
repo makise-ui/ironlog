@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../core/utils/haptics.dart';
 
 class RestTimerState {
   final DateTime? endsAt;
@@ -62,6 +63,7 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _ticker;
   RestTimerState _state = const RestTimerState();
   bool _isAppInBackground = false;
+  bool _warningHapticGiven = false;
 
   RestTimerState get state => _state;
   bool get isAppInBackground => _isAppInBackground;
@@ -112,6 +114,7 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
 
   void start({required int seconds, required String exerciseName}) {
     _ticker?.cancel();
+    _warningHapticGiven = false;
     final endsAt = DateTime.now().add(Duration(seconds: seconds));
 
     _state = RestTimerState(
@@ -135,6 +138,7 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
 
   void addSeconds(int delta) {
     if (_state.endsAt == null && !_state.isPaused) return;
+    _warningHapticGiven = false;
 
     if (_state.isPaused) {
       final newRemaining = math.max(5, (_state.pausedRemainingSeconds ?? 0) + delta);
@@ -181,6 +185,7 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
+    _warningHapticGiven = false;
     final newEndsAt = DateTime.now().add(Duration(seconds: remaining));
     _state = _state.copyWith(
       endsAt: newEndsAt,
@@ -198,6 +203,7 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
   void stop() {
     _cancelNotification();
     _ticker?.cancel();
+    _warningHapticGiven = false;
     _state = const RestTimerState();
     notifyListeners();
   }
@@ -206,13 +212,20 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_state.endsAt != null) {
-        if (_state.endsAt!.isBefore(DateTime.now())) {
+        final now = DateTime.now();
+        if (_state.endsAt!.isBefore(now)) {
           final finishedEx = _state.exerciseName;
           stop();
+          AppHaptics.timerFinished();
           if (_isAppInBackground) {
             _showRestFinishedNotification(finishedEx);
           }
         } else {
+          final remaining = _state.endsAt!.difference(now).inSeconds;
+          if (remaining <= 10 && remaining > 0 && !_warningHapticGiven) {
+            _warningHapticGiven = true;
+            AppHaptics.timerWarning();
+          }
           notifyListeners();
         }
       }

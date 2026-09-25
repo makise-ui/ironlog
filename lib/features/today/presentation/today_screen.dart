@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,6 +29,8 @@ import 'widgets/exercise_table_card.dart';
 import 'widgets/docked_workout_numpad.dart';
 import '../../../domain/models/active_workout_input.dart';
 import '../../../domain/models/set_model.dart';
+import '../../../domain/models/exercise_model.dart';
+import '../../../domain/services/weight_step_learner.dart';
 import 'confetti_celebration.dart';
 import 'workout_summary_dialog.dart';
 import 'suggestion_explain_sheet.dart';
@@ -41,6 +44,31 @@ import 'widgets/routine_card.dart';
 import '../../routines/presentation/create_preset_sheet.dart';
 import '../../intro/presentation/onboarding_sheet.dart';
 
+class _NextTargetInfo {
+  final WorkoutExerciseItem exerciseItem;
+  final int exerciseIndex;
+  final int totalExercises;
+  final int setIndex;
+  final int totalSets;
+  final double targetWeight;
+  final int targetReps;
+  final SetType targetType;
+  final ExerciseTrackingType trackingType;
+  final EquipmentType equipment;
+
+  const _NextTargetInfo({
+    required this.exerciseItem,
+    required this.exerciseIndex,
+    required this.totalExercises,
+    required this.setIndex,
+    required this.totalSets,
+    required this.targetWeight,
+    required this.targetReps,
+    required this.targetType,
+    required this.trackingType,
+    required this.equipment,
+  });
+}
 
 class TodayScreen extends ConsumerStatefulWidget {
   final DateTime? initialDate;
@@ -54,6 +82,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   WorkoutModel? _workout;
   bool _isLoading = true;
   bool _sessionLeft = false;
+  String? _activeWorkoutExerciseId;
   late DateTime _selectedDate;
   final Set<String> _selectedMuscleGroupIds = {};
   List<Suggestion> _suggestions = [];
@@ -750,7 +779,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             await repo.startWorkout(_workout!.id, startedAt: start);
           }
           await _refreshWorkout();
-          unawaited(BackupService.autoBackup(ref.read(databaseProvider)));
+          await BackupService.autoBackup(ref.read(databaseProvider));
           if (mounted) {
             ConfettiCelebration.show(context);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -871,14 +900,19 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       exerciseId: input.exerciseId,
       exerciseName: input.exerciseName,
       equipment: input.equipment,
+      trackingType: input.trackingType,
       setIndex: input.setIndex + 1,
       existingSetId: null,
       setType: SetType.working,
-      field: WorkoutInputField.weight,
+      field: input.trackingType != ExerciseTrackingType.weightAndReps
+          ? WorkoutInputField.reps
+          : WorkoutInputField.weight,
       initialWeight: input.effectiveWeight,
       initialReps: input.effectiveReps,
       unit: input.unit,
       isCompleted: false,
+      targetWeight: input.effectiveWeight,
+      targetReps: input.effectiveReps,
     );
   }
 
@@ -894,6 +928,587 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     await _refreshWorkout();
     ref.read(activeWorkoutInputProvider.notifier).close();
   }
+
+  Future<void> _quickLogTargetSet(_NextTargetInfo target, WeightUnit unit) async {
+    final repo = ref.read(workoutRepositoryProvider);
+    final newSetId = await repo.logSet(
+      workoutExerciseId: target.exerciseItem.id,
+      exerciseId: target.exerciseItem.exercise.id,
+      muscleGroupId: target.exerciseItem.exercise.muscleGroupId,
+      date: DateTime.now(),
+      weight: target.targetWeight,
+      reps: target.targetReps,
+      setType: target.targetType,
+    );
+
+    ref.read(restTimerProvider).start(
+      seconds: target.exerciseItem.exercise.restSeconds,
+      exerciseName: target.exerciseItem.exercise.name,
+    );
+
+    final allHistory = await repo.getAllHistoricalSetsForExercise(target.exerciseItem.exercise.id);
+    final newlyCreatedSet = SetModel(
+      id: newSetId,
+      workoutExerciseId: target.exerciseItem.id,
+      exerciseId: target.exerciseItem.exercise.id,
+      muscleGroupId: target.exerciseItem.exercise.muscleGroupId,
+      date: DateTime.now(),
+      setIndex: target.setIndex,
+      weight: target.targetWeight,
+      reps: target.targetReps,
+      setType: target.targetType,
+      completedAt: DateTime.now(),
+    );
+
+    final prCheck = PrDetector.checkSetPr(
+      newSet: newlyCreatedSet,
+      historicalSets: allHistory,
+      weightUnit: unit.label,
+    );
+
+    if (prCheck.isPr) {
+      AppHaptics.pr();
+      setState(() => _activePr = prCheck);
+    } else {
+      AppHaptics.success();
+    }
+
+    _activeWorkoutExerciseId = target.exerciseItem.id;
+    await _refreshWorkout();
+  }
+
+  void _openNextTargetInNumpad(_NextTargetInfo target, WeightUnit unit) {
+    AppHaptics.tap();
+    _activeWorkoutExerciseId = target.exerciseItem.id;
+    ref.read(activeWorkoutInputProvider.notifier).startEditing(
+      workoutExerciseId: target.exerciseItem.id,
+      exerciseId: target.exerciseItem.exercise.id,
+      exerciseName: target.exerciseItem.exercise.name,
+      equipment: target.equipment,
+      trackingType: target.trackingType,
+      setIndex: target.setIndex,
+      existingSetId: null,
+      setType: target.targetType,
+      field: target.trackingType != ExerciseTrackingType.weightAndReps
+          ? WorkoutInputField.reps
+          : WorkoutInputField.weight,
+      initialWeight: target.targetWeight,
+      initialReps: target.targetReps,
+      unit: unit,
+      isCompleted: false,
+      targetWeight: target.targetWeight,
+      targetReps: target.targetReps,
+    );
+  }
+
+  void _selectPreviousExercise(List<WorkoutExerciseItem> activeExercises) {
+    if (activeExercises.isEmpty) return;
+    AppHaptics.selection();
+    final currentIndex = activeExercises.indexWhere((e) => e.id == _activeWorkoutExerciseId);
+    if (currentIndex > 0) {
+      setState(() {
+        _activeWorkoutExerciseId = activeExercises[currentIndex - 1].id;
+      });
+    } else {
+      setState(() {
+        _activeWorkoutExerciseId = activeExercises.last.id;
+      });
+    }
+  }
+
+  void _selectNextExercise(List<WorkoutExerciseItem> activeExercises) {
+    if (activeExercises.isEmpty) return;
+    AppHaptics.selection();
+    final currentIndex = activeExercises.indexWhere((e) => e.id == _activeWorkoutExerciseId);
+    if (currentIndex >= 0 && currentIndex + 1 < activeExercises.length) {
+      setState(() {
+        _activeWorkoutExerciseId = activeExercises[currentIndex + 1].id;
+      });
+    } else {
+      setState(() {
+        _activeWorkoutExerciseId = activeExercises.first.id;
+      });
+    }
+  }
+
+  void _showExerciseJumpSheet(List<WorkoutExerciseItem> activeExercises) {
+    AppHaptics.selection();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF141722) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF262B3D) : const Color(0xFFE2E4EE),
+            ),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 6, bottom: 8),
+                child: Text(
+                  'Select Exercise',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              ...activeExercises.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final item = entry.value;
+                final isSelected = item.id == _activeWorkoutExerciseId;
+                final completedCount = item.sets.where((s) => !s.archived).length;
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  leading: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? context.accent.withValues(alpha: 0.2)
+                          : (isDark ? const Color(0xFF1E2232) : const Color(0xFFF1F5F9)),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${idx + 1}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: isSelected ? context.accent : context.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    item.exercise.name,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? context.accent : context.textPrimary,
+                    ),
+                  ),
+                  trailing: Text(
+                    '$completedCount sets',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  onTap: () {
+                    AppHaptics.tap();
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _activeWorkoutExerciseId = item.id;
+                    });
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  _NextTargetInfo? _computeNextTarget(List<WorkoutExerciseItem> activeExercises, WeightUnit unit) {
+    if (activeExercises.isEmpty) return null;
+
+    // Resolve which exercise is currently active
+    WorkoutExerciseItem? currentItem;
+    if (_activeWorkoutExerciseId != null) {
+      currentItem = activeExercises.where((e) => e.id == _activeWorkoutExerciseId).firstOrNull;
+    }
+
+    if (currentItem == null) {
+      // Find the first exercise with incomplete sets or default to the first exercise
+      for (final e in activeExercises) {
+        final completed = e.sets.where((s) => !s.archived).toList();
+        if (completed.length < 3) {
+          currentItem = e;
+          break;
+        }
+      }
+      currentItem ??= activeExercises.first;
+      _activeWorkoutExerciseId = currentItem.id;
+    }
+
+    final exIndex = activeExercises.indexWhere((e) => e.id == currentItem!.id);
+    final completedSets = currentItem.sets.where((s) => !s.archived).toList();
+    final nextSetIndex = completedSets.length + 1;
+    final totalSets = math.max(3, completedSets.length + 1);
+
+    double targetW;
+    int targetR;
+    if (completedSets.isNotEmpty) {
+      targetW = completedSets.last.weight;
+      targetR = completedSets.last.reps;
+    } else {
+      final exSug = _suggestions.where((s) => s.payload['exerciseId'] == currentItem!.exercise.id).firstOrNull;
+      final sw = exSug?.payload['suggestedWeight'] as num?;
+      final sr = exSug?.payload['suggestedReps'] as num?;
+      targetW = sw?.toDouble() ?? (currentItem.exercise.equipment == EquipmentType.barbell ? (unit == WeightUnit.kg ? 20.0 : 45.0) : 0.0);
+      targetR = sr?.toInt() ?? (currentItem.exercise.trackingType == ExerciseTrackingType.duration ? 30 : 10);
+    }
+
+    return _NextTargetInfo(
+      exerciseItem: currentItem,
+      exerciseIndex: exIndex >= 0 ? exIndex : 0,
+      totalExercises: activeExercises.length,
+      setIndex: nextSetIndex,
+      totalSets: totalSets,
+      targetWeight: targetW,
+      targetReps: targetR,
+      targetType: SetType.working,
+      trackingType: currentItem.exercise.trackingType,
+      equipment: currentItem.exercise.equipment,
+    );
+  }
+
+  Widget _buildNextTargetHud(_NextTargetInfo? target, WeightUnit unit, List<WorkoutExerciseItem> activeExercises) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (target == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xF8121520) : Colors.white.withValues(alpha: 0.98),
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF262B3D) : const Color(0xFFE2E4EE),
+              width: 1.0,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle_rounded, size: 20, color: AppColors.success),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'All Targets Logged',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'All planned sets for this session are complete',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ScaleTap(
+                onPressed: _finishWorkout,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: C.positive,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.flag_rounded, size: 16, color: Colors.black),
+                      SizedBox(width: 5),
+                      Text(
+                        'Finish',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final tracking = target.trackingType;
+    final targetStr = tracking == ExerciseTrackingType.duration
+        ? '${target.targetReps}s hold'
+        : (tracking == ExerciseTrackingType.cardioTime
+            ? '${target.targetReps} min'
+            : (tracking == ExerciseTrackingType.bodyweightReps
+                ? '${target.targetReps} reps ${target.targetWeight > 0 ? '(+${UnitConverter.formatWeight(target.targetWeight, unit: unit)})' : '(BW)'}'
+                : '${UnitConverter.formatWeight(target.targetWeight, unit: unit)} × ${target.targetReps} reps'));
+
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity == null) return;
+        if (details.primaryVelocity! < -200) {
+          // Swipe left -> Next exercise
+          _selectNextExercise(activeExercises);
+        } else if (details.primaryVelocity! > 200) {
+          // Swipe right -> Previous exercise
+          _selectPreviousExercise(activeExercises);
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xF8121520) : Colors.white.withValues(alpha: 0.98),
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF262B3D) : const Color(0xFFE2E4EE),
+              width: 1.0,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                // Set Indicator Pill
+                ScaleTap(
+                  onPressed: () => _openNextTargetInNumpad(target, unit),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: context.accent.withValues(alpha: isDark ? 0.20 : 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: context.accent.withValues(alpha: 0.45),
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'NEXT',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: context.accent,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        Text(
+                          'SET ${target.setIndex}',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: context.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Exercise Info & Steppers
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _openNextTargetInNumpad(target, unit),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                target.exerciseItem.exercise.name,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            // Exercise Switcher Pill (Tap opens quick exercise jump sheet)
+                            GestureDetector(
+                              onTap: () => _showExerciseJumpSheet(activeExercises),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E2232) : const Color(0xFFEEF2F6),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${target.exerciseIndex + 1}/${target.totalExercises}',
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: context.textSecondary,
+                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Icon(Icons.unfold_more_rounded, size: 10, color: context.textSecondary),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Target: $targetStr',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: context.accent,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Previous Exercise Button
+                if (activeExercises.length > 1) ...[
+                  ScaleTap(
+                    onPressed: () => _selectPreviousExercise(activeExercises),
+                    child: Container(
+                      width: 28,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A1D2B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF282D42) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(Icons.chevron_left_rounded, size: 18, color: context.textSecondary),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Next Exercise Button
+                  ScaleTap(
+                    onPressed: () => _selectNextExercise(activeExercises),
+                    child: Container(
+                      width: 28,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A1D2B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF282D42) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(Icons.chevron_right_rounded, size: 18, color: context.textSecondary),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+
+                // 1-Tap Quick Log Button
+                ScaleTap(
+                  onPressed: () => _quickLogTargetSet(target, unit),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8.5),
+                    decoration: BoxDecoration(
+                      color: context.accent,
+                      borderRadius: BorderRadius.circular(9),
+                      boxShadow: [
+                        BoxShadow(
+                          color: context.accent.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_rounded, size: 15, color: Colors.black),
+                        SizedBox(width: 3),
+                        Text(
+                          'Log Set',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
 
   void _leaveSession() {
     ref.read(activeWorkoutInputProvider.notifier).close();
@@ -1463,6 +2078,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
     final activeExercises = _workout?.exercises.where((e) => !e.archived).toList() ?? [];
     final nextWorkoutSug = _suggestions.where((s) => s.type == SuggestionType.nextWorkout).firstOrNull;
+
+    final activeInputState = ref.watch(activeWorkoutInputProvider);
+    if (activeInputState != null && _activeWorkoutExerciseId != activeInputState.workoutExerciseId) {
+      _activeWorkoutExerciseId = activeInputState.workoutExerciseId;
+    }
     ref.listen<DateTime>(selectedWorkoutDateProvider, (prev, next) {
       if (prev != next && !AppDateUtils.isSameDay(_selectedDate, next)) {
         _loadWorkoutForDate(next);
@@ -2256,6 +2876,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       setState(() => _activePr = pr);
                     },
                     onRemoveExercise: () => _removeExercise(item),
+                    onExerciseFocused: () {
+                      if (_activeWorkoutExerciseId != item.id) {
+                        setState(() => _activeWorkoutExerciseId = item.id);
+                      }
+                    },
                   ),
                 );
               },
@@ -2341,12 +2966,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         ),
 
         SliverToBoxAdapter(
-          child: SizedBox(height: ref.watch(activeWorkoutInputProvider) != null ? 310 : 120),
+          child: SizedBox(height: ref.watch(activeWorkoutInputProvider) != null ? 310 : (hasActiveWorkout ? 160 : 120)),
         ),
       ],
     );
 
     final hasActiveInput = ref.watch(activeWorkoutInputProvider) != null;
+    final nextTarget = hasActiveWorkout && !isFinished
+        ? _computeNextTarget(activeExercises, unit)
+        : null;
 
     return PopScope(
       canPop: false, // Today is always a root tab — never pop (would exit the app)
@@ -2375,14 +3003,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   ),
           ),
 
-          // Floating Rest Timer Dynamic Capsule (glides above numpad when active!)
+          // Floating Rest Timer Dynamic Capsule (glides above numpad or HUD!)
           if (hasActiveWorkout)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: hasActiveInput ? 280 : 24,
+              bottom: hasActiveInput ? 280 : (hasActiveWorkout && !isFinished ? 76 : 24),
               child: const RestTimerOverlay(),
             ),
 
@@ -2391,6 +3019,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ConfettiOverlay(
               prResult: _activePr!,
               onDismiss: () => setState(() => _activePr = null),
+            ),
+
+          // Next Target HUD (active session mode when numpad is closed)
+          if (hasActiveWorkout && !hasActiveInput && !isFinished)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildNextTargetHud(nextTarget, unit, activeExercises),
             ),
 
           // Docked Fast-Entry Workout Numpad

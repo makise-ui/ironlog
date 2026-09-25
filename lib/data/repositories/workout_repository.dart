@@ -143,6 +143,7 @@ class WorkoutRepository {
         archived: const Value(false),
       ),
     );
+    BackupService.scheduleAutoBackup(_db);
     return getWorkoutById(newId);
   }
 
@@ -229,6 +230,7 @@ class WorkoutRepository {
         archived: const Value(false),
       ),
     );
+    BackupService.scheduleAutoBackup(_db);
     return id;
   }
 
@@ -240,6 +242,7 @@ class WorkoutRepository {
     await (_db.update(_db.sets)..where((t) => t.workoutExerciseId.equals(workoutExerciseId))).write(
       const SetsCompanion(archived: Value(true)),
     );
+    BackupService.scheduleAutoBackup(_db);
   }
 
   /// Ensures that any orphan workout_exercises or sets belonging to an archived workout are properly marked archived

@@ -85,21 +85,29 @@ class AiToolService {
           'type': 'function',
           'function': {
             'name': 'log_set',
-            'description': 'Log a completed set into the workout session (today or a past date). Automatically creates the exercise if not found in catalog.',
+            'description': 'Log a completed set into the workout session (today or a past date). Supports standard lifting (weight & reps), bodyweight exercises (pushups, pullups, dips, crunches - weight defaults to 0.0 unless weighted), timed isometric holds (planks, wall sits, dead hangs - reps or durationSeconds represents duration in seconds), and sports/games (football, basketball, boxing, running - reps or durationMinutes represents duration in minutes). Automatically creates the exercise if not found in catalog.',
             'parameters': {
               'type': 'object',
               'properties': {
                 'exerciseName': {
                   'type': 'string',
-                  'description': 'Name of the exercise or sport/game (e.g., Bench Press, Squat, Lat Pulldown, Football, Basketball).',
+                  'description': 'Name of the exercise or sport/game (e.g., Bench Press, Squat, Push-up, Plank, Football, Basketball, Running).',
                 },
                 'weight': {
                   'type': 'number',
-                  'description': 'Weight used for the set in the current unit (kg or lbs).',
+                  'description': 'Weight used for the set in the current unit (kg or lbs). For bodyweight, timed holds, and sports/games, set to 0.0 unless extra added load was used (e.g. +10kg weighted dips). Defaults to 0.0.',
                 },
                 'reps': {
                   'type': 'integer',
-                  'description': 'Number of repetitions completed.',
+                  'description': 'Number of repetitions completed. For timed isometric holds (Planks, Wall Sits), this is duration in seconds. For sports and games (Football, Basketball, Boxing), this is duration in minutes.',
+                },
+                'durationSeconds': {
+                  'type': 'integer',
+                  'description': 'Optional hold duration in seconds for isometric holds like Planks, Wall Sits, or Dead Hangs.',
+                },
+                'durationMinutes': {
+                  'type': 'integer',
+                  'description': 'Optional duration in minutes for sports, games, and cardio activities (Football, Running, Basketball).',
                 },
                 'setType': {
                   'type': 'string',
@@ -111,7 +119,7 @@ class AiToolService {
                   'description': 'Date of the workout (e.g., "today", "yesterday", "2 days ago", or "2026-09-22"). Defaults to today if omitted.',
                 },
               },
-              'required': ['exerciseName', 'weight', 'reps'],
+              'required': ['exerciseName'],
             },
           },
         },
@@ -684,7 +692,9 @@ class AiToolService {
           return await _executeLogSet(
             exerciseName: call.arguments['exerciseName']?.toString() ?? '',
             weight: (call.arguments['weight'] as num?)?.toDouble() ?? 0.0,
-            reps: (call.arguments['reps'] as num?)?.toInt() ?? 0,
+            reps: (call.arguments['reps'] as num?)?.toInt(),
+            durationSeconds: (call.arguments['durationSeconds'] as num?)?.toInt(),
+            durationMinutes: (call.arguments['durationMinutes'] as num?)?.toInt(),
             setTypeStr: call.arguments['setType']?.toString(),
             dateStr: call.arguments['date']?.toString(),
           );
@@ -1124,8 +1134,10 @@ class AiToolService {
 
   Future<AiToolExecutionResult> _executeLogSet({
     required String exerciseName,
-    required double weight,
-    required int reps,
+    double weight = 0.0,
+    int? reps,
+    int? durationSeconds,
+    int? durationMinutes,
     String? setTypeStr,
     String? dateStr,
   }) async {
@@ -1136,6 +1148,24 @@ class AiToolService {
 
     // Find or automatically create custom exercise/game
     final matchedEx = await _ensureExercise(exerciseName);
+
+    // Resolve final reps / duration based on trackingType or explicit parameters
+    int finalReps;
+    if (durationSeconds != null && durationSeconds > 0) {
+      finalReps = durationSeconds;
+    } else if (durationMinutes != null && durationMinutes > 0) {
+      finalReps = durationMinutes;
+    } else if (reps != null && reps > 0) {
+      finalReps = reps;
+    } else {
+      if (matchedEx.trackingType == ExerciseTrackingType.duration) {
+        finalReps = matchedEx.repMin > 0 ? matchedEx.repMin : 60;
+      } else if (matchedEx.trackingType == ExerciseTrackingType.cardioTime) {
+        finalReps = matchedEx.repMin > 0 ? matchedEx.repMin : 30;
+      } else {
+        finalReps = matchedEx.repMin > 0 ? matchedEx.repMin : 10;
+      }
+    }
 
     // Check if exercise already in workout — reuse existing entry to avoid duplicates
     var weItem = workout.exercises.where((we) => we.exercise.id == matchedEx.id).firstOrNull;
@@ -1176,7 +1206,7 @@ class AiToolService {
       muscleGroupId: matchedEx.muscleGroupId,
       date: targetDate,
       weight: weight,
-      reps: reps,
+      reps: finalReps,
       setType: setType,
     );
 
@@ -1199,7 +1229,7 @@ class AiToolService {
         date: targetDate,
         setIndex: (weItem?.sets.length ?? 0) + 1,
         weight: weight,
-        reps: reps,
+        reps: finalReps,
         setType: setType,
         completedAt: targetDate,
       ),
@@ -1212,14 +1242,28 @@ class AiToolService {
         : ' on ${AppDateUtils.formatShortDate(targetDate)}';
     final customNotice = matchedEx.isCustom ? ' (custom exercise created)' : '';
 
+    final tracking = matchedEx.trackingType;
+    String performanceSummary;
+    if (tracking == ExerciseTrackingType.duration) {
+      final dur = SetModel.formatDuration(finalReps);
+      performanceSummary = weight > 0 ? '$dur (+${weight}kg)' : dur;
+    } else if (tracking == ExerciseTrackingType.cardioTime) {
+      performanceSummary = '$finalReps min session';
+    } else if (tracking == ExerciseTrackingType.bodyweightReps) {
+      performanceSummary = weight > 0 ? '$finalReps reps (+${weight}kg)' : '$finalReps reps';
+    } else {
+      performanceSummary = '${weight}kg × $finalReps';
+    }
+
     return AiToolExecutionResult(
       toolName: 'log_set',
       success: true,
-      summary: 'Logged ${matchedEx.name}$customNotice: ${weight}kg × $reps (${setType.name})$dateNotice$prText',
+      summary: 'Logged ${matchedEx.name}$customNotice: $performanceSummary (${setType.name})$dateNotice$prText',
       data: {
         'exercise': matchedEx.name,
+        'trackingType': tracking.name,
         'weight': weight,
-        'reps': reps,
+        'reps': finalReps,
         'setType': setType.name,
         'date': targetDate.toIso8601String(),
         'pr': pr.isPr ? pr.description : null,
@@ -1724,6 +1768,7 @@ class AiToolService {
         'setIndex': s.setIndex,
         'weight': s.weight,
         'reps': s.reps,
+        'performance': s.formatPerformance(we.exercise.trackingType, unit: unit),
         'setType': s.setType.name,
         'e1rm': s.e1rm,
       }).toList();
@@ -1732,12 +1777,13 @@ class AiToolService {
         'exerciseId': we.exercise.id,
         'exerciseName': we.exercise.name,
         'muscleGroup': we.exercise.muscleGroupId,
+        'trackingType': we.exercise.trackingType.name,
         'sets': setsList,
       });
 
       final setsDesc = activeSets.isEmpty
           ? 'no sets logged'
-          : activeSets.map((s) => '${UnitConverter.formatWeight(s.weight, unit: unit)}×${s.reps}').join(', ');
+          : activeSets.map((s) => s.formatPerformance(we.exercise.trackingType, unit: unit)).join(', ');
       summaryBuffer.writeln('• ${we.exercise.name}: $setsDesc');
     }
 
