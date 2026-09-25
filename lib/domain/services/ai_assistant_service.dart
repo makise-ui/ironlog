@@ -35,7 +35,21 @@ class AiAssistantService {
         final profiles = list
             .map((item) => AiConfigModel.fromMap(Map<String, dynamic>.from(item as Map)))
             .toList();
-        if (profiles.isNotEmpty) return profiles;
+        if (profiles.isNotEmpty) {
+          // Merge any newly introduced default profiles (e.g. Agnes, Claude 3.7, Groq, DeepSeek)
+          final existingIds = profiles.map((p) => p.id).toSet();
+          bool updated = false;
+          for (final def in AiConfigModel.defaultProfiles) {
+            if (!existingIds.contains(def.id)) {
+              profiles.add(def);
+              updated = true;
+            }
+          }
+          if (updated) {
+            await saveProfiles(profiles);
+          }
+          return profiles;
+        }
       } catch (_) {}
     }
     // Default seed profiles
