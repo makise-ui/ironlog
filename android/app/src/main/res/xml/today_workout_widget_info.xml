@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:description="@string/app_name"
+    android:description="@string/widget_today_description"
     android:initialLayout="@layout/widget_today_workout"
+    android:previewLayout="@layout/widget_today_workout"
+    android:previewImage="@drawable/preview_today_workout"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
     android:minWidth="180dp"
     android:minHeight="110dp"
     android:resizeMode="horizontal|vertical"

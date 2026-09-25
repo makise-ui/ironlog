@@ -33,6 +33,7 @@ void main() async {
     await AppNotificationService.instance.initialize();
     await AppNotificationService.instance.requestPermissions();
     await HomeWidgetService.init();
+    await HomeWidgetService.syncAllWidgets();
   } catch (e) {
     debugPrint('Service init warning: $e');
   }

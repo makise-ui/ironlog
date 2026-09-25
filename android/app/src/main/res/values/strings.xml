@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">IronLog</string>
+    <string name="widget_today_label">Today\'s Workout</string>
+    <string name="widget_today_description">Daily workout summary, active exercises, and training status</string>
+    <string name="widget_streak_label">Streak &amp; Week</string>
+    <string name="widget_streak_description">Consecutive workout streak and weekly consistency counter</string>
+    <string name="widget_quick_log_label">Quick Shortcuts</string>
+    <string name="widget_quick_log_description">1-tap shortcuts to log workout, track meals, or ask AI coach</string>
+    <string name="widget_live_workout_label">Live Workout Ticker</string>
+    <string name="widget_live_workout_description">Real-time session timer, active exercise, and volume tracking</string>
 </resources>
