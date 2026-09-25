@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/tokens.dart';
 import 'data/providers.dart';
@@ -44,11 +46,73 @@ void main() async {
   );
 }
 
-class IronLogApp extends ConsumerWidget {
+class IronLogApp extends ConsumerStatefulWidget {
   const IronLogApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<IronLogApp> createState() => _IronLogAppState();
+}
+
+class _IronLogAppState extends ConsumerState<IronLogApp> {
+  StreamSubscription<Uri?>? _widgetSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initWidgetNavigation();
+  }
+
+  void _initWidgetNavigation() {
+    // Listen for widget clicks while app is already running
+    _widgetSubscription = HomeWidget.widgetClicked.listen(_handleWidgetUri);
+
+    // Check if app was initially opened from a widget click
+    HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
+      if (uri != null && mounted) {
+        _handleWidgetUri(uri);
+      }
+    });
+  }
+
+  void _handleWidgetUri(Uri? uri) {
+    if (uri == null) return;
+    try {
+      final router = ref.read(appRouterProvider);
+      final target = uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
+      switch (target.toLowerCase()) {
+        case 'history':
+          router.go('/history');
+          break;
+        case 'analytics':
+          router.go('/analytics');
+          break;
+        case 'settings':
+          router.go('/settings');
+          break;
+        case 'nutrition':
+          router.go('/nutrition');
+          break;
+        case 'ai':
+          router.go('/ai');
+          break;
+        case 'today':
+        default:
+          router.go('/today');
+          break;
+      }
+    } catch (e) {
+      debugPrint('Error navigating from widget URI $uri: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _widgetSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
     // Watch accent preset so MaterialApp updates when accent changes

@@ -24,7 +24,47 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/today',
+    redirect: (context, state) {
+      final uri = state.uri;
+      final matched = state.matchedLocation;
+
+      // Handle root '/'
+      if (matched == '/' || (uri.path == '/' && uri.scheme.isEmpty && uri.host.isEmpty)) {
+        return '/today';
+      }
+
+      // Handle custom deep link scheme (ironlog://today, ironlog://history, etc.)
+      if (uri.scheme == 'ironlog') {
+        final host = uri.host;
+        final path = uri.path.replaceAll('/', '');
+        final target = host.isNotEmpty ? host : path;
+        switch (target.toLowerCase()) {
+          case 'history':
+            return '/history';
+          case 'analytics':
+            return '/analytics';
+          case 'settings':
+            return '/settings';
+          case 'nutrition':
+            return '/nutrition';
+          case 'ai':
+            return '/ai';
+          case 'today':
+          default:
+            return '/today';
+        }
+      }
+      return null;
+    },
+    errorBuilder: (context, state) {
+      debugPrint('GoRouter navigation fallback for location: ${state.uri}');
+      return const TodayScreen();
+    },
     routes: [
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/today',
+      ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {

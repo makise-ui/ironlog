@@ -129,9 +129,6 @@ class _Intro3DOverlayState extends State<Intro3DOverlay>
     // Phase 3: Notes Ascend smoothly towards top (0.28 -> 0.85)
     final notesAscendProg = const Interval(0.28, 0.85, curve: Curves.easeInOutCubic).transform(t);
 
-    // Phase 4: Screen reveal / Background fade out (0.75 -> 0.98)
-    final bgFadeOut = (1.0 - const Interval(0.75, 0.98, curve: Curves.easeInOut).transform(t)).clamp(0.0, 1.0);
-
     // Logo display size (proportional to screen width)
     final logoSize = math.min(size.width * 0.72, 310.0);
     final centerOffset = Offset(size.width / 2, size.height * 0.45);
@@ -168,17 +165,14 @@ class _Intro3DOverlayState extends State<Intro3DOverlay>
         // 1. Underlying Main App Screen
         widget.child,
 
-        // 2. Backdrop Overlay with tap-to-skip
+        // 2. Transparent Backdrop with tap-to-skip
         if (!_isAnimationComplete && t < 0.99)
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _skipIntro,
-              child: Container(
-                color: (isDark
-                        ? const Color(0xFF0C0D10)
-                        : const Color(0xFFF4F4F6))
-                    .withValues(alpha: bgFadeOut),
+              child: const ColoredBox(
+                color: Colors.transparent,
               ),
             ),
           ),

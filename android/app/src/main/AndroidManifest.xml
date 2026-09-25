@@ -12,6 +12,7 @@
         android:label="IronLog"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:requestLegacyExternalStorage="true"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true">
@@ -38,6 +39,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Deep linking for IronLog Home Screen Widgets and Links -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ironlog" />
             </intent-filter>
         </activity>
         <!-- Android Home Screen Widgets -->
