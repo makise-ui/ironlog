@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1535,32 +1536,9 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                   ),
                 );
               },
-              child: Container(
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isUser
-                      ? context.accent
-                      : (msg.isError
-                          ? AppColors.error.withValues(alpha: 0.15)
-                          : (context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9))),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
-                    bottomLeft: Radius.circular(isUser ? 16 : 4),
-                    bottomRight: Radius.circular(isUser ? 4 : 16),
-                  ),
-                  border: Border.all(
-                    color: isUser
-                        ? Colors.transparent
-                        : (msg.isError ? AppColors.error.withValues(alpha: 0.4) : context.cardBorder),
-                  ),
-                ),
-                child: _buildFormattedMarkdown(
-                  msg.content,
-                  isUser: isUser,
-                  isStreaming: msg.isStreaming,
-                ),
+              child: _buildBubbleContent(
+                msg: msg,
+                isUser: isUser,
               ),
             ),
 
@@ -1668,6 +1646,55 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     );
   }
 
+  Widget _buildBubbleContent({
+    required AiChatMessage msg,
+    required bool isUser,
+  }) {
+    final bubbleRadius = BorderRadius.only(
+      topLeft: const Radius.circular(16),
+      topRight: const Radius.circular(16),
+      bottomLeft: Radius.circular(isUser ? 16 : 4),
+      bottomRight: Radius.circular(isUser ? 4 : 16),
+    );
+
+    if (!isUser && msg.isStreaming) {
+      return _StreamingAssistantBubble(
+        borderRadius: bubbleRadius,
+        child: _GeminiShimmerText(
+          isDark: context.isDark,
+          child: _buildFormattedMarkdown(
+            msg.content,
+            isUser: false,
+            isStreaming: true,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isUser
+            ? context.accent
+            : (msg.isError
+                ? AppColors.error.withValues(alpha: 0.15)
+                : (context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9))),
+        borderRadius: bubbleRadius,
+        border: Border.all(
+          color: isUser
+              ? Colors.transparent
+              : (msg.isError ? AppColors.error.withValues(alpha: 0.4) : context.cardBorder),
+        ),
+      ),
+      child: _buildFormattedMarkdown(
+        msg.content,
+        isUser: isUser,
+        isStreaming: false,
+      ),
+    );
+  }
+
   Widget _buildFormattedMarkdown(
     String text, {
     required bool isUser,
@@ -1764,17 +1791,29 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
           ),
         ),
         if (isStreaming) ...[
-          const SizedBox(height: 4),
-          FadeTransition(
-            opacity: _pulseController,
-            child: Container(
-              width: 7,
-              height: 13,
-              decoration: BoxDecoration(
-                color: isUser ? Colors.black : context.accent,
-                borderRadius: BorderRadius.circular(1.5),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FadeTransition(
+                opacity: _pulseController,
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 11,
+                  color: context.isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                ),
               ),
-            ),
+              const SizedBox(width: 5),
+              Text(
+                'Generating...',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: context.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+              ),
+            ],
           ),
         ],
       ],
@@ -2647,6 +2686,220 @@ class _WaveringShimmerTextState extends State<_WaveringShimmerText>
           letterSpacing: -0.1,
         ),
       ),
+    );
+  }
+}
+
+// ── Gemini & Apple Intelligence Streaming Response Shimmer ─────────────────
+
+/// Live rotating iridescent gradient border with breathing ambient glow for the streaming response bubble.
+class _StreamingAssistantBubble extends StatefulWidget {
+  final Widget child;
+  final BorderRadius borderRadius;
+
+  const _StreamingAssistantBubble({
+    required this.child,
+    required this.borderRadius,
+  });
+
+  @override
+  State<_StreamingAssistantBubble> createState() => _StreamingAssistantBubbleState();
+}
+
+class _StreamingAssistantBubbleState extends State<_StreamingAssistantBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        return Container(
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
+            borderRadius: widget.borderRadius,
+            boxShadow: [
+              BoxShadow(
+                color: (isDark ? const Color(0xFF8B5CF6) : const Color(0xFF6366F1))
+                    .withValues(alpha: 0.16),
+                blurRadius: 18,
+                spreadRadius: 0.5,
+              ),
+              BoxShadow(
+                color: (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7))
+                    .withValues(alpha: 0.10),
+                blurRadius: 26,
+                spreadRadius: 1.5,
+              ),
+            ],
+          ),
+          child: CustomPaint(
+            foregroundPainter: _GradientBorderPainter(
+              animationProgress: _ctrl.value,
+              borderRadius: widget.borderRadius,
+              strokeWidth: 1.5,
+              isDark: isDark,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// Custom painter for the animated iridescent sweep gradient along the bubble border.
+class _GradientBorderPainter extends CustomPainter {
+  final double animationProgress;
+  final BorderRadius borderRadius;
+  final double strokeWidth;
+  final bool isDark;
+
+  _GradientBorderPainter({
+    required this.animationProgress,
+    required this.borderRadius,
+    this.strokeWidth = 1.5,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    final rect = Offset.zero & size;
+    final rrect = borderRadius.toRRect(rect).deflate(strokeWidth / 2);
+
+    final angle = animationProgress * 2 * math.pi;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..shader = SweepGradient(
+        center: Alignment.center,
+        startAngle: 0.0,
+        endAngle: 2 * math.pi,
+        transform: GradientRotation(angle),
+        colors: isDark
+            ? const [
+                Color(0xFF38BDF8), // Radiant Cyan
+                Color(0xFF818CF8), // Soft Indigo
+                Color(0xFFC084FC), // Luminescent Violet
+                Color(0xFFF472B6), // Electric Pink
+                Color(0xFF38BDF8), // Radiant Cyan
+              ]
+            : const [
+                Color(0xFF0284C7),
+                Color(0xFF6366F1),
+                Color(0xFFA855F7),
+                Color(0xFFEC4899),
+                Color(0xFF0284C7),
+              ],
+        stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+      ).createShader(rect);
+
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(_GradientBorderPainter oldDelegate) =>
+      oldDelegate.animationProgress != animationProgress || oldDelegate.isDark != isDark;
+}
+
+/// Shimmer light wave effect streaming continuously across the response text itself (Gemini / Apple Intelligence style).
+class _GeminiShimmerText extends StatefulWidget {
+  final Widget child;
+  final bool isDark;
+
+  const _GeminiShimmerText({
+    required this.child,
+    required this.isDark,
+  });
+
+  @override
+  State<_GeminiShimmerText> createState() => _GeminiShimmerTextState();
+}
+
+class _GeminiShimmerTextState extends State<_GeminiShimmerText>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final baseColor = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A);
+    final geminiBlue = isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB);
+    final geminiPurple = isDark ? const Color(0xFFC084FC) : const Color(0xFF7C3AED);
+    final geminiPink = isDark ? const Color(0xFFF472B6) : const Color(0xFFDB2777);
+    final geminiCyan = isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
+    final highlightGlow = isDark ? Colors.white : const Color(0xFF4338CA);
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        final v = _ctrl.value;
+        final startX = -1.6 + (v * 3.2);
+        final endX = startX + 1.2;
+
+        return ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              begin: Alignment(startX, -0.2),
+              end: Alignment(endX, 0.2),
+              colors: [
+                baseColor,
+                baseColor,
+                geminiBlue,
+                geminiPurple,
+                highlightGlow,
+                geminiPink,
+                geminiCyan,
+                baseColor,
+                baseColor,
+              ],
+              stops: const [0.0, 0.22, 0.38, 0.48, 0.54, 0.64, 0.74, 0.88, 1.0],
+            ).createShader(bounds);
+          },
+          child: child,
+        );
+      },
+      child: widget.child,
     );
   }
 }
