@@ -13,6 +13,8 @@ import '../../domain/models/routine_model.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/unit_converter.dart';
 import '../models/ai_chat_message.dart';
+import 'ai_memory_service.dart';
+import 'exercise_image_search_service.dart';
 
 class AiToolService {
   final Ref _ref;
@@ -651,6 +653,61 @@ class AiToolService {
             },
           },
         },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'save_user_memory',
+            'description': 'Save a key, lasting fact, physical condition, injury, equipment constraint, long-term goal, or preference about the user to long-term memory across sessions. Only call this when the user reveals lasting personal details (e.g. injuries, available equipment, target goals, schedule constraints, training preferences). Do NOT save temporary single-session workout logs or small talk.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'fact': {
+                  'type': 'string',
+                  'description': 'The concise fact or preference to remember (e.g. "Left rotator cuff impingement - needs warmups before pressing", "Home gym with dumbbells up to 32kg", "Aiming for 100kg bench press").',
+                },
+                'category': {
+                  'type': 'string',
+                  'description': 'Optional category: "injury", "goal", "equipment", "preference", "schedule", or "general".',
+                },
+              },
+              'required': ['fact'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'delete_user_memory',
+            'description': 'Delete a previously saved memory by its ID or keyword when the user asks to forget or remove a remembered fact.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'memoryId': {
+                  'type': 'string',
+                  'description': 'The ID of the memory to delete (e.g. "mem_1727371200"), or the keyword/phrase to forget.',
+                },
+              },
+              'required': ['memoryId'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'get_exercise_image',
+            'description': 'Search the web for high-quality demonstration form images of a specific exercise or workout movement. Returns image URLs to embed inline into your explanation using markdown `![Exercise Form](url)`. Call this whenever explaining how to do an exercise or giving form cues.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'exerciseName': {
+                  'type': 'string',
+                  'description': 'Name of the exercise (e.g. "Bulgarian Split Squat", "Incline Dumbbell Press", "Romanian Deadlift").',
+                },
+              },
+              'required': ['exerciseName'],
+            },
+          },
+        },
       ];
 
   /// Execute a tool by name with arguments
@@ -803,6 +860,19 @@ class AiToolService {
         case 'query_today_workout':
         case 'get_workout_session':
           return await _executeGetTodayWorkout(call.arguments['date']?.toString());
+        case 'save_user_memory':
+          return await _executeSaveUserMemory(
+            fact: call.arguments['fact']?.toString() ?? '',
+            category: call.arguments['category']?.toString(),
+          );
+        case 'delete_user_memory':
+          return await _executeDeleteUserMemory(
+            memoryId: call.arguments['memoryId']?.toString() ?? '',
+          );
+        case 'get_exercise_image':
+          return await _executeGetExerciseImage(
+            exerciseName: call.arguments['exerciseName']?.toString() ?? '',
+          );
         case 'export_backup':
           return await _executeExportBackup();
         default:
@@ -2685,6 +2755,116 @@ class AiToolService {
         'question': question,
         'options': options,
         if (summary != null && summary.isNotEmpty) 'summary': summary,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeSaveUserMemory({
+    required String fact,
+    String? category,
+  }) async {
+    final clean = fact.trim();
+    if (clean.isEmpty) {
+      return const AiToolExecutionResult(
+        toolName: 'save_user_memory',
+        success: false,
+        summary: 'Cannot save an empty memory fact',
+        data: {'error': 'Fact cannot be empty'},
+      );
+    }
+    final memoryService = _ref.read(aiMemoryServiceProvider);
+    final saved = await memoryService.saveMemory(fact: clean, category: category);
+    return AiToolExecutionResult(
+      toolName: 'save_user_memory',
+      success: true,
+      summary: '🧠 Remembered: "$clean"',
+      data: {
+        'id': saved.id,
+        'fact': saved.fact,
+        'category': saved.category,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeDeleteUserMemory({
+    required String memoryId,
+  }) async {
+    final clean = memoryId.trim();
+    if (clean.isEmpty) {
+      return const AiToolExecutionResult(
+        toolName: 'delete_user_memory',
+        success: false,
+        summary: 'No memory ID or query specified',
+        data: {'error': 'ID is required'},
+      );
+    }
+    final memoryService = _ref.read(aiMemoryServiceProvider);
+    final deleted = await memoryService.deleteMemory(clean);
+    if (!deleted) {
+      final matchCount = await memoryService.deleteMatching(clean);
+      if (matchCount > 0) {
+        return AiToolExecutionResult(
+          toolName: 'delete_user_memory',
+          success: true,
+          summary: 'Removed $matchCount memory item(s)',
+          data: {'deletedCount': matchCount},
+        );
+      }
+      return AiToolExecutionResult(
+        toolName: 'delete_user_memory',
+        success: false,
+        summary: 'Memory not found: "$clean"',
+        data: {'error': 'Memory not found'},
+      );
+    }
+    return AiToolExecutionResult(
+      toolName: 'delete_user_memory',
+      success: true,
+      summary: 'Memory removed successfully',
+      data: {'deletedId': clean},
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeGetExerciseImage({
+    required String exerciseName,
+  }) async {
+    final clean = exerciseName.trim();
+    if (clean.isEmpty) {
+      return const AiToolExecutionResult(
+        toolName: 'get_exercise_image',
+        success: false,
+        summary: 'Exercise name cannot be empty',
+        data: {'error': 'Name is required'},
+      );
+    }
+    final results = await ExerciseImageSearchService.searchWebExerciseImages(clean);
+    if (results.isEmpty) {
+      return AiToolExecutionResult(
+        toolName: 'get_exercise_image',
+        success: false,
+        summary: 'No demonstration images found for "$clean"',
+        data: {'exerciseName': clean, 'images': []},
+      );
+    }
+    final topImages = results.take(2).map((img) => {
+      'title': img.title,
+      'url': img.fullUrl,
+      'thumbnail': img.thumbnailUrl,
+      'tag': img.positionTag ?? 'FORM DEMONSTRATION',
+    }).toList();
+
+    final primaryUrl = topImages.first['url'] as String;
+    final primaryTitle = topImages.first['title'] as String;
+
+    return AiToolExecutionResult(
+      toolName: 'get_exercise_image',
+      success: true,
+      summary: 'Retrieved form demonstration for "$clean"',
+      data: {
+        'exerciseName': clean,
+        'images': topImages,
+        'primaryImageUrl': primaryUrl,
+        'markdownTag': '![$primaryTitle]($primaryUrl)',
       },
     );
   }
