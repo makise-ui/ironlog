@@ -1516,26 +1516,24 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
             ),
           ],
 
-          // Content Bubble (shown when hasContent OR when assistant is streaming waiting for first tokens)
-          if (hasContent || (!isUser && isStreaming)) ...[
+          // Content (only shown when text has actually arrived)
+          if (hasContent) ...[
             GestureDetector(
               onLongPress: () {
-                if (msg.content.trim().isNotEmpty) {
-                  Clipboard.setData(ClipboardData(text: msg.content));
-                  AppHaptics.success();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isUser ? 'Prompt copied to clipboard' : 'Response copied to clipboard',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      duration: const Duration(seconds: 2),
-                      behavior: SnackBarBehavior.floating,
-                      width: 220,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                Clipboard.setData(ClipboardData(text: msg.content));
+                AppHaptics.success();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isUser ? 'Prompt copied to clipboard' : 'Response copied to clipboard',
+                      style: const TextStyle(fontSize: 12),
                     ),
-                  );
-                }
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    width: 220,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                );
               },
               child: _buildBubbleContent(
                 msg: msg,
@@ -1651,72 +1649,59 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     required AiChatMessage msg,
     required bool isUser,
   }) {
-    final bubbleRadius = BorderRadius.only(
-      topLeft: const Radius.circular(16),
-      topRight: const Radius.circular(16),
-      bottomLeft: Radius.circular(isUser ? 16 : 4),
-      bottomRight: Radius.circular(isUser ? 4 : 16),
-    );
-
-    final hasContent = msg.content.trim().isNotEmpty;
-
-    // While assistant is streaming:
-    if (!isUser && msg.isStreaming) {
+    // 1. User Message (Pill bubble on the right)
+    if (isUser) {
       return Container(
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9),
-          borderRadius: bubbleRadius,
-          border: Border.all(color: context.cardBorder),
+          color: context.accent,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(4),
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // If text has already arrived, display the arrived text with the monochromatic silver shimmer
-            if (hasContent) ...[
-              _SilverShimmerText(
-                isDark: context.isDark,
-                child: _buildFormattedMarkdown(
-                  msg.content,
-                  isUser: false,
-                  isStreaming: false,
-                ),
-              ),
-              const SizedBox(height: 10),
-              // Trailing shimmering skeleton bar representing incoming sentences
-              const _SkeletonSentenceLines(singleLine: true),
-            ] else ...[
-              // Waiting for the first tokens to arrive: show 3 skeleton sentence bars
-              const _SkeletonSentenceLines(singleLine: false),
-            ],
-          ],
+        child: _buildFormattedMarkdown(
+          msg.content,
+          isUser: true,
+          isStreaming: false,
         ),
       );
     }
 
-    return Container(
-      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: isUser
-            ? context.accent
-            : (msg.isError
-                ? AppColors.error.withValues(alpha: 0.15)
-                : (context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9))),
-        borderRadius: bubbleRadius,
-        border: Border.all(
-          color: isUser
-              ? Colors.transparent
-              : (msg.isError ? AppColors.error.withValues(alpha: 0.4) : context.cardBorder),
+    // 2. Error Message
+    if (msg.isError) {
+      return Container(
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.88),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
         ),
-      ),
-      child: _buildFormattedMarkdown(
-        msg.content,
-        isUser: isUser,
-        isStreaming: false,
-      ),
+        child: _buildFormattedMarkdown(
+          msg.content,
+          isUser: false,
+          isStreaming: false,
+        ),
+      );
+    }
+
+    // 3. AI Assistant Response (Clean unboxed layout without gray container/border, like ChatGPT mobile)
+    final content = _buildFormattedMarkdown(
+      msg.content,
+      isUser: false,
+      isStreaming: false,
+    );
+
+    return Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.94),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      child: msg.isStreaming
+          ? _ChatGptStreamingSentenceFade(child: content)
+          : content,
     );
   }
 
@@ -2689,122 +2674,25 @@ class _WaveringShimmerTextState extends State<_WaveringShimmerText>
   }
 }
 
-// ── Monochromatic Sentence Shimmer & Silver Streaming Text ──────────────────
+// ── ChatGPT-Style Sentence Drop Streaming Fade ─────────────────────────────
 
-/// Rounded sentence placeholder bars with a sleek monochromatic light-wave shimmer.
-/// Shown before response tokens arrive (3 lines) and as trailing incoming lines (1 line).
-class _SkeletonSentenceLines extends StatefulWidget {
-  final bool singleLine;
-
-  const _SkeletonSentenceLines({this.singleLine = false});
-
-  @override
-  State<_SkeletonSentenceLines> createState() => _SkeletonSentenceLinesState();
-}
-
-class _SkeletonSentenceLinesState extends State<_SkeletonSentenceLines>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBarColor = isDark ? const Color(0xFF282C3D) : const Color(0xFFE2E8F0);
-    final highlightBarColor = isDark ? const Color(0xFF454B64) : const Color(0xFFCBD5E1);
-    final glintPeak = isDark ? const Color(0xFF6B7280) : const Color(0xFF94A3B8);
-
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, child) {
-        final v = _ctrl.value;
-        final startX = -1.5 + (v * 3.0);
-        final endX = startX + 1.2;
-
-        return ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment(startX, 0),
-              end: Alignment(endX, 0),
-              colors: [
-                baseBarColor,
-                baseBarColor,
-                highlightBarColor,
-                glintPeak,
-                highlightBarColor,
-                baseBarColor,
-                baseBarColor,
-              ],
-              stops: const [0.0, 0.25, 0.42, 0.50, 0.58, 0.75, 1.0],
-            ).createShader(bounds);
-          },
-          child: child,
-        );
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: widget.singleLine
-            ? [
-                _buildBar(fraction: 0.65, height: 11),
-              ]
-            : [
-                _buildBar(fraction: 1.0, height: 12),
-                const SizedBox(height: 8),
-                _buildBar(fraction: 0.85, height: 12),
-                const SizedBox(height: 8),
-                _buildBar(fraction: 0.52, height: 12),
-              ],
-      ),
-    );
-  }
-
-  Widget _buildBar({required double fraction, required double height}) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
-          width: constraints.maxWidth * fraction,
-          height: height,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(height / 2),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Monochromatic silver light-wave shimmer streaming across the arrived response text.
-class _SilverShimmerText extends StatefulWidget {
+/// Soft vertical fade on the bottom trailing edge of the streaming response.
+/// Previous sentences are 100% crisp and solid; the newest incoming sentence at the bottom
+/// emerges softly from a subtle dimmed gradient and illuminates as it completes.
+class _ChatGptStreamingSentenceFade extends StatefulWidget {
   final Widget child;
-  final bool isDark;
 
-  const _SilverShimmerText({
+  const _ChatGptStreamingSentenceFade({
     required this.child,
-    required this.isDark,
   });
 
   @override
-  State<_SilverShimmerText> createState() => _SilverShimmerTextState();
+  State<_ChatGptStreamingSentenceFade> createState() =>
+      _ChatGptStreamingSentenceFadeState();
 }
 
-class _SilverShimmerTextState extends State<_SilverShimmerText>
+class _ChatGptStreamingSentenceFadeState
+    extends State<_ChatGptStreamingSentenceFade>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
 
@@ -2813,8 +2701,8 @@ class _SilverShimmerTextState extends State<_SilverShimmerText>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat();
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -2825,34 +2713,35 @@ class _SilverShimmerTextState extends State<_SilverShimmerText>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDark;
-    final baseColor = isDark ? const Color(0xFFD6DBE4) : const Color(0xFF334155);
-    final glintGlow = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0F172A);
-    final glintMid = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
-
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) {
-        final v = _ctrl.value;
-        final startX = -1.6 + (v * 3.2);
-        final endX = startX + 1.2;
+        final shimmerGlow = 0.40 + (_ctrl.value * 0.35);
 
         return ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: (bounds) {
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (Rect bounds) {
+            // Keep everything above the last sentence at 100% solid opacity
+            final fadeHeight = (bounds.height * 0.35).clamp(24.0, 52.0);
+            final fadeStart = (bounds.height <= fadeHeight)
+                ? 0.0
+                : (bounds.height - fadeHeight) / bounds.height;
+
             return LinearGradient(
-              begin: Alignment(startX, -0.1),
-              end: Alignment(endX, 0.1),
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [
-                baseColor,
-                baseColor,
-                glintMid,
-                glintGlow,
-                glintMid,
-                baseColor,
-                baseColor,
+                Colors.white,
+                Colors.white,
+                Colors.white.withValues(alpha: shimmerGlow),
+                Colors.white.withValues(alpha: 0.18),
               ],
-              stops: const [0.0, 0.28, 0.44, 0.50, 0.56, 0.72, 1.0],
+              stops: [
+                0.0,
+                fadeStart,
+                (fadeStart + (1.0 - fadeStart) * 0.55).clamp(0.0, 0.95),
+                1.0,
+              ],
             ).createShader(bounds);
           },
           child: child,
