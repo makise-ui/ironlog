@@ -10,6 +10,7 @@ import '../models/ai_config_model.dart';
 import '../models/ai_chat_message.dart';
 import '../models/chibi_avatar_model.dart';
 import 'ai_tool_service.dart';
+import 'ai_memory_service.dart';
 
 final aiAssistantServiceProvider = Provider<AiAssistantService>((ref) {
   return AiAssistantService(ref);
@@ -577,6 +578,7 @@ TODAY'S WORKOUT LOG ($dateFormatted):
     String? athleteProfile,
     String? todayWorkoutContext,
     String? companionPersona,
+    String? userMemoriesPrompt,
     int maxCharacters = 16000,
   }) {
     final systemPromptText = StringBuffer('''You are the premier Gym AI Coach embedded inside this workout app with direct app control.
@@ -597,6 +599,17 @@ CRITICAL RULES FOR LOGGING WORKOUTS:
 - Sports, Games & Cardio (Football, Basketball, Boxing, Running, Cycling, Swimming): Pass durationMinutes (or reps) representing session duration in minutes and weight 0.0. The app automatically creates the activity under CARDIO.
 9. HISTORICAL WORKOUTS & MUSCLE GROUP SEARCH: When asked about past workouts, previous sessions, or which sessions included specific muscle groups (e.g., "which sessions did I train Glutes?", "show my leg days", "what was my last back workout"), ALWAYS call query_workout_history(muscleGroup: "...", limit: 10). NEVER say "Let me check..." and pause — execute query_workout_history immediately so you can deliver the complete answer in a single turn.
 
+CRITICAL RULES FOR ATHLETE MEMORY (PERSISTENCE ACROSS SESSIONS):
+1. You have long-term persistent memory across chat sessions. When the athlete mentions personal constraints, injuries, physical limitations, available equipment, long-term goals, schedule constraints, or coaching preferences, autonomously call `save_user_memory(fact: ...)` to save it for future sessions.
+2. Only save durable, lasting facts (e.g. "Needs rotator cuff warm-up before pressing", "Home gym with dumbbells up to 32kg", "Aiming for 100kg bench"). Never save transient chat or single workout set logs to memory.
+3. If the user tells you to forget or remove a memory, call `delete_user_memory`.
+4. Always strictly respect remembered conditions and limitations in all workout planning and exercise recommendations.
+
+CRITICAL RULES FOR EXERCISE & WORKOUT EXPLANATIONS WITH INLINE DEMONSTRATION IMAGES:
+1. Whenever the athlete asks how to perform an exercise, asks for form cues, asks about workout movements, or whenever you recommend an exercise, ALWAYS call `get_exercise_image(exerciseName: ...)` to retrieve web demonstration images.
+2. Place the returned demonstration image markdown `![Exercise Form](url)` directly under or right after the sentence that introduces or explains the exercise.
+3. This creates an intuitive visual guide where the demonstration image appears directly alongside the corresponding coaching sentence.
+
 When asked to delete a logged workout, always inform the athlete that deleting a workout requires their explicit confirmation before it is removed.
 When you need clarification, choices, or user preference (e.g. choosing a routine, picking a target weight, confirming an action), call the ask_user_question tool with a summary of the situation/context, the question, and 2 to 4 selectable options. Calling ask_user_question immediately halts execution so the athlete can respond before you take any further steps.
 Never use developer jargon like "toolcall", "tool execution", or "JSON" in your messages to the user; use natural coaching phrases like "I logged your set", "I updated your routine", "Would you like me to delete this workout?".
@@ -613,6 +626,10 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
 
     if (companionPersona != null && companionPersona.trim().isNotEmpty) {
       systemPromptText.write('\n\n$companionPersona');
+    }
+
+    if (userMemoriesPrompt != null && userMemoriesPrompt.trim().isNotEmpty) {
+      systemPromptText.write('\n\n=== ATHLETE PERSISTENT MEMORY (ACROSS SESSIONS) ===\n$userMemoriesPrompt');
     }
 
     final systemMessage = <String, dynamic>{
@@ -690,6 +707,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
     final athleteProfile = await _getAthleteProfilePrompt();
     final todayWorkoutContext = await _getTodayWorkoutContextPrompt();
     final companion = await ChibiAvatar.loadCurrent();
+    final memoryService = _ref.read(aiMemoryServiceProvider);
+    final userMemoriesPrompt = await memoryService.formatMemoriesPrompt();
     final messages = _buildPrunedContext(
       history: history,
       userPrompt: userPrompt,
@@ -697,6 +716,7 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
       athleteProfile: athleteProfile,
       todayWorkoutContext: todayWorkoutContext,
       companionPersona: companion.personaPrompt,
+      userMemoriesPrompt: userMemoriesPrompt,
       maxCharacters: 16000,
     );
 
@@ -923,9 +943,12 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
     });
 
     yield const AiThinkingEvent('Generating workout insights...');
+    final memoryService = _ref.read(aiMemoryServiceProvider);
+    final userMemoriesPrompt = await memoryService.formatMemoriesPrompt();
     final systemPrompt = 'You are a premier strength and hypertrophy AI Coach. You help athletes track workouts, progressive overload, and search exercise science.'
         '${athleteProfile.isNotEmpty ? '\n\n$athleteProfile' : ''}'
-        '${todayWorkoutContext.isNotEmpty ? '\n\n$todayWorkoutContext' : ''}';
+        '${todayWorkoutContext.isNotEmpty ? '\n\n$todayWorkoutContext' : ''}'
+        '\n\n=== ATHLETE PERSISTENT MEMORY (ACROSS SESSIONS) ===\n$userMemoriesPrompt';
 
     final resp = await http.post(
       url,
@@ -976,9 +999,12 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
     messages.add({'role': 'user', 'content': userPrompt});
 
     yield const AiThinkingEvent('Analyzing hypertrophy split...');
+    final memoryService = _ref.read(aiMemoryServiceProvider);
+    final userMemoriesPrompt = await memoryService.formatMemoriesPrompt();
     final systemPrompt = 'You are a premier strength and hypertrophy AI Coach. You help athletes track workouts, progressive overload, and search exercise science.'
         '${athleteProfile.isNotEmpty ? '\n\n$athleteProfile' : ''}'
-        '${todayWorkoutContext.isNotEmpty ? '\n\n$todayWorkoutContext' : ''}';
+        '${todayWorkoutContext.isNotEmpty ? '\n\n$todayWorkoutContext' : ''}'
+        '\n\n=== ATHLETE PERSISTENT MEMORY (ACROSS SESSIONS) ===\n$userMemoriesPrompt';
 
     final resp = await http.post(
       url,
@@ -1172,6 +1198,33 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
       'category': category,
       'exerciseNames': exercises,
     };
+  }
+
+  String? _extractExerciseNameFromPrompt(String prompt) {
+    final lower = prompt.toLowerCase();
+    for (final prefix in [
+      'how to do',
+      'how do i do',
+      'how to perform',
+      'show me form for',
+      'show me how to do',
+      'show me',
+      'form for',
+      'explain how to do',
+      'explain form for',
+      'explain',
+      'technique for',
+      'cues for',
+      'tell me about',
+    ]) {
+      if (lower.contains(prefix)) {
+        final idx = lower.indexOf(prefix) + prefix.length;
+        var sub = prompt.substring(idx).trim();
+        sub = sub.replaceAll(RegExp(r'[?!.]+$'), '').trim();
+        if (sub.isNotEmpty) return sub;
+      }
+    }
+    return null;
   }
 
   /// Smart local fallback streaming: parses natural language intent and executes tools directly
@@ -1476,7 +1529,88 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
       yield AiToolCompletedEvent(res);
       reply = res.summary;
     }
-    // 7. General Assistant Greeting / Help
+    // 7. Athlete Memory Intent (Persistent Across Sessions)
+    else if (lower.startsWith('remember ') ||
+        lower.startsWith('note that ') ||
+        lower.startsWith('keep in mind ') ||
+        lower.contains('save to memory') ||
+        lower.startsWith('forget ')) {
+      if (lower.startsWith('forget ')) {
+        final query = prompt.substring(7).trim();
+        final call = AiToolCall(
+          id: 'call_mem_${DateTime.now().millisecondsSinceEpoch}',
+          name: 'delete_user_memory',
+          arguments: {'memoryId': query},
+        );
+        toolCalls.add(call);
+        yield const AiThinkingEvent('Removing memory from athlete profile...');
+        yield AiToolExecutingEvent('delete_user_memory', call.arguments);
+        final res = await _toolService.executeTool(call);
+        executed.add(res);
+        yield AiToolCompletedEvent(res);
+        reply = res.summary;
+      } else {
+        String fact = prompt;
+        for (final prefix in [
+          'remember that',
+          'remember',
+          'note that',
+          'note',
+          'keep in mind that',
+          'keep in mind',
+          'save to memory:',
+          'save to memory'
+        ]) {
+          if (lower.startsWith(prefix)) {
+            fact = prompt.substring(prefix.length).trim();
+            break;
+          }
+        }
+        if (fact.startsWith(':')) fact = fact.substring(1).trim();
+
+        final call = AiToolCall(
+          id: 'call_mem_${DateTime.now().millisecondsSinceEpoch}',
+          name: 'save_user_memory',
+          arguments: {'fact': fact},
+        );
+        toolCalls.add(call);
+        yield const AiThinkingEvent('Saving to persistent athlete memory...');
+        yield AiToolExecutingEvent('save_user_memory', call.arguments);
+        final res = await _toolService.executeTool(call);
+        executed.add(res);
+        yield AiToolCompletedEvent(res);
+        reply = '🧠 I will remember this across all our sessions:\n\n**"$fact"**\n\nI will factor this into all your future workout recommendations and coaching!';
+      }
+    }
+    // 8. Exercise Form & Demonstration Intent with Web Image
+    else if (lower.contains('how to') ||
+        lower.contains('form') ||
+        lower.contains('explain ') ||
+        lower.contains('show me ') ||
+        lower.contains('technique') ||
+        lower.contains('cues')) {
+      final exName = _extractExerciseNameFromPrompt(prompt) ?? 'Barbell Bench Press';
+      final call = AiToolCall(
+        id: 'call_img_${DateTime.now().millisecondsSinceEpoch}',
+        name: 'get_exercise_image',
+        arguments: {'exerciseName': exName},
+      );
+      toolCalls.add(call);
+      yield AiThinkingEvent('Searching web demonstration for "$exName"...');
+      yield AiToolExecutingEvent('get_exercise_image', call.arguments);
+      final res = await _toolService.executeTool(call);
+      executed.add(res);
+      yield AiToolCompletedEvent(res);
+      final imgUrl = res.data['primaryImageUrl'] as String?;
+      final imgTag = (imgUrl != null && imgUrl.isNotEmpty) ? '\n\n![$exName Form]($imgUrl)\n\n' : '\n\n';
+
+      reply = '$exName is an essential compound movement for strength and hypertrophy.$imgTag'
+          'Key technique cues to follow:\n'
+          '• Plant your feet firmly and establish a solid, stable foundation.\n'
+          '• Control the eccentric lowering phase smoothly under full muscle tension.\n'
+          '• Drive forcefully through the concentric phase while maintaining proper joint alignment.';
+    }
+    // 9. General Assistant Greeting / Help
     else {
       reply = 'I am your AI Workout Coach with live app control!\n\n'
           'Here is what I can execute directly:\n'
