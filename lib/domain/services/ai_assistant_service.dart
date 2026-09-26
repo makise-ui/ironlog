@@ -885,26 +885,11 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
       finalContent = "Done! Let me know if you need anything else.";
     }
 
-    // Stream text chunk by chunk
-    yield const AiThinkingEvent('Streaming response...');
-    final words = finalContent.split(' ');
-    String accumulated = '';
-    for (int i = 0; i < words.length; i++) {
-      final delta = i == 0 ? words[i] : ' ${words[i]}';
-      accumulated += delta;
-      yield AiStreamChunkEvent(delta, accumulated);
-      await Future.delayed(const Duration(milliseconds: 14));
-    }
-
-    yield AiCompleteEvent(
-      AiChatMessage(
-        id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-        role: 'assistant',
-        content: accumulated,
-        timestamp: DateTime.now(),
-        toolCalls: allToolCalls.isNotEmpty ? allToolCalls : null,
-        toolResults: allExecutedResults.isNotEmpty ? allExecutedResults : null,
-      ),
+    // Stream text in sentence drops (ChatGPT mobile style)
+    yield* _streamSentenceDrops(
+      finalContent,
+      toolCalls: allToolCalls.isNotEmpty ? allToolCalls : null,
+      toolResults: allExecutedResults.isNotEmpty ? allExecutedResults : null,
     );
   }
 
@@ -967,24 +952,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
     final parts = first?['content']?['parts'] as List?;
     final text = parts?.firstOrNull?['text']?.toString() ?? 'No content returned.';
 
-    yield const AiThinkingEvent('Streaming response...');
-    final words = text.split(' ');
-    String accumulated = '';
-    for (int i = 0; i < words.length; i++) {
-      final delta = i == 0 ? words[i] : ' ${words[i]}';
-      accumulated += delta;
-      yield AiStreamChunkEvent(delta, accumulated);
-      await Future.delayed(const Duration(milliseconds: 14));
-    }
-
-    yield AiCompleteEvent(
-      AiChatMessage(
-        id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-        role: 'assistant',
-        content: accumulated,
-        timestamp: DateTime.now(),
-      ),
-    );
+    // Stream text in sentence drops (ChatGPT mobile style)
+    yield* _streamSentenceDrops(text);
   }
 
   /// Anthropic Claude execution with stream
@@ -1034,24 +1003,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
     final contentList = data['content'] as List?;
     final text = contentList?.firstOrNull?['text']?.toString() ?? 'No content.';
 
-    yield const AiThinkingEvent('Streaming response...');
-    final words = text.split(' ');
-    String accumulated = '';
-    for (int i = 0; i < words.length; i++) {
-      final delta = i == 0 ? words[i] : ' ${words[i]}';
-      accumulated += delta;
-      yield AiStreamChunkEvent(delta, accumulated);
-      await Future.delayed(const Duration(milliseconds: 14));
-    }
-
-    yield AiCompleteEvent(
-      AiChatMessage(
-        id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-        role: 'assistant',
-        content: accumulated,
-        timestamp: DateTime.now(),
-      ),
-    );
+    // Stream text in sentence drops (ChatGPT mobile style)
+    yield* _streamSentenceDrops(text);
   }
 
   String _formatActionThinking(String toolName) {
@@ -1540,25 +1493,158 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
       reply += '\n\n*(Notice: Used local execution mode. Endpoint reported: $fallbackError)*';
     }
 
-    yield const AiThinkingEvent('Streaming response...');
-    final words = reply.split(' ');
+    // Stream text in sentence drops (ChatGPT mobile style)
+    yield* _streamSentenceDrops(
+      reply,
+      toolCalls: toolCalls.isNotEmpty ? toolCalls : null,
+      toolResults: executed.isNotEmpty ? executed : null,
+    );
+  }
+
+  /// Streams text out in natural sentence and clause units ("Sentence Drop View")
+  /// matching ChatGPT mobile, rather than robotic token/word typewriter output.
+  Stream<AiAssistantEvent> _streamSentenceDrops(
+    String content, {
+    List<AiToolCall>? toolCalls,
+    List<AiToolExecutionResult>? toolResults,
+  }) async* {
+    if (content.trim().isEmpty) {
+      yield AiCompleteEvent(
+        AiChatMessage(
+          id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
+          role: 'assistant',
+          content: content,
+          timestamp: DateTime.now(),
+          toolCalls: toolCalls,
+          toolResults: toolResults,
+        ),
+      );
+      return;
+    }
+
+    final chunks = _splitIntoSentenceDrops(content);
     String accumulated = '';
-    for (int i = 0; i < words.length; i++) {
-      final delta = i == 0 ? words[i] : ' ${words[i]}';
-      accumulated += delta;
-      yield AiStreamChunkEvent(delta, accumulated);
-      await Future.delayed(const Duration(milliseconds: 14));
+
+    for (int i = 0; i < chunks.length; i++) {
+      final chunk = chunks[i];
+      accumulated += chunk;
+      yield AiStreamChunkEvent(chunk, accumulated);
+
+      if (i < chunks.length - 1) {
+        // Natural ChatGPT-like cadence: 140ms - 260ms per sentence drop
+        final delayMs = (chunk.length * 4.0).clamp(140, 260).toInt();
+        await Future.delayed(Duration(milliseconds: delayMs));
+      }
     }
 
     yield AiCompleteEvent(
       AiChatMessage(
         id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
         role: 'assistant',
-        content: accumulated,
+        content: accumulated.isNotEmpty ? accumulated : content,
         timestamp: DateTime.now(),
-        toolCalls: toolCalls.isNotEmpty ? toolCalls : null,
-        toolResults: executed.isNotEmpty ? executed : null,
+        toolCalls: toolCalls,
+        toolResults: toolResults,
       ),
     );
+  }
+
+  List<String> _splitIntoSentenceDrops(String text) {
+    if (text.isEmpty) return [];
+
+    final List<String> chunks = [];
+    final buffer = StringBuffer();
+    final lines = text.split('\n');
+
+    for (int l = 0; l < lines.length; l++) {
+      final line = lines[l];
+      final isLastLine = l == lines.length - 1;
+      final lineEnd = isLastLine ? '' : '\n';
+
+      if (line.trim().isEmpty) {
+        if (buffer.isNotEmpty) {
+          buffer.write(lineEnd);
+          _flushChunkWithClauseSplits(chunks, buffer.toString());
+          buffer.clear();
+        } else {
+          if (chunks.isNotEmpty) {
+            chunks[chunks.length - 1] = chunks.last + lineEnd;
+          } else {
+            chunks.add(lineEnd);
+          }
+        }
+        continue;
+      }
+
+      final trimmed = line.trimLeft();
+      final isHeaderOrList = trimmed.startsWith('#') ||
+          trimmed.startsWith('- ') ||
+          trimmed.startsWith('* ') ||
+          RegExp(r'^\d+\.\s').hasMatch(trimmed);
+
+      if (isHeaderOrList) {
+        if (buffer.isNotEmpty) {
+          _flushChunkWithClauseSplits(chunks, buffer.toString());
+          buffer.clear();
+        }
+        chunks.add(line + lineEnd);
+        continue;
+      }
+
+      // Split regular paragraphs by sentence endings (. ! ? : followed by space or end)
+      final sentencePattern = RegExp(
+        r"""(?<=[.!?:]+)(?=\s+(?:[A-Z0-9"'(\[*#]|$))""",
+      );
+
+      final parts = line.split(sentencePattern);
+      for (int p = 0; p < parts.length; p++) {
+        final part = parts[p];
+        final isLastPart = p == parts.length - 1;
+
+        buffer.write(part);
+        if (!isLastPart) {
+          final currentText = buffer.toString();
+          // Don't split on common abbreviations
+          if (RegExp(r'\b(e\.g|i\.e|vs|etc|dr|mr|mrs|prof|no)\.$', caseSensitive: false).hasMatch(currentText.trimRight())) {
+            continue;
+          }
+          _flushChunkWithClauseSplits(chunks, buffer.toString());
+          buffer.clear();
+        } else {
+          buffer.write(lineEnd);
+          _flushChunkWithClauseSplits(chunks, buffer.toString());
+          buffer.clear();
+        }
+      }
+    }
+
+    if (buffer.isNotEmpty) {
+      _flushChunkWithClauseSplits(chunks, buffer.toString());
+    }
+
+    return chunks.where((c) => c.isNotEmpty).toList();
+  }
+
+  void _flushChunkWithClauseSplits(List<String> chunks, String text) {
+    if (text.length <= 110) {
+      chunks.add(text);
+      return;
+    }
+
+    // If a sentence is long, split at natural clause boundaries (, or ;)
+    final clausePattern = RegExp(r'(?<=[,;])(?=\s+)');
+    final parts = text.split(clausePattern);
+    final buf = StringBuffer();
+
+    for (final part in parts) {
+      if (buf.length + part.length > 90 && buf.isNotEmpty) {
+        chunks.add(buf.toString());
+        buf.clear();
+      }
+      buf.write(part);
+    }
+    if (buf.isNotEmpty) {
+      chunks.add(buf.toString());
+    }
   }
 }
