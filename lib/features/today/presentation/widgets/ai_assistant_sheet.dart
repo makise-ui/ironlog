@@ -582,7 +582,14 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     final isLoading = chatState.isLoading;
 
     ref.listen<AiChatState>(aiChatNotifierProvider, (prev, next) {
-      if (prev?.messages.length != next.messages.length) {
+      final prevLen = prev?.messages.length ?? 0;
+      final nextLen = next.messages.length;
+      final isStreaming = next.messages.isNotEmpty && next.messages.last.isStreaming;
+      final contentChanged = prev?.messages.isNotEmpty == true &&
+          next.messages.isNotEmpty &&
+          prev!.messages.last.content.length != next.messages.last.content.length;
+
+      if (prevLen != nextLen || (isStreaming && contentChanged)) {
         _scrollToBottom();
       }
     });
@@ -1699,9 +1706,14 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     return Container(
       constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.94),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-      child: msg.isStreaming
-          ? _ChatGptStreamingSentenceFade(child: content)
-          : content,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topLeft,
+        child: msg.isStreaming
+            ? _ChatGptStreamingSentenceFade(child: content)
+            : content,
+      ),
     );
   }
 
@@ -2716,13 +2728,14 @@ class _ChatGptStreamingSentenceFadeState
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) {
-        final shimmerGlow = 0.40 + (_ctrl.value * 0.35);
+        final shimmerGlow = 0.55 + (_ctrl.value * 0.35); // 0.55 -> 0.90
+        final trailingGlow = 0.38 + (_ctrl.value * 0.22); // 0.38 -> 0.60
 
         return ShaderMask(
           blendMode: BlendMode.dstIn,
           shaderCallback: (Rect bounds) {
             // Keep everything above the last sentence at 100% solid opacity
-            final fadeHeight = (bounds.height * 0.35).clamp(24.0, 52.0);
+            final fadeHeight = (bounds.height * 0.40).clamp(24.0, 56.0);
             final fadeStart = (bounds.height <= fadeHeight)
                 ? 0.0
                 : (bounds.height - fadeHeight) / bounds.height;
@@ -2734,7 +2747,7 @@ class _ChatGptStreamingSentenceFadeState
                 Colors.white,
                 Colors.white,
                 Colors.white.withValues(alpha: shimmerGlow),
-                Colors.white.withValues(alpha: 0.18),
+                Colors.white.withValues(alpha: trailingGlow),
               ],
               stops: [
                 0.0,
