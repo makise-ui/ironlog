@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1517,24 +1516,26 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
             ),
           ],
 
-          // Content Bubble (only show if content not empty)
-          if (hasContent) ...[
+          // Content Bubble (shown when hasContent OR when assistant is streaming waiting for first tokens)
+          if (hasContent || (!isUser && isStreaming)) ...[
             GestureDetector(
               onLongPress: () {
-                Clipboard.setData(ClipboardData(text: msg.content));
-                AppHaptics.success();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      isUser ? 'Prompt copied to clipboard' : 'Response copied to clipboard',
-                      style: const TextStyle(fontSize: 12),
+                if (msg.content.trim().isNotEmpty) {
+                  Clipboard.setData(ClipboardData(text: msg.content));
+                  AppHaptics.success();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isUser ? 'Prompt copied to clipboard' : 'Response copied to clipboard',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                      width: 220,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    duration: const Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
-                    width: 220,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                );
+                  );
+                }
               },
               child: _buildBubbleContent(
                 msg: msg,
@@ -1582,8 +1583,8 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                 ),
               ),
 
-            // Copy Action under Assistant Bubbles
-            if (!isUser)
+            // Copy Action under Assistant Bubbles (only when completed)
+            if (!isUser && hasContent && !isStreaming)
               Padding(
                 padding: const EdgeInsets.only(left: 4, top: 3),
                 child: BouncyPressable(
@@ -1657,16 +1658,40 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
       bottomRight: Radius.circular(isUser ? 4 : 16),
     );
 
+    final hasContent = msg.content.trim().isNotEmpty;
+
+    // While assistant is streaming:
     if (!isUser && msg.isStreaming) {
-      return _StreamingAssistantBubble(
-        borderRadius: bubbleRadius,
-        child: _GeminiShimmerText(
-          isDark: context.isDark,
-          child: _buildFormattedMarkdown(
-            msg.content,
-            isUser: false,
-            isStreaming: true,
-          ),
+      return Container(
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9),
+          borderRadius: bubbleRadius,
+          border: Border.all(color: context.cardBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // If text has already arrived, display the arrived text with the monochromatic silver shimmer
+            if (hasContent) ...[
+              _SilverShimmerText(
+                isDark: context.isDark,
+                child: _buildFormattedMarkdown(
+                  msg.content,
+                  isUser: false,
+                  isStreaming: false,
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Trailing shimmering skeleton bar representing incoming sentences
+              const _SkeletonSentenceLines(singleLine: true),
+            ] else ...[
+              // Waiting for the first tokens to arrive: show 3 skeleton sentence bars
+              const _SkeletonSentenceLines(singleLine: false),
+            ],
+          ],
         ),
       );
     }
@@ -1790,32 +1815,6 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
             blockquotePadding: const EdgeInsets.only(left: 8, top: 2, bottom: 2),
           ),
         ),
-        if (isStreaming) ...[
-          const SizedBox(height: 6),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FadeTransition(
-                opacity: _pulseController,
-                child: Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 11,
-                  color: context.isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
-                ),
-              ),
-              const SizedBox(width: 5),
-              Text(
-                'Generating...',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  color: context.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }
@@ -2690,23 +2689,20 @@ class _WaveringShimmerTextState extends State<_WaveringShimmerText>
   }
 }
 
-// ── Gemini & Apple Intelligence Streaming Response Shimmer ─────────────────
+// ── Monochromatic Sentence Shimmer & Silver Streaming Text ──────────────────
 
-/// Live rotating iridescent gradient border with breathing ambient glow for the streaming response bubble.
-class _StreamingAssistantBubble extends StatefulWidget {
-  final Widget child;
-  final BorderRadius borderRadius;
+/// Rounded sentence placeholder bars with a sleek monochromatic light-wave shimmer.
+/// Shown before response tokens arrive (3 lines) and as trailing incoming lines (1 line).
+class _SkeletonSentenceLines extends StatefulWidget {
+  final bool singleLine;
 
-  const _StreamingAssistantBubble({
-    required this.child,
-    required this.borderRadius,
-  });
+  const _SkeletonSentenceLines({this.singleLine = false});
 
   @override
-  State<_StreamingAssistantBubble> createState() => _StreamingAssistantBubbleState();
+  State<_SkeletonSentenceLines> createState() => _SkeletonSentenceLinesState();
 }
 
-class _StreamingAssistantBubbleState extends State<_StreamingAssistantBubble>
+class _SkeletonSentenceLinesState extends State<_SkeletonSentenceLines>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
 
@@ -2715,7 +2711,7 @@ class _StreamingAssistantBubbleState extends State<_StreamingAssistantBubble>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3200),
+      duration: const Duration(milliseconds: 1600),
     )..repeat();
   }
 
@@ -2728,119 +2724,87 @@ class _StreamingAssistantBubbleState extends State<_StreamingAssistantBubble>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseBarColor = isDark ? const Color(0xFF282C3D) : const Color(0xFFE2E8F0);
+    final highlightBarColor = isDark ? const Color(0xFF454B64) : const Color(0xFFCBD5E1);
+    final glintPeak = isDark ? const Color(0xFF6B7280) : const Color(0xFF94A3B8);
 
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, child) {
+        final v = _ctrl.value;
+        final startX = -1.5 + (v * 3.0);
+        final endX = startX + 1.2;
+
+        return ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              begin: Alignment(startX, 0),
+              end: Alignment(endX, 0),
+              colors: [
+                baseBarColor,
+                baseBarColor,
+                highlightBarColor,
+                glintPeak,
+                highlightBarColor,
+                baseBarColor,
+                baseBarColor,
+              ],
+              stops: const [0.0, 0.25, 0.42, 0.50, 0.58, 0.75, 1.0],
+            ).createShader(bounds);
+          },
+          child: child,
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: widget.singleLine
+            ? [
+                _buildBar(fraction: 0.65, height: 11),
+              ]
+            : [
+                _buildBar(fraction: 1.0, height: 12),
+                const SizedBox(height: 8),
+                _buildBar(fraction: 0.85, height: 12),
+                const SizedBox(height: 8),
+                _buildBar(fraction: 0.52, height: 12),
+              ],
+      ),
+    );
+  }
+
+  Widget _buildBar({required double fraction, required double height}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
         return Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
+          width: constraints.maxWidth * fraction,
+          height: height,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
-            borderRadius: widget.borderRadius,
-            boxShadow: [
-              BoxShadow(
-                color: (isDark ? const Color(0xFF8B5CF6) : const Color(0xFF6366F1))
-                    .withValues(alpha: 0.16),
-                blurRadius: 18,
-                spreadRadius: 0.5,
-              ),
-              BoxShadow(
-                color: (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7))
-                    .withValues(alpha: 0.10),
-                blurRadius: 26,
-                spreadRadius: 1.5,
-              ),
-            ],
-          ),
-          child: CustomPaint(
-            foregroundPainter: _GradientBorderPainter(
-              animationProgress: _ctrl.value,
-              borderRadius: widget.borderRadius,
-              strokeWidth: 1.5,
-              isDark: isDark,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: child,
-            ),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(height / 2),
           ),
         );
       },
-      child: widget.child,
     );
   }
 }
 
-/// Custom painter for the animated iridescent sweep gradient along the bubble border.
-class _GradientBorderPainter extends CustomPainter {
-  final double animationProgress;
-  final BorderRadius borderRadius;
-  final double strokeWidth;
-  final bool isDark;
-
-  _GradientBorderPainter({
-    required this.animationProgress,
-    required this.borderRadius,
-    this.strokeWidth = 1.5,
-    required this.isDark,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.width <= 0 || size.height <= 0) return;
-    final rect = Offset.zero & size;
-    final rrect = borderRadius.toRRect(rect).deflate(strokeWidth / 2);
-
-    final angle = animationProgress * 2 * math.pi;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        startAngle: 0.0,
-        endAngle: 2 * math.pi,
-        transform: GradientRotation(angle),
-        colors: isDark
-            ? const [
-                Color(0xFF38BDF8), // Radiant Cyan
-                Color(0xFF818CF8), // Soft Indigo
-                Color(0xFFC084FC), // Luminescent Violet
-                Color(0xFFF472B6), // Electric Pink
-                Color(0xFF38BDF8), // Radiant Cyan
-              ]
-            : const [
-                Color(0xFF0284C7),
-                Color(0xFF6366F1),
-                Color(0xFFA855F7),
-                Color(0xFFEC4899),
-                Color(0xFF0284C7),
-              ],
-        stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
-      ).createShader(rect);
-
-    canvas.drawRRect(rrect, paint);
-  }
-
-  @override
-  bool shouldRepaint(_GradientBorderPainter oldDelegate) =>
-      oldDelegate.animationProgress != animationProgress || oldDelegate.isDark != isDark;
-}
-
-/// Shimmer light wave effect streaming continuously across the response text itself (Gemini / Apple Intelligence style).
-class _GeminiShimmerText extends StatefulWidget {
+/// Monochromatic silver light-wave shimmer streaming across the arrived response text.
+class _SilverShimmerText extends StatefulWidget {
   final Widget child;
   final bool isDark;
 
-  const _GeminiShimmerText({
+  const _SilverShimmerText({
     required this.child,
     required this.isDark,
   });
 
   @override
-  State<_GeminiShimmerText> createState() => _GeminiShimmerTextState();
+  State<_SilverShimmerText> createState() => _SilverShimmerTextState();
 }
 
-class _GeminiShimmerTextState extends State<_GeminiShimmerText>
+class _SilverShimmerTextState extends State<_SilverShimmerText>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
 
@@ -2849,7 +2813,7 @@ class _GeminiShimmerTextState extends State<_GeminiShimmerText>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 1800),
     )..repeat();
   }
 
@@ -2862,12 +2826,9 @@ class _GeminiShimmerTextState extends State<_GeminiShimmerText>
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    final baseColor = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A);
-    final geminiBlue = isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB);
-    final geminiPurple = isDark ? const Color(0xFFC084FC) : const Color(0xFF7C3AED);
-    final geminiPink = isDark ? const Color(0xFFF472B6) : const Color(0xFFDB2777);
-    final geminiCyan = isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
-    final highlightGlow = isDark ? Colors.white : const Color(0xFF4338CA);
+    final baseColor = isDark ? const Color(0xFFD6DBE4) : const Color(0xFF334155);
+    final glintGlow = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF0F172A);
+    final glintMid = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B);
 
     return AnimatedBuilder(
       animation: _ctrl,
@@ -2880,20 +2841,18 @@ class _GeminiShimmerTextState extends State<_GeminiShimmerText>
           blendMode: BlendMode.srcIn,
           shaderCallback: (bounds) {
             return LinearGradient(
-              begin: Alignment(startX, -0.2),
-              end: Alignment(endX, 0.2),
+              begin: Alignment(startX, -0.1),
+              end: Alignment(endX, 0.1),
               colors: [
                 baseColor,
                 baseColor,
-                geminiBlue,
-                geminiPurple,
-                highlightGlow,
-                geminiPink,
-                geminiCyan,
+                glintMid,
+                glintGlow,
+                glintMid,
                 baseColor,
                 baseColor,
               ],
-              stops: const [0.0, 0.22, 0.38, 0.48, 0.54, 0.64, 0.74, 0.88, 1.0],
+              stops: const [0.0, 0.28, 0.44, 0.50, 0.56, 0.72, 1.0],
             ).createShader(bounds);
           },
           child: child,
