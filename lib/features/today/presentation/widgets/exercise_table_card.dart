@@ -2095,7 +2095,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
               scaleDown: 0.96,
               child: Container(
                 width: 80,
-                padding: const EdgeInsets.symmetric(vertical: 5),
+                padding: const EdgeInsets.symmetric(vertical: 11),
                 decoration: BoxDecoration(
                   color: isRepsActive
                       ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
@@ -2152,7 +2152,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
               scaleDown: 0.96,
               child: Container(
                 width: 72,
-                padding: const EdgeInsets.symmetric(vertical: 5),
+                padding: const EdgeInsets.symmetric(vertical: 11),
                 decoration: BoxDecoration(
                   color: isWeightActive
                       ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
@@ -2211,7 +2211,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
               scaleDown: 0.96,
               child: Container(
                 width: 54,
-                padding: const EdgeInsets.symmetric(vertical: 5),
+                padding: const EdgeInsets.symmetric(vertical: 11),
                 decoration: BoxDecoration(
                   color: isRepsActive
                       ? context.accent.withValues(alpha: isDark ? 0.22 : 0.12)
@@ -2252,8 +2252,8 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
             },
             scaleDown: 0.84,
             child: Container(
-              width: 36,
-              height: 30,
+              width: 40,
+              height: 36,
               decoration: BoxDecoration(
                 color: context.accent.withValues(alpha: isDark ? 0.14 : 0.08),
                 borderRadius: BorderRadius.circular(8),

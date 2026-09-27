@@ -224,6 +224,25 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
   Future<void> _deleteExistingSet() async {
     if (widget.existingSetToEdit == null) return;
     AppHaptics.warning();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Set?'),
+        content: const Text('This will permanently remove this logged set.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     final repo = ref.read(workoutRepositoryProvider);
     await repo.deleteSet(widget.existingSetToEdit!.id);
     if (mounted) {
@@ -407,7 +426,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
                     onPressed: _deleteExistingSet,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: 20),
                 Expanded(
                   flex: 2,
                   child: GlassButton(

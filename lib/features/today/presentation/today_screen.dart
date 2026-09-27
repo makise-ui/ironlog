@@ -1500,6 +1500,43 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     ),
                   ),
                 ),
+                // Finish / Start button in bottom HUD for single-hand reach
+                if (_workout?.startedAt == null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: ScaleTap(
+                      onPressed: _startWorkout,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8.5),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [C.positive, const Color(0xFF10B981)],
+                          ),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: const Icon(Icons.play_arrow_rounded, size: 16, color: Colors.black),
+                      ),
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: ScaleTap(
+                      onPressed: _finishWorkout,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8.5),
+                        decoration: BoxDecoration(
+                          color: C.positive.withValues(alpha: isDark ? 0.18 : 0.12),
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(
+                            color: C.positive.withValues(alpha: 0.5),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Icon(Icons.flag_rounded, size: 16, color: C.positive),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
