@@ -238,10 +238,12 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
   Future<void> _initSpeech() async {
     try {
       final available = await _speech.initialize(
-        onError: (_) => setState(() => _isListening = false),
+        onError: (_) {
+          if (mounted) setState(() => _isListening = false);
+        },
         onStatus: (status) {
           if (status == 'done' || status == 'notListening') {
-            setState(() => _isListening = false);
+            if (mounted) setState(() => _isListening = false);
           }
         },
       );
@@ -527,30 +529,46 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
 
   void _toggleListening() async {
     if (!_speechAvailable) {
+      await _initSpeech();
+    }
+
+    if (!_speechAvailable) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Speech recognition not available on this device.')),
+        const SnackBar(
+          content: Text('Speech recognition not available. Please allow microphone permission.'),
+          duration: Duration(seconds: 3),
+        ),
       );
       return;
     }
 
     if (_isListening) {
       await _speech.stop();
-      setState(() => _isListening = false);
+      if (mounted) setState(() => _isListening = false);
     } else {
       AppHaptics.tap();
-      setState(() => _isListening = true);
+      if (mounted) setState(() => _isListening = true);
       _speech.listen(
         onResult: (result) {
           if (!mounted) return;
           setState(() {
             _textController.text = result.recognizedWords;
+            _textController.selection = TextSelection.fromPosition(
+              TextPosition(offset: _textController.text.length),
+            );
           });
-          if (result.finalResult) {
+          if (result.finalResult && result.recognizedWords.trim().isNotEmpty) {
             _speech.stop();
             setState(() => _isListening = false);
             _handleSend();
           }
         },
+        listenOptions: stt.SpeechListenOptions(
+          listenMode: stt.ListenMode.dictation,
+          partialResults: true,
+          cancelOnError: true,
+        ),
       );
     }
   }
