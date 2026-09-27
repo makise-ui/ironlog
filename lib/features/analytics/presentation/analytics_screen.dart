@@ -11,6 +11,8 @@ import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/scale_tap.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/analytics_model.dart';
+import '../../../domain/models/muscle_recovery_model.dart';
+import 'widgets/realistic_body_heatmap.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
@@ -27,6 +29,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   AnalyticsOverviewData? _overview;
   List<DailyVolumeStat> _volumeStats = [];
   Map<String, int> _muscleSplit = {};
+  Map<String, MuscleRecoveryData> _muscleRecovery = {};
   List<PrItemData> _recentPrs = [];
 
   // Advanced analytics state
@@ -50,6 +53,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     final overview = await repo.getAnalyticsOverview();
     final volumeStats = await repo.getDailyVolumeStats(days: _selectedDaysWindow);
     final muscleSplit = await repo.getMuscleGroupBreakdown(days: _selectedDaysWindow);
+    final muscleRecovery = await repo.getMuscleRecoveryStatus();
     final prs = await repo.getRecentPrs(limit: 8);
 
     // Advanced analytics queries
@@ -65,6 +69,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         _overview = overview;
         _volumeStats = volumeStats;
         _muscleSplit = muscleSplit;
+        _muscleRecovery = muscleRecovery;
         _recentPrs = prs;
         _weeklyFrequency = weeklyFreq;
         _topExercises = topExercises;
@@ -432,7 +437,19 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-              // 3. Muscle Group Split Breakdown
+              // 3. Muscle Recovery & Fatigue Heatmap (Realistic Human Anatomy)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: RealisticBodyHeatmap(
+                    recoveryData: _muscleRecovery,
+                  ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+              // 4. Muscle Group Split Breakdown
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),

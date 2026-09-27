@@ -29,6 +29,13 @@ class ExerciseRepository {
       equip = EquipmentType.values.byName(data.equipment.toLowerCase());
     } catch (_) {}
 
+    ExerciseTrackingType? tracking;
+    if (data.trackingType != null && data.trackingType!.isNotEmpty) {
+      try {
+        tracking = ExerciseTrackingType.values.byName(data.trackingType!);
+      } catch (_) {}
+    }
+
     return ExerciseModel(
       id: data.id,
       name: data.name,
@@ -43,6 +50,8 @@ class ExerciseRepository {
       restSeconds: data.restSeconds,
       isCustom: data.isCustom,
       archived: data.archived,
+      imagePath: data.imagePath,
+      customTrackingType: tracking,
     );
   }
 
@@ -108,6 +117,8 @@ class ExerciseRepository {
         restSeconds: Value(model.restSeconds),
         isCustom: Value(model.isCustom),
         archived: Value(model.archived),
+        imagePath: Value(model.imagePath),
+        trackingType: Value(model.customTrackingType?.name),
       ),
     );
     BackupService.scheduleAutoBackup(_db);
@@ -127,6 +138,26 @@ class ExerciseRepository {
         repMax: Value(model.repMax),
         restSeconds: Value(model.restSeconds),
         archived: Value(model.archived),
+        imagePath: Value(model.imagePath),
+        trackingType: Value(model.customTrackingType?.name),
+      ),
+    );
+    BackupService.scheduleAutoBackup(_db);
+  }
+
+  Future<void> updateExerciseImage(String id, String? imagePath) async {
+    await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
+      ExercisesCompanion(
+        imagePath: Value(imagePath),
+      ),
+    );
+    BackupService.scheduleAutoBackup(_db);
+  }
+
+  Future<void> updateExerciseTrackingType(String id, ExerciseTrackingType trackingType) async {
+    await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
+      ExercisesCompanion(
+        trackingType: Value(trackingType.name),
       ),
     );
     BackupService.scheduleAutoBackup(_db);
@@ -169,9 +200,11 @@ class ExerciseRepository {
     int repMin = 8,
     int repMax = 12,
     int restSeconds = 90,
+    ExerciseTrackingType? trackingType,
+    String? imagePath,
   }) async {
     final newId = 'custom_${DateTime.now().millisecondsSinceEpoch}';
-    final isBw = equipment == EquipmentType.bodyweight;
+    final isBw = equipment == EquipmentType.bodyweight || trackingType == ExerciseTrackingType.bodyweightReps;
     final resolvedLoadMode = loadMode ?? (isBw ? LoadMode.bodyweight : LoadMode.total);
     final resolvedWeightStep = weightStep ?? (isBw ? 0.0 : 2.5);
     final model = ExerciseModel(
@@ -188,6 +221,8 @@ class ExerciseRepository {
       restSeconds: restSeconds,
       isCustom: true,
       archived: false,
+      imagePath: imagePath,
+      customTrackingType: trackingType,
     );
     await createExercise(model);
     return model;

@@ -47,25 +47,47 @@ class BackupService {
   static Future<List<Directory>> getPersistentDirectories() async {
     final dirs = <Directory>[];
 
-    // 1. Android public Documents/IronLog folder (survives app uninstall)
+    // 1. Application documents directory (always guaranteed to be writable and reliable)
+    try {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final ironDir = Directory('${appDocDir.path}/IronLog');
+      if (!await ironDir.exists()) {
+        await ironDir.create(recursive: true);
+      }
+      dirs.add(ironDir);
+    } catch (_) {}
+
+    // 2. External app storage directory (survives app updates, writable without runtime permissions on Android)
+    try {
+      final extDir = await getExternalStorageDirectory();
+      if (extDir != null) {
+        final ironDir = Directory('${extDir.path}/IronLog');
+        if (!await ironDir.exists()) {
+          await ironDir.create(recursive: true);
+        }
+        if (!dirs.any((d) => d.path == ironDir.path)) dirs.add(ironDir);
+      }
+    } catch (_) {}
+
+    // 3. Android public Documents/IronLog folder (survives app uninstall)
     try {
       final docDir = Directory('/storage/emulated/0/Documents/IronLog');
       if (!await docDir.exists()) {
         await docDir.create(recursive: true);
       }
-      dirs.add(docDir);
+      if (!dirs.any((d) => d.path == docDir.path)) dirs.add(docDir);
     } catch (_) {}
 
-    // 2. Android public Download/IronLog folder (survives app uninstall)
+    // 4. Android public Download/IronLog folder (survives app uninstall)
     try {
       final downloadDir = Directory('/storage/emulated/0/Download/IronLog');
       if (!await downloadDir.exists()) {
         await downloadDir.create(recursive: true);
       }
-      dirs.add(downloadDir);
+      if (!dirs.any((d) => d.path == downloadDir.path)) dirs.add(downloadDir);
     } catch (_) {}
 
-    // 3. Android /sdcard symlink fallbacks
+    // 5. Android /sdcard symlink fallbacks
     try {
       final sdDoc = Directory('/sdcard/Documents/IronLog');
       if (!await sdDoc.exists()) {
@@ -82,7 +104,7 @@ class BackupService {
       if (!dirs.any((d) => d.path == sdDownload.path)) dirs.add(sdDownload);
     } catch (_) {}
 
-    // 4. Desktop (Linux, macOS, Windows) user Documents folder
+    // 6. Desktop (Linux, macOS, Windows) user Documents folder
     if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
       try {
         final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
@@ -96,7 +118,7 @@ class BackupService {
       } catch (_) {}
     }
 
-    // 5. System Downloads directory via path_provider
+    // 7. System Downloads directory via path_provider
     try {
       final downloads = await getDownloadsDirectory();
       if (downloads != null) {
@@ -106,28 +128,6 @@ class BackupService {
         }
         if (!dirs.any((d) => d.path == ironDir.path)) dirs.add(ironDir);
       }
-    } catch (_) {}
-
-    // 6. External storage directory
-    try {
-      final extDir = await getExternalStorageDirectory();
-      if (extDir != null) {
-        final ironDir = Directory('${extDir.path}/IronLog');
-        if (!await ironDir.exists()) {
-          await ironDir.create(recursive: true);
-        }
-        if (!dirs.any((d) => d.path == ironDir.path)) dirs.add(ironDir);
-      }
-    } catch (_) {}
-
-    // 7. Application documents directory fallback
-    try {
-      final appDocDir = await getApplicationDocumentsDirectory();
-      final ironDir = Directory('${appDocDir.path}/IronLog');
-      if (!await ironDir.exists()) {
-        await ironDir.create(recursive: true);
-      }
-      if (!dirs.any((d) => d.path == ironDir.path)) dirs.add(ironDir);
     } catch (_) {}
 
     return dirs;
@@ -229,7 +229,7 @@ class BackupService {
       'user_experience_level': settingsMap['user_level'] ?? prefs.getString('user_experience_level'),
       'weight_unit': settingsMap['weight_unit'] ?? prefs.getString('weight_unit') ?? 'kg',
       'theme_mode': settingsMap['theme_mode'] ?? prefs.getString('theme_mode') ?? 'dark',
-      'accent_preset': settingsMap['accent_preset'] ?? 'cobalt',
+      'accent_preset': settingsMap['accent_preset'] ?? 'titanium',
       'include_warmup': settingsMap['include_warmup_volume'] == 'true',
     };
 
@@ -382,7 +382,7 @@ class BackupService {
   /// Check if a previous backup exists in persistent device storage (surviving reinstall)
   static Future<BackupFileInfo?> findExistingBackup() async {
     final dirs = await getPersistentDirectories();
-    BackupFileInfo? bestCandidate;
+    final candidates = <BackupFileInfo>[];
 
     for (final dir in dirs) {
       for (final fname in [backupFileName, autoBackupFileName]) {
@@ -406,7 +406,7 @@ class BackupService {
 
             final exportedAt = DateTime.tryParse(data['exported_at']?.toString() ?? '') ?? stat.modified;
 
-            final info = BackupFileInfo(
+            candidates.add(BackupFileInfo(
               path: file.path,
               modifiedAt: stat.modified,
               exportedAt: exportedAt,
@@ -416,23 +416,27 @@ class BackupService {
               athleteWeight: athleteWeight,
               weightUnit: weightUnit?.toString(),
               displayDirectory: dir.path,
-            );
-
-            if (bestCandidate == null) {
-              bestCandidate = info;
-            } else if (info.exportedAt.isAfter(bestCandidate.exportedAt)) {
-              bestCandidate = info;
-            } else if (info.exportedAt.isAtSameMomentAs(bestCandidate.exportedAt) &&
-                info.workoutCount > bestCandidate.workoutCount) {
-              bestCandidate = info;
-            }
+            ));
           } catch (e) {
             debugPrint('Error parsing found backup at ${file.path}: $e');
           }
         }
       }
     }
-    return bestCandidate;
+
+    if (candidates.isEmpty) return null;
+
+    // Sort to prioritize the most complete and recent backup:
+    // 1. Never pick an empty/partial backup (e.g. 1 workout) over a full backup (e.g. 13 workouts)
+    // 2. If workout counts are comparable, pick the newest exportedAt
+    candidates.sort((a, b) {
+      if (a.workoutCount != b.workoutCount) {
+        return b.workoutCount.compareTo(a.workoutCount);
+      }
+      return b.exportedAt.compareTo(a.exportedAt);
+    });
+
+    return candidates.first;
   }
 
   /// Restores progress directly from a file path
@@ -445,6 +449,24 @@ class BackupService {
 
   /// Restores all progress from a JSON map into the local SQLite database
   static Future<int> restoreFromJson(AppDatabase db, Map<String, dynamic> data) async {
+    // 0. Safety snapshot of current database state before performing any restore
+    try {
+      final currentBackup = await createBackupJson(db);
+      final currentWorkouts = (currentBackup['workouts'] as List?)?.length ?? 0;
+      if (currentWorkouts > 0) {
+        final jsonStr = jsonEncode(currentBackup);
+        final dirs = await getPersistentDirectories();
+        for (final dir in dirs) {
+          try {
+            final safetyFile = File('${dir.path}/ironlog_pre_restore_safety.json');
+            await safetyFile.writeAsString(jsonStr, flush: true);
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('Pre-restore safety snapshot error: $e');
+    }
+
     final workoutsList = (data['workouts'] as List? ?? []);
     final weList = (data['workout_exercises'] as List? ?? []);
     final setsList = (data['sets'] as List? ?? []);

@@ -100,5 +100,42 @@ void main() {
       expect(parsed.protein, 36);
       expect(parsed.benefit, contains('Omega-3'));
     });
+
+    test('AnalyzedFoodResult handles non-food images correctly', () {
+      final nonFoodMap = {
+        'isFood': false,
+        'reason': 'Image shows a person instead of a meal.',
+      };
+      final result = AnalyzedFoodResult.fromMap(nonFoodMap);
+
+      expect(result.isFood, false);
+      expect(result.protein, 0.0);
+      expect(result.calories, 0);
+      expect(result.mealName, 'No Food Detected');
+      expect(result.nonFoodReason, contains('person'));
+    });
+
+    test('AnalyzedFoodResult parses valid food properly', () {
+      final foodMap = {
+        'isFood': true,
+        'mealName': 'Grilled Chicken Bowl',
+        'protein': 45.0,
+        'carbs': 50.0,
+        'fat': 8.0,
+        'calories': 452,
+        'mealType': 'postWorkout',
+        'summary': 'Nutritious recovery meal',
+        'detectedItems': ['Chicken breast (160g)', 'Rice (200g)'],
+      };
+      final result = AnalyzedFoodResult.fromMap(foodMap);
+
+      expect(result.isFood, true);
+      expect(result.mealName, 'Grilled Chicken Bowl');
+      expect(result.protein, 45.0);
+      expect(result.carbs, 50.0);
+      expect(result.fat, 8.0);
+      expect(result.calories, 452);
+      expect(result.detectedItems.length, 2);
+    });
   });
 }

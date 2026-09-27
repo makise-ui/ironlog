@@ -46,6 +46,17 @@ class AiAssistantService {
               updated = true;
             }
           }
+          // Heal any previously misconfigured Agnes profiles
+          for (int i = 0; i < profiles.length; i++) {
+            if (profiles[i].id == 'agnes_flash' && profiles[i].provider != AiProvider.agnes) {
+              profiles[i] = profiles[i].copyWith(
+                provider: AiProvider.agnes,
+                baseUrl: 'https://apihub.agnes-ai.com/v1',
+                modelName: 'agnes-3.0-flash',
+              );
+              updated = true;
+            }
+          }
           if (updated) {
             await saveProfiles(profiles);
           }

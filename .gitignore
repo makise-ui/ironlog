@@ -46,3 +46,9 @@ app.*.map.json
 
 # Test generated sample files
 sample_growth_timeline_*.json
+
+# User backup data (dev artifacts)
+saved_user_backups/
+
+# Dev mockup images
+ai_shimmer_mockup.jpg

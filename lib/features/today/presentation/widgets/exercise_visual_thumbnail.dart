@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../domain/services/exercise_media_service.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import 'exercise_diagram_painter.dart';
 
 class ExerciseVisualThumbnail extends StatelessWidget {
   final String? exerciseName;
+  final String? imagePath;
   final String muscleGroupId;
   final String equipment;
   final double size;
@@ -12,6 +15,7 @@ class ExerciseVisualThumbnail extends StatelessWidget {
   const ExerciseVisualThumbnail({
     super.key,
     this.exerciseName,
+    this.imagePath,
     required this.muscleGroupId,
     required this.equipment,
     this.size = 46.0,
@@ -35,6 +39,48 @@ class ExerciseVisualThumbnail extends StatelessWidget {
       default:
         return Icons.fitness_center_rounded;
     }
+  }
+
+  Widget _buildCustomImage(String path, bool isDark) {
+    final isGif = path.toLowerCase().endsWith('.gif');
+    final fit = isGif ? BoxFit.contain : BoxFit.cover;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: fit,
+        cacheWidth: (size * 2).toInt(),
+        cacheHeight: (size * 2).toInt(),
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return ShimmerLoading(
+            width: size,
+            height: size,
+            borderRadius: BorderRadius.circular(9),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
+      );
+    }
+    final file = File(path);
+    if (file.existsSync()) {
+      return Image.file(
+        file,
+        fit: fit,
+        cacheWidth: (size * 2).toInt(),
+        cacheHeight: (size * 2).toInt(),
+        errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
+      );
+    }
+    if (path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: fit,
+        cacheWidth: (size * 2).toInt(),
+        cacheHeight: (size * 2).toInt(),
+        errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
+      );
+    }
+    return _buildFallbackVector(isDark);
   }
 
   @override
@@ -62,7 +108,9 @@ class ExerciseVisualThumbnail extends StatelessWidget {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              if (mediaInfo != null)
+              if (imagePath != null && imagePath!.isNotEmpty)
+                _buildCustomImage(imagePath!, isDark)
+              else if (mediaInfo != null)
                 Padding(
                   padding: const EdgeInsets.all(2.0),
                   child: mediaInfo.isLocalAsset

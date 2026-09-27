@@ -1,12 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/haptics.dart';
+import '../../../../core/widgets/scale_tap.dart';
 import '../../../../domain/services/exercise_media_service.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import 'exercise_web_search_sheet.dart';
 
 /// Exercise Guide Hero Widget
-/// - Displays 100% verified 3D animated model if exact match exists.
+/// - Displays custom assigned image or 100% verified 3D animated model if exact match exists.
 /// - If not matched, strictly DOES NOT show any wrong animation.
 /// - Provides a one-tap in-app Google Search & Images button so beginners
 ///   can view real gym machines, photos, and form guides directly inside the app.
@@ -16,6 +19,8 @@ class Exercise3DViewer extends StatelessWidget {
   final String equipment;
   final double height;
   final bool isThumbnail;
+  final String? imagePath;
+  final VoidCallback? onChangeImage;
 
   const Exercise3DViewer({
     super.key,
@@ -24,6 +29,8 @@ class Exercise3DViewer extends StatelessWidget {
     required this.equipment,
     this.height = 240,
     this.isThumbnail = false,
+    this.imagePath,
+    this.onChangeImage,
   });
 
   IconData _getEquipmentIcon(String eq) {
@@ -104,8 +111,140 @@ class Exercise3DViewer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // If verified animation exists, show it with top badges
-          if (verifiedMedia != null) ...[
+          // 1. If custom image exists, show it with top badges
+          if (imagePath != null && imagePath!.isNotEmpty) ...[
+            Container(
+              height: 200,
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF141416) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Center(
+                    child: imagePath!.startsWith('http')
+                        ? Image.network(
+                            imagePath!,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return ShimmerLoading(
+                                width: double.infinity,
+                                height: double.infinity,
+                                borderRadius: BorderRadius.circular(12),
+                                label: 'Loading visual...',
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.fitness_center_rounded, size: 48),
+                          )
+                        : Image.file(
+                            File(imagePath!),
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.fitness_center_rounded, size: 48),
+                          ),
+                  ),
+
+                  // Top badge: Custom Image
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (isDark ? const Color(0xFF222226) : const Color(0xFFF1F1F5)).withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3B82F6),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'CUSTOM VISUAL',
+                            style: TextStyle(
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Top badge: Muscle
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        muscleGroupId.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 9.0,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Bottom Change Image button
+                  if (onChangeImage != null)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: ScaleTap(
+                        onPressed: onChangeImage!,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: context.cardBg.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: context.cardBorder),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.edit_outlined, size: 13, color: context.accent),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Change Image',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+          ]
+          // 2. If verified animation exists, show it with top badges
+          else if (verifiedMedia != null) ...[
             Container(
               height: 200,
               width: double.infinity,
@@ -181,6 +320,39 @@ class Exercise3DViewer extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // Bottom Change Image button
+                  if (onChangeImage != null)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: ScaleTap(
+                        onPressed: onChangeImage!,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: context.cardBg.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: context.cardBorder),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.edit_outlined, size: 13, color: context.accent),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Change Image',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -236,7 +408,7 @@ class Exercise3DViewer extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Detailed Visual Guide',
+                          'Visual Form Guide',
                           style: TextStyle(
                             fontFamily: AppTypography.fontFamilyDisplay,
                             fontSize: 15,
@@ -255,6 +427,33 @@ class Exercise3DViewer extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (onChangeImage != null)
+                    ScaleTap(
+                      onPressed: onChangeImage!,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: context.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: context.accent.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined, size: 14, color: context.accent),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Set Image',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: context.accent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

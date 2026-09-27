@@ -2088,6 +2088,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         _loadWorkoutForDate(next);
       }
     });
+    ref.listen<int>(exerciseImageRevisionProvider, (previous, next) {
+      _refreshWorkout();
+    });
 
     final isToday = AppDateUtils.isSameDay(_selectedDate, DateTime.now());
     final isPastDate = !isToday;

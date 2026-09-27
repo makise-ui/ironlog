@@ -34,6 +34,10 @@ class _AiFloatingCapsuleState extends ConsumerState<AiFloatingCapsule>
   Offset _dockStartPos = Offset.zero;
   Offset _dockTargetPos = Offset.zero;
 
+  // Pointer & anchor tracking for smooth hold-and-drag
+  Offset? _dragStartPointer;
+  Offset? _dragStartPosition;
+
   static const double _mascotWidth = 58.0;
   static const double _mascotHeight = 64.0;
   static const double _peekVisibleWidth = 34.0;
@@ -254,6 +258,89 @@ class _AiFloatingCapsuleState extends ConsumerState<AiFloatingCapsule>
     );
   }
 
+  void _startDrag(
+    Offset globalPos, {
+    required bool isLongPress,
+    required double startX,
+    required double startY,
+  }) {
+    _dockSnapController.stop();
+    _hopController.stop();
+    _dragStartPointer = globalPos;
+    _dragStartPosition = Offset(startX, startY);
+    _dragDistance = 0.0;
+    setState(() {
+      _position = Offset(startX, startY);
+      _isDragging = true;
+      _isPeeking = false;
+      _dragTilt = 0.0;
+    });
+    if (isLongPress) {
+      AppHaptics.mediumImpact();
+    } else {
+      AppHaptics.step();
+    }
+  }
+
+  void _updateDrag(
+    Offset globalPos, {
+    required double screenW,
+    required double leftDockX,
+    required double minY,
+    required double maxY,
+  }) {
+    if (!_isDragging || _dragStartPointer == null || _dragStartPosition == null) return;
+    final totalDelta = globalPos - _dragStartPointer!;
+    _dragDistance = totalDelta.distance;
+    final nextX = (_dragStartPosition!.dx + totalDelta.dx)
+        .clamp(leftDockX - 8.0, screenW - _mascotWidth + 8.0);
+    final nextY = (_dragStartPosition!.dy + totalDelta.dy).clamp(minY, maxY);
+    final tiltTarget = (totalDelta.dx * 0.03).clamp(-0.25, 0.25);
+    setState(() {
+      _position = Offset(nextX, nextY);
+      _dragTilt = tiltTarget;
+    });
+  }
+
+  void _endDrag({
+    required double screenW,
+    required double leftDockX,
+    required double rightDockX,
+    required double minY,
+    required double maxY,
+    required double currentY,
+    required bool fromLongPress,
+  }) {
+    if (!_isDragging) return;
+    setState(() {
+      _isDragging = false;
+      _dragTilt = 0.0;
+    });
+
+    if (_dragDistance < 8.0) {
+      if (!fromLongPress) {
+        _openAi();
+      }
+      return;
+    }
+
+    // Snap to nearest edge (left or right)
+    final curX = _position?.dx ?? (_dockSide == 'left' ? leftDockX : rightDockX);
+    final curY = (_position?.dy ?? currentY).clamp(minY, maxY);
+    final snapToRight = (curX + (_mascotWidth / 2)) >= (screenW / 2);
+    final targetSide = snapToRight ? 'right' : 'left';
+    final targetX = snapToRight ? rightDockX : leftDockX;
+    final targetY = curY;
+
+    _dockSide = targetSide;
+    _dockStartPos = Offset(curX, curY);
+    _dockTargetPos = Offset(targetX, targetY);
+
+    AppHaptics.tap();
+    _savePosition(Offset(targetX, targetY), targetSide);
+    _dockSnapController.forward(from: 0.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(aiChatNotifierProvider);
@@ -295,55 +382,60 @@ class _AiFloatingCapsuleState extends ConsumerState<AiFloatingCapsule>
     final isDockedOnRight = _dockSide == 'right';
     final isPeekingMode = _isPeeking && !_isDragging;
 
+    final startX = (_isDragging && _position != null)
+        ? _position!.dx
+        : (_dockSide == 'left' ? leftDockX : rightDockX);
+    final startY = currentY;
+
     // Chibi Mascot Widget (Free-standing, NO circular container)
     final mascotWidget = GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onPanStart: (details) {
-        _dockSnapController.stop();
-        setState(() {
-          _isDragging = true;
-          _isPeeking = false;
-          _dragDistance = 0.0;
-        });
-        AppHaptics.step();
-      },
-      onPanUpdate: (details) {
-        _dragDistance += details.delta.distance;
-        final nextX = currentX + details.delta.dx;
-        final nextY = (currentY + details.delta.dy).clamp(minY, maxY);
-        final tiltTarget = (details.delta.dx * 0.04).clamp(-0.25, 0.25);
-        setState(() {
-          _position = Offset(nextX, nextY);
-          _dragTilt = tiltTarget;
-        });
-      },
-      onPanEnd: (details) {
-        setState(() {
-          _isDragging = false;
-          _dragTilt = 0.0;
-        });
-
-        if (_dragDistance < 7.0) {
-          _openAi();
-          return;
-        }
-
-        // Snap to nearest edge (left or right)
-        final snapToRight = (currentX + (_mascotWidth / 2)) >= (screenW / 2);
-        final targetSide = snapToRight ? 'right' : 'left';
-        final targetX = snapToRight ? rightDockX : leftDockX;
-        final targetY = currentY.clamp(minY, maxY);
-
-        _dockSide = targetSide;
-        _dockStartPos = Offset(currentX, currentY);
-        _dockTargetPos = Offset(targetX, targetY);
-
-        AppHaptics.tap();
-        _savePosition(Offset(targetX, targetY), targetSide);
-        _dockSnapController.forward(from: 0.0);
-      },
+      onPanStart: (details) => _startDrag(
+        details.globalPosition,
+        isLongPress: false,
+        startX: startX,
+        startY: startY,
+      ),
+      onPanUpdate: (details) => _updateDrag(
+        details.globalPosition,
+        screenW: screenW,
+        leftDockX: leftDockX,
+        minY: minY,
+        maxY: maxY,
+      ),
+      onPanEnd: (details) => _endDrag(
+        screenW: screenW,
+        leftDockX: leftDockX,
+        rightDockX: rightDockX,
+        minY: minY,
+        maxY: maxY,
+        currentY: currentY,
+        fromLongPress: false,
+      ),
+      onLongPressStart: (details) => _startDrag(
+        details.globalPosition,
+        isLongPress: true,
+        startX: startX,
+        startY: startY,
+      ),
+      onLongPressMoveUpdate: (details) => _updateDrag(
+        details.globalPosition,
+        screenW: screenW,
+        leftDockX: leftDockX,
+        minY: minY,
+        maxY: maxY,
+      ),
+      onLongPressEnd: (details) => _endDrag(
+        screenW: screenW,
+        leftDockX: leftDockX,
+        rightDockX: rightDockX,
+        minY: minY,
+        maxY: maxY,
+        currentY: currentY,
+        fromLongPress: true,
+      ),
       onTap: _openAi,
-      onLongPress: _showAvatarSelector,
+      onDoubleTap: _showAvatarSelector,
       child: AnimatedBuilder(
         animation: _hopController,
         builder: (context, child) {
@@ -368,7 +460,7 @@ class _AiFloatingCapsuleState extends ConsumerState<AiFloatingCapsule>
           );
         },
         child: AnimatedScale(
-          scale: _isDragging ? 1.15 : 1.0,
+          scale: _isDragging ? 1.18 : 1.0,
           duration: const Duration(milliseconds: 140),
           curve: Curves.easeOutBack,
           child: SizedBox(
@@ -380,19 +472,19 @@ class _AiFloatingCapsuleState extends ConsumerState<AiFloatingCapsule>
               children: [
                 // Clean drop shadow silhouette for high contrast on light & dark themes
                 Positioned(
-                  bottom: 0,
+                  bottom: _isDragging ? -4 : 0,
                   child: Image.asset(
                     _currentAvatar.assetPath,
                     width: _mascotWidth,
                     height: _mascotHeight,
                     fit: BoxFit.contain,
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: Colors.black.withValues(alpha: _isDragging ? 0.45 : 0.35),
                     filterQuality: FilterQuality.medium,
                   ),
                 ),
                 // Free-standing Chibi Mascot
                 Positioned(
-                  bottom: 2,
+                  bottom: _isDragging ? 4 : 2,
                   child: Image.asset(
                     _currentAvatar.assetPath,
                     width: _mascotWidth,

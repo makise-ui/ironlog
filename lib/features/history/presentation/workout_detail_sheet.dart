@@ -12,6 +12,8 @@ import '../../../domain/models/workout_model.dart';
 import '../../../domain/models/exercise_model.dart';
 import '../../../domain/models/set_model.dart';
 import '../../../data/providers.dart';
+import '../../today/presentation/widgets/exercise_visual_thumbnail.dart';
+import '../../today/presentation/widgets/shareable_workout_card.dart';
 
 class WorkoutDetailSheet extends ConsumerWidget {
   final WorkoutModel workout;
@@ -79,6 +81,23 @@ class WorkoutDetailSheet extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
+                  icon: Icon(Icons.share_rounded, color: context.accent),
+                  tooltip: 'Share Workout Card',
+                  onPressed: () async {
+                    AppHaptics.tap();
+                    final repo = ref.read(workoutRepositoryProvider);
+                    final debrief = await repo.getWorkoutDebrief(workout);
+                    if (context.mounted) {
+                      ShareWorkoutModalDialog.show(
+                        context,
+                        workout: workout,
+                        debrief: debrief,
+                        unit: unit,
+                      );
+                    }
+                  },
+                ),
+                IconButton(
                   icon: Icon(Icons.close_rounded, color: context.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
@@ -103,8 +122,16 @@ class WorkoutDetailSheet extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          ExerciseVisualThumbnail(
+                            exerciseName: exItem.exercise.name,
+                            imagePath: exItem.exercise.imagePath,
+                            muscleGroupId: exItem.exercise.muscleGroupId,
+                            equipment: exItem.exercise.equipment.name,
+                            size: 40,
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               exItem.exercise.name,

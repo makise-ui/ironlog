@@ -1880,17 +1880,30 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet>
         if (mounted) {
           _scanController.stop();
           _scanController.reset();
-          setState(() {
-            _isAnalyzing = false;
-            _aiResult = result;
-            _nameCtrl.text = result.mealName;
-            _protein = result.protein;
-            _carbs = result.carbs;
-            _fat = result.fat;
-            _manualCalories = result.calories;
-            _selectedType = result.mealType;
-          });
-          AppHaptics.save();
+          if (!result.isFood) {
+            AppHaptics.warning();
+            setState(() {
+              _isAnalyzing = false;
+              _aiResult = result;
+              _nameCtrl.clear();
+              _protein = 0.0;
+              _carbs = 0.0;
+              _fat = 0.0;
+              _manualCalories = 0;
+            });
+          } else {
+            setState(() {
+              _isAnalyzing = false;
+              _aiResult = result;
+              _nameCtrl.text = result.mealName;
+              _protein = result.protein;
+              _carbs = result.carbs;
+              _fat = result.fat;
+              _manualCalories = result.calories;
+              _selectedType = result.mealType;
+            });
+            AppHaptics.save();
+          }
         }
       }
     } catch (e) {
@@ -1907,7 +1920,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet>
     final name = _nameCtrl.text.trim();
     final finalName = name.isNotEmpty
         ? name
-        : (_aiResult != null ? _aiResult!.mealName : 'Logged Meal');
+        : (_aiResult != null && _aiResult!.isFood ? _aiResult!.mealName : 'Logged Meal');
 
     final item = MealItem(
       id: _uuid.v4(),
@@ -2404,11 +2417,11 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet>
                   )
                 else if (_aiResult != null)
                   Text(
-                    'AI Portions Verified',
+                    _aiResult!.isFood ? 'AI Portions Verified' : 'No Food Detected',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF10B981),
+                      color: _aiResult!.isFood ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                     ),
                   ),
               ],
@@ -2422,6 +2435,61 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet>
 
   Widget _buildAiAnalysisResultBadge() {
     final ai = _aiResult!;
+    if (!ai.isFood) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFF59E0B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No Food Detected',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                ),
+                Text(
+                  'Non-food photo',
+                  style: TextStyle(fontSize: 11, color: C.text3),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              ai.nonFoodReason ?? ai.summary,
+              style: TextStyle(fontSize: 12, color: C.text1, height: 1.35),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 13, color: C.text3),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'Please snap a photo of a meal/beverage, or enter macros manually below.',
+                    style: TextStyle(fontSize: 11, color: C.text3),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),

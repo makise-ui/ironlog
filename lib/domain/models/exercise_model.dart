@@ -55,6 +55,8 @@ class ExerciseModel {
   final int restSeconds;
   final bool isCustom;
   final bool archived;
+  final String? imagePath;
+  final ExerciseTrackingType? customTrackingType;
 
   const ExerciseModel({
     required this.id,
@@ -70,10 +72,51 @@ class ExerciseModel {
     this.restSeconds = 90,
     this.isCustom = false,
     this.archived = false,
+    this.imagePath,
+    this.customTrackingType,
   });
+
+  ExerciseModel copyWith({
+    String? id,
+    String? name,
+    String? muscleGroupId,
+    List<String>? secondaryGroups,
+    EquipmentType? equipment,
+    LoadMode? loadMode,
+    bool? isUnilateral,
+    double? weightStep,
+    int? repMin,
+    int? repMax,
+    int? restSeconds,
+    bool? isCustom,
+    bool? archived,
+    String? imagePath,
+    ExerciseTrackingType? customTrackingType,
+  }) {
+    return ExerciseModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      muscleGroupId: muscleGroupId ?? this.muscleGroupId,
+      secondaryGroups: secondaryGroups ?? this.secondaryGroups,
+      equipment: equipment ?? this.equipment,
+      loadMode: loadMode ?? this.loadMode,
+      isUnilateral: isUnilateral ?? this.isUnilateral,
+      weightStep: weightStep ?? this.weightStep,
+      repMin: repMin ?? this.repMin,
+      repMax: repMax ?? this.repMax,
+      restSeconds: restSeconds ?? this.restSeconds,
+      isCustom: isCustom ?? this.isCustom,
+      archived: archived ?? this.archived,
+      imagePath: imagePath ?? this.imagePath,
+      customTrackingType: customTrackingType ?? this.customTrackingType,
+    );
+  }
 
   /// Automatically categorizes the exercise into one of the 4 adaptive tracking modes
   ExerciseTrackingType get trackingType {
+    if (customTrackingType != null) {
+      return customTrackingType!;
+    }
     final nameLower = name.toLowerCase();
     final muscleLower = muscleGroupId.toLowerCase();
 
@@ -177,38 +220,6 @@ class ExerciseModel {
   bool get isCardioTime => trackingType == ExerciseTrackingType.cardioTime;
   bool get isBodyweight => trackingType == ExerciseTrackingType.bodyweightReps;
   bool get isStandardWeightAndReps => trackingType == ExerciseTrackingType.weightAndReps;
-
-  ExerciseModel copyWith({
-    String? id,
-    String? name,
-    String? muscleGroupId,
-    List<String>? secondaryGroups,
-    EquipmentType? equipment,
-    LoadMode? loadMode,
-    bool? isUnilateral,
-    double? weightStep,
-    int? repMin,
-    int? repMax,
-    int? restSeconds,
-    bool? isCustom,
-    bool? archived,
-  }) {
-    return ExerciseModel(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      muscleGroupId: muscleGroupId ?? this.muscleGroupId,
-      secondaryGroups: secondaryGroups ?? this.secondaryGroups,
-      equipment: equipment ?? this.equipment,
-      loadMode: loadMode ?? this.loadMode,
-      isUnilateral: isUnilateral ?? this.isUnilateral,
-      weightStep: weightStep ?? this.weightStep,
-      repMin: repMin ?? this.repMin,
-      repMax: repMax ?? this.repMax,
-      restSeconds: restSeconds ?? this.restSeconds,
-      isCustom: isCustom ?? this.isCustom,
-      archived: archived ?? this.archived,
-    );
-  }
 }
 
 class MuscleGroupModel {

@@ -441,6 +441,9 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(exerciseImageRevisionProvider, (previous, next) {
+      widget.onRefresh();
+    });
     final activeSets = _currentActiveSets;
     final ex = widget.item.exercise;
 
@@ -503,12 +506,14 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
               children: [
                 ExerciseVisualThumbnail(
                   exerciseName: ex.name,
+                  imagePath: ex.imagePath,
                   muscleGroupId: ex.muscleGroupId,
                   equipment: ex.equipment.name,
                   size: 38,
-                  onTap: () {
+                  onTap: () async {
                     AppHaptics.tap();
-                    ExerciseGuideSheet.show(context, ex, () {});
+                    await ExerciseGuideSheet.show(context, ex, () {});
+                    widget.onRefresh();
                   },
                 ),
                 const SizedBox(width: 10),
@@ -517,9 +522,10 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
                           AppHaptics.tap();
-                          ExerciseGuideSheet.show(context, ex, () {});
+                          await ExerciseGuideSheet.show(context, ex, () {});
+                          widget.onRefresh();
                         },
                         child: Row(
                           children: [

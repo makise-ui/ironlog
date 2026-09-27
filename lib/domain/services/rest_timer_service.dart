@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/haptics.dart';
 
 class RestTimerState {
@@ -236,6 +237,11 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
     if (!_initialized) return;
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('rest_timer_notifications_enabled') ??
+          (prefs.getString('rest_timer_notifications_enabled') != 'false');
+      if (!enabled) return;
+
       final name = exerciseName.isEmpty ? 'Exercise' : exerciseName;
       final timeStr = '${endsAt.hour}:${endsAt.minute.toString().padLeft(2, '0')}';
       const androidDetails = AndroidNotificationDetails(
@@ -265,6 +271,11 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
     if (!_initialized) return;
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('rest_timer_notifications_enabled') ??
+          (prefs.getString('rest_timer_notifications_enabled') != 'false');
+      if (!enabled) return;
+
       final name = exerciseName.isEmpty ? 'Your rest interval' : 'Rest for $exerciseName';
       const androidDetails = AndroidNotificationDetails(
         'rest_timer_channel',

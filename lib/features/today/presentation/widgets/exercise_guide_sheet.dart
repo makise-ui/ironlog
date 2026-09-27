@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/haptics.dart';
 import '../../../../core/widgets/glass_button.dart';
+import '../../../../data/providers.dart';
 import '../../../../domain/models/exercise_model.dart';
-import 'exercise_3d_viewer.dart';
+import 'exercise_image_picker_sheet.dart';
+import 'exercise_position_slideshow.dart';
 import 'exercise_web_search_sheet.dart';
 
-class ExerciseGuideSheet extends StatelessWidget {
+class ExerciseGuideSheet extends ConsumerStatefulWidget {
   final ExerciseModel exercise;
   final VoidCallback onConfirm;
 
@@ -17,9 +20,9 @@ class ExerciseGuideSheet extends StatelessWidget {
     required this.onConfirm,
   });
 
-  static void show(BuildContext context, ExerciseModel exercise, VoidCallback onConfirm) {
+  static Future<String?> show(BuildContext context, ExerciseModel exercise, VoidCallback onConfirm) {
     AppHaptics.tap();
-    showModalBottomSheet(
+    return showModalBottomSheet<String?>(
       context: context,
       isScrollControlled: true,
       enableDrag: false,
@@ -29,6 +32,43 @@ class ExerciseGuideSheet extends StatelessWidget {
         onConfirm: onConfirm,
       ),
     );
+  }
+
+  @override
+  ConsumerState<ExerciseGuideSheet> createState() => _ExerciseGuideSheetState();
+}
+
+class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
+  late ExerciseModel _exercise;
+
+  @override
+  void initState() {
+    super.initState();
+    _exercise = widget.exercise;
+  }
+
+  Future<void> _changeImage() async {
+    final newPath = await ExerciseImagePickerSheet.show(
+      context,
+      exercise: _exercise,
+    );
+    if (newPath != null && mounted) {
+      ref.read(exerciseImageRevisionProvider.notifier).state++;
+      setState(() {
+        _exercise = _exercise.copyWith(imagePath: newPath);
+      });
+    }
+  }
+
+  Future<void> _updateImage(String newPath) async {
+    final repo = ref.read(exerciseRepositoryProvider);
+    await repo.updateExerciseImage(_exercise.id, newPath);
+    ref.read(exerciseImageRevisionProvider.notifier).state++;
+    if (mounted) {
+      setState(() {
+        _exercise = _exercise.copyWith(imagePath: newPath);
+      });
+    }
   }
 
   Map<String, String> _getDetailedEquipmentInfo(ExerciseModel ex) {
@@ -153,6 +193,7 @@ class ExerciseGuideSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final exercise = _exercise;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cues = _getBeginnerCues(exercise);
     final eqInfo = _getDetailedEquipmentInfo(exercise);
@@ -186,30 +227,37 @@ class ExerciseGuideSheet extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'EXERCISE PREVIEW & EQUIPMENT',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                        color: isDark ? const Color(0xFFA3A3A3) : const Color(0xFF71717A),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'EXERCISE PREVIEW & EQUIPMENT',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                          color: isDark ? const Color(0xFFA3A3A3) : const Color(0xFF71717A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Beginner Form Guide',
-                      style: TextStyle(
-                        fontFamily: AppTypography.fontFamilyDisplay,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: context.textPrimary,
+                      const SizedBox(height: 2),
+                      Text(
+                        'Beginner Form Guide',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamilyDisplay,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -220,7 +268,7 @@ class ExerciseGuideSheet extends StatelessWidget {
                         ExerciseWebSearchSheet.show(context, exerciseName: exercise.name);
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
                         decoration: BoxDecoration(
                           color: isDark ? const Color(0xFF27272A) : const Color(0xFFEAEAEE),
                           borderRadius: BorderRadius.circular(8),
@@ -236,13 +284,13 @@ class ExerciseGuideSheet extends StatelessWidget {
                               'G',
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
-                                fontSize: 13,
+                                fontSize: 12.5,
                                 color: Color(0xFF4285F4),
                               ),
                             ),
-                            const SizedBox(width: 5),
+                            const SizedBox(width: 4),
                             Text(
-                              'Search Form',
+                              'Search',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
@@ -253,10 +301,47 @@ class ExerciseGuideSheet extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        AppHaptics.save();
+                        Navigator.of(context).pop(_exercise.imagePath);
+                        widget.onConfirm();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: context.accent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, size: 15, color: context.isDark ? Colors.black : Colors.white),
+                            const SizedBox(width: 2),
+                            Text(
+                              'Add',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: context.isDark ? Colors.black : Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 4),
-                    IconButton(
-                      icon: Icon(Icons.close_rounded, color: context.textSecondary),
-                      onPressed: () => Navigator.of(context).pop(),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => Navigator.of(context).pop(_exercise.imagePath),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        child: Icon(Icons.close_rounded, size: 20, color: context.textSecondary),
+                      ),
                     ),
                   ],
                 ),
@@ -273,12 +358,15 @@ class ExerciseGuideSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. LIVE ANIMATED REP CANVAS WITH EQUIPMENT & LIFTER
-                  Exercise3DViewer(
+                  // 1. Movement position demonstrations with auto-fetch and auto-retry slideshow
+                  ExercisePositionSlideshow(
                     exerciseName: exercise.name,
                     muscleGroupId: exercise.muscleGroupId,
                     equipment: exercise.equipment.name,
-                    height: 280,
+                    currentImagePath: exercise.imagePath,
+                    onImageSelected: _updateImage,
+                    onChangeImage: _changeImage,
+                    height: 275,
                   ),
 
                   const SizedBox(height: 16),
@@ -461,8 +549,8 @@ class ExerciseGuideSheet extends StatelessWidget {
               height: 52,
               onPressed: () {
                 AppHaptics.save();
-                Navigator.of(context).pop();
-                onConfirm();
+                Navigator.of(context).pop(_exercise.imagePath);
+                widget.onConfirm();
               },
             ),
           ),

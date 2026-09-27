@@ -1,15 +1,18 @@
+import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import '../database/database.dart';
 import '../../domain/models/exercise_model.dart';
 import '../../domain/models/set_model.dart';
 import '../../domain/models/workout_model.dart';
+import '../../domain/models/muscle_recovery_model.dart';
 import '../../domain/services/paste_parser.dart';
 import '../../domain/services/weight_step_learner.dart';
 import '../../domain/models/analytics_model.dart';
 import '../../core/utils/fuzzy_matcher.dart';
 import '../../core/utils/date_utils.dart';
 import '../../domain/services/backup_service.dart';
+import '../../domain/models/workout_debrief_model.dart';
 
 class WorkoutRepository {
   final AppDatabase _db;
@@ -773,6 +776,101 @@ class WorkoutRepository {
     return counts;
   }
 
+  /// Analytics: Real-time muscle recovery & fatigue status based on historical training load
+  Future<Map<String, MuscleRecoveryData>> getMuscleRecoveryStatus() async {
+    final now = DateTime.now();
+    // Look back 7 days for recent working volume
+    final cutoff = now.subtract(const Duration(days: 7));
+
+    final setsQuery = _db.select(_db.sets)
+      ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff))
+      ..orderBy([(t) => OrderingTerm.desc(t.date)]);
+    final recentSets = await setsQuery.get();
+
+    final allMuscleGroups = await _db.select(_db.muscleGroups).get();
+    final Map<String, String> mgNameMap = {for (final m in allMuscleGroups) m.id: m.name};
+
+    // Standard major muscle groups to track
+    const trackedGroups = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'core', 'forearms'];
+
+    // Group sets by muscle group
+    final Map<String, List<GymSetData>> setsByMuscle = {};
+    for (final s in recentSets) {
+      final mgId = s.muscleGroupId.toLowerCase().trim();
+      setsByMuscle.putIfAbsent(mgId, () => []).add(s);
+    }
+
+    final Map<String, MuscleRecoveryData> results = {};
+
+    for (final mgId in trackedGroups) {
+      final name = mgNameMap[mgId] ?? (mgId[0].toUpperCase() + mgId.substring(1));
+      final sets = setsByMuscle[mgId] ?? [];
+      final weeklySets = sets.length;
+
+      if (sets.isEmpty) {
+        // Never trained recently -> 100% fresh
+        results[mgId] = MuscleRecoveryData(
+          id: mgId,
+          name: name,
+          recoveryPercent: 1.0,
+          hoursSinceLastTrained: null,
+          lastTrainedDate: null,
+          weeklySetsCount: 0,
+          status: 'Fully Recovered',
+          tip: 'Optimal readiness. Zero muscular fatigue detected. Primed for high intensity working sets.',
+        );
+        continue;
+      }
+
+      // Most recent set date
+      final lastDate = sets.first.date;
+      final hoursAgo = math.max(0.0, now.difference(lastDate).inMinutes / 60.0);
+
+      // Full recovery duration scaled by set volume (36h to 72h)
+      double requiredHours;
+      if (weeklySets <= 4) {
+        requiredHours = 40.0;
+      } else if (weeklySets <= 8) {
+        requiredHours = 52.0;
+      } else if (weeklySets <= 14) {
+        requiredHours = 64.0;
+      } else {
+        requiredHours = 72.0;
+      }
+
+      final recoveryFraction = (hoursAgo / requiredHours).clamp(0.05, 1.0);
+
+      String status;
+      String tip;
+      if (recoveryFraction >= 0.85) {
+        status = 'Fully Recovered';
+        tip = 'Muscle glycogen fully replenished and micro-damage repaired. Ready for maximum progressive overload.';
+      } else if (recoveryFraction >= 0.65) {
+        status = 'Ready to Train';
+        tip = 'Supercompensation phase active. Muscle is ready for direct training load.';
+      } else if (recoveryFraction >= 0.40) {
+        status = 'Recovering';
+        tip = 'Myofibrillar protein synthesis in progress. Consider training opposing muscle groups today.';
+      } else {
+        status = 'Fatigued';
+        tip = 'Acute fatigue from recent session. Rest, hydrate, and maintain high protein intake for recovery.';
+      }
+
+      results[mgId] = MuscleRecoveryData(
+        id: mgId,
+        name: name,
+        recoveryPercent: recoveryFraction,
+        hoursSinceLastTrained: hoursAgo,
+        lastTrainedDate: lastDate,
+        weeklySetsCount: weeklySets,
+        status: status,
+        tip: tip,
+      );
+    }
+
+    return results;
+  }
+
   /// Analytics: Overview metrics
   Future<AnalyticsOverviewData> getAnalyticsOverview() async {
 
@@ -843,6 +941,213 @@ class WorkoutRepository {
         achievedAt: pr.achievedAt,
       );
     }).toList();
+  }
+
+  /// Generates a comprehensive AI post-workout debrief comparing against historical volume baseline,
+  /// evaluating new personal records (PRs), fatigued muscle groups, and recovery recommendations.
+  Future<WorkoutDebriefData> getWorkoutDebrief(
+    WorkoutModel workout, {
+    Duration? elapsed,
+  }) async {
+    final now = DateTime.now();
+    final actualDuration = elapsed ??
+        (workout.startedAt != null && workout.endedAt != null
+            ? workout.endedAt!.difference(workout.startedAt!)
+            : (workout.startedAt != null
+                ? now.difference(workout.startedAt!)
+                : const Duration(minutes: 50)));
+
+    final currentVolume = workout.totalVolume;
+
+    // 1. Calculate 30-day baseline average session volume
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+    final pastWorkoutsQuery = _db.select(_db.workouts)
+      ..where((t) =>
+          t.archived.equals(false) &
+          t.date.isBiggerOrEqualValue(thirtyDaysAgo) &
+          t.id.equals(workout.id).not());
+    final pastWorkouts = await pastWorkoutsQuery.get();
+
+    double baselineVolume = 0.0;
+    int eligibleWorkouts = 0;
+
+    for (final pw in pastWorkouts) {
+      if (pw.title.toLowerCase().contains('rest')) continue;
+      final setsQuery = _db.customSelect(
+        'SELECT COALESCE(SUM(s.weight * s.reps), 0.0) AS vol '
+        'FROM sets s '
+        'INNER JOIN workout_exercises we ON s.workout_exercise_id = we.id '
+        'WHERE we.workout_id = ? AND s.archived = 0 AND s.set_type != \'warmup\'',
+        variables: [Variable.withString(pw.id)],
+      );
+      final res = await setsQuery.getSingleOrNull();
+      final vol = res?.read<double>('vol') ?? 0.0;
+      if (vol > 0) {
+        baselineVolume += vol;
+        eligibleWorkouts++;
+      }
+    }
+
+    final avgBaseline = eligibleWorkouts > 0 ? (baselineVolume / eligibleWorkouts) : currentVolume;
+    final volumeDeltaPercent = avgBaseline > 0
+        ? ((currentVolume - avgBaseline) / avgBaseline) * 100.0
+        : 0.0;
+
+    // 2. Muscle group set counting
+    final Map<String, int> muscleSets = {};
+    for (final exItem in workout.exercises.where((e) => !e.archived)) {
+      final activeSets = exItem.sets.where((s) => !s.archived && !s.isWarmup).length;
+      if (activeSets > 0) {
+        final group = exItem.exercise.muscleGroupId.toLowerCase();
+        muscleSets[group] = (muscleSets[group] ?? 0) + activeSets;
+      }
+    }
+
+    final sortedMuscles = muscleSets.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final primaryFatiguedMuscles = sortedMuscles.take(3).map((e) => e.key).toList();
+
+    // 3. Evaluate Personal Records for this session
+    final List<PrItemData> brokenPrs = [];
+    final currentWorkoutExIds = workout.exercises.map((e) => e.id).toSet();
+
+    for (final exItem in workout.exercises.where((e) => !e.archived)) {
+      final workingSets = exItem.sets.where((s) => !s.archived && !s.isWarmup).toList();
+      if (workingSets.isEmpty) continue;
+
+      final sessionMaxWeight = workingSets.map((s) => s.weight).reduce(math.max);
+      final sessionMaxE1rm = workingSets.map((s) => s.e1rm).reduce(math.max);
+
+      // Check all historical sets for this exercise BEFORE this workout or outside this workout
+      final histSetsRows = await getAllHistoricalSetsForExercise(exItem.exercise.id);
+
+      // Filter out sets belonging to the current workout and warmups
+      final priorSets = histSetsRows
+          .where((s) => !currentWorkoutExIds.contains(s.workoutExerciseId) && !s.isWarmup)
+          .toList();
+
+      if (priorSets.isNotEmpty) {
+        final histMaxWeight = priorSets.map((s) => s.weight).fold(0.0, math.max);
+        final histMaxE1rm = priorSets.map((s) => s.e1rm).fold(0.0, math.max);
+
+        if (sessionMaxWeight > histMaxWeight && sessionMaxWeight > 0) {
+          final prId = _uuid.v4();
+          final pr = PrItemData(
+            id: prId,
+            exerciseId: exItem.exercise.id,
+            exerciseName: exItem.exercise.name,
+            muscleGroupId: exItem.exercise.muscleGroupId,
+            kind: 'heaviest',
+            value: sessionMaxWeight,
+            achievedAt: workout.date,
+          );
+          brokenPrs.add(pr);
+
+          await _db.into(_db.prs).insertOnConflictUpdate(
+                PrsCompanion.insert(
+                  id: prId,
+                  exerciseId: exItem.exercise.id,
+                  kind: 'heaviest',
+                  value: sessionMaxWeight,
+                  achievedAt: workout.date,
+                ),
+              );
+        }
+
+        if (sessionMaxE1rm > histMaxE1rm && sessionMaxE1rm > (sessionMaxWeight * 1.05)) {
+          final prId = _uuid.v4();
+          final pr = PrItemData(
+            id: prId,
+            exerciseId: exItem.exercise.id,
+            exerciseName: exItem.exercise.name,
+            muscleGroupId: exItem.exercise.muscleGroupId,
+            kind: 'e1rm',
+            value: sessionMaxE1rm,
+            achievedAt: workout.date,
+          );
+          brokenPrs.add(pr);
+
+          await _db.into(_db.prs).insertOnConflictUpdate(
+                PrsCompanion.insert(
+                  id: prId,
+                  exerciseId: exItem.exercise.id,
+                  kind: 'e1rm',
+                  value: sessionMaxE1rm,
+                  achievedAt: workout.date,
+                ),
+              );
+        }
+      } else if (sessionMaxWeight > 0) {
+        final prId = _uuid.v4();
+        final pr = PrItemData(
+          id: prId,
+          exerciseId: exItem.exercise.id,
+          exerciseName: exItem.exercise.name,
+          muscleGroupId: exItem.exercise.muscleGroupId,
+          kind: 'heaviest',
+          value: sessionMaxWeight,
+          achievedAt: workout.date,
+        );
+        brokenPrs.add(pr);
+
+        await _db.into(_db.prs).insertOnConflictUpdate(
+              PrsCompanion.insert(
+                id: prId,
+                exerciseId: exItem.exercise.id,
+                kind: 'heaviest',
+                value: sessionMaxWeight,
+                achievedAt: workout.date,
+              ),
+            );
+      }
+    }
+
+    // 4. Generate AI Headlines and Insights
+    String headline;
+    if (brokenPrs.isNotEmpty) {
+      headline = '${brokenPrs.length} New Personal Record${brokenPrs.length > 1 ? 's' : ''} Shattered! 🏆';
+    } else if (volumeDeltaPercent >= 12.0) {
+      headline = 'High Volume Hypertrophy Surge! 🔥';
+    } else if (volumeDeltaPercent <= -15.0 && eligibleWorkouts > 0) {
+      headline = 'Controlled Deload & Recovery Session ⚡';
+    } else {
+      headline = 'Solid Progressive Overload Session 💪';
+    }
+
+    String volumeInsight;
+    if (eligibleWorkouts > 0) {
+      final sign = volumeDeltaPercent >= 0 ? '+' : '';
+      volumeInsight = '$sign${volumeDeltaPercent.toStringAsFixed(1)}% volume vs your 30-day baseline (${avgBaseline.toStringAsFixed(0)} kg avg)';
+    } else {
+      volumeInsight = 'Benchmark volume set at ${currentVolume.toStringAsFixed(0)} kg total load.';
+    }
+
+    String recoveryAdvice;
+    if (primaryFatiguedMuscles.isNotEmpty) {
+      final muscleNames = primaryFatiguedMuscles
+          .map((m) => m[0].toUpperCase() + m.substring(1))
+          .join(', ');
+      recoveryAdvice = 'Significant mechanical fatigue logged on $muscleNames. Allow 36–48h of muscular recovery before training these groups with high intensity again.';
+    } else {
+      recoveryAdvice = 'Muscular stress is evenly balanced. Maintain hydration, rest, and prepare for upcoming training blocks.';
+    }
+
+    const nutritionTip = 'Target 35–45g high-leucine protein and 50–70g fast-absorbing carbohydrates within 2 hours to optimize glycogen resynthesis and muscle recovery.';
+
+    return WorkoutDebriefData(
+      workout: workout,
+      duration: actualDuration,
+      brokenPrs: brokenPrs,
+      currentVolume: currentVolume,
+      baselineVolume: avgBaseline,
+      volumeDeltaPercent: volumeDeltaPercent,
+      muscleSets: muscleSets,
+      primaryFatiguedMuscles: primaryFatiguedMuscles,
+      headline: headline,
+      volumeInsight: volumeInsight,
+      recoveryAdvice: recoveryAdvice,
+      nutritionTip: nutritionTip,
+    );
   }
 
   /// Calculates streak and this week's 7-day completion activity

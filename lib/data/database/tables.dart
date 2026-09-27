@@ -27,6 +27,8 @@ class Exercises extends Table {
   IntColumn get restSeconds => integer().withDefault(const Constant(90))();
   BoolColumn get isCustom => boolean().withDefault(const Constant(false))();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
+  TextColumn get imagePath => text().nullable()();
+  TextColumn get trackingType => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

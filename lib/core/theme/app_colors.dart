@@ -72,13 +72,13 @@ class AppColors {
     ),
   };
 
-  // Currently selected preset (defaults to flagship Cobalt Sapphire)
-  static AccentPreset currentPreset = AccentPreset.cobalt;
+  // Currently selected preset (defaults to Titanium Slate)
+  static AccentPreset currentPreset = AccentPreset.titanium;
 
   static Color get activeAccentDark =>
-      accentPresets[currentPreset]?.darkColor ?? const Color(0xFF3B82F6);
+      accentPresets[currentPreset]?.darkColor ?? const Color(0xFFE2E8F0);
   static Color get activeAccentLight =>
-      accentPresets[currentPreset]?.lightColor ?? const Color(0xFF2563EB);
+      accentPresets[currentPreset]?.lightColor ?? const Color(0xFF1E293B);
 
   // Backward compatibility aliases
   static Color get activeAccent => activeAccentDark;
@@ -86,7 +86,7 @@ class AppColors {
   static Color get accentPrimary => activeAccentDark;
 
   static Color currentOnAccent(bool isDark) {
-    final theme = accentPresets[currentPreset] ?? accentPresets[AccentPreset.cobalt]!;
+    final theme = accentPresets[currentPreset] ?? accentPresets[AccentPreset.titanium]!;
     return isDark ? theme.onDark : theme.onLight;
   }
 

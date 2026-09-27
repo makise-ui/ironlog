@@ -11,6 +11,7 @@ import '../domain/services/rest_timer_service.dart';
 import '../core/utils/unit_converter.dart';
 import '../core/utils/date_utils.dart';
 import '../core/theme/app_colors.dart';
+import '../domain/models/muscle_recovery_model.dart';
 
 final selectedWorkoutDateProvider = StateProvider<DateTime>((ref) {
   return AppDateUtils.normalizeDate(DateTime.now());
@@ -111,7 +112,7 @@ final accentPresetProvider = StateNotifierProvider<AccentPresetNotifier, AccentP
 class AccentPresetNotifier extends StateNotifier<AccentPreset> {
   final SettingsRepository _repo;
 
-  AccentPresetNotifier(this._repo) : super(AccentPreset.cobalt) {
+  AccentPresetNotifier(this._repo) : super(AccentPreset.titanium) {
     _load();
   }
 
@@ -121,9 +122,11 @@ class AccentPresetNotifier extends StateNotifier<AccentPreset> {
       if (p.name == presetName) {
         state = p;
         AppColors.currentPreset = p;
-        break;
+        return;
       }
     }
+    state = AccentPreset.titanium;
+    AppColors.currentPreset = AccentPreset.titanium;
   }
 
   Future<void> setPreset(AccentPreset preset) async {
@@ -143,3 +146,12 @@ final isWorkoutActiveProvider = StateProvider<bool>((ref) => false);
 /// Counter provider incremented when the system back button is pressed
 /// while an active workout is underway, requesting TodayScreen to minimize/pause it.
 final requestCollapseWorkoutProvider = StateProvider<int>((ref) => 0);
+
+/// Global revision counter incremented whenever an exercise image is updated.
+/// Any screen showing exercise lists or cards watches/listens to this to refresh.
+final exerciseImageRevisionProvider = StateProvider<int>((ref) => 0);
+
+final muscleRecoveryProvider = FutureProvider<Map<String, MuscleRecoveryData>>((ref) async {
+  final repo = ref.watch(workoutRepositoryProvider);
+  return repo.getMuscleRecoveryStatus();
+});

@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../core/utils/unit_converter.dart';
 import '../../../core/widgets/glass_button.dart';
+import '../../../data/providers.dart';
 import '../../../domain/models/workout_model.dart';
+import '../../../domain/models/workout_debrief_model.dart';
+import 'widgets/shareable_workout_card.dart';
 
-class WorkoutSummaryDialog extends StatefulWidget {
+class WorkoutSummaryDialog extends ConsumerStatefulWidget {
   final WorkoutModel workout;
   final Duration elapsed;
   final WeightUnit unit;
@@ -22,12 +26,15 @@ class WorkoutSummaryDialog extends StatefulWidget {
   });
 
   @override
-  State<WorkoutSummaryDialog> createState() => _WorkoutSummaryDialogState();
+  ConsumerState<WorkoutSummaryDialog> createState() => _WorkoutSummaryDialogState();
 }
 
-class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
+class _WorkoutSummaryDialogState extends ConsumerState<WorkoutSummaryDialog> {
   int _selectedFeel = 4; // default good
   final TextEditingController _noteController = TextEditingController();
+
+  WorkoutDebriefData? _debrief;
+  bool _loadingDebrief = true;
 
   final List<IconData> _feelIcons = [
     Icons.sentiment_very_dissatisfied_rounded,
@@ -45,6 +52,24 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
       _selectedFeel = widget.workout.feel!;
     }
     _noteController.text = widget.workout.note ?? '';
+    _loadDebrief();
+  }
+
+  Future<void> _loadDebrief() async {
+    try {
+      final repo = ref.read(workoutRepositoryProvider);
+      final debrief = await repo.getWorkoutDebrief(widget.workout, elapsed: widget.elapsed);
+      if (mounted) {
+        setState(() {
+          _debrief = debrief;
+          _loadingDebrief = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingDebrief = false);
+      }
+    }
   }
 
   @override
@@ -72,7 +97,7 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: context.cardBg,
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -93,8 +118,8 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
               // Header with trophy / check icon
               Center(
                 child: Container(
-                  width: 56,
-                  height: 56,
+                  width: 54,
+                  height: 54,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: context.accent,
@@ -105,10 +130,10 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
                       ),
                     ],
                   ),
-                  child: Icon(Icons.check_rounded, color: context.onAccent, size: 32),
+                  child: Icon(Icons.check_rounded, color: context.onAccent, size: 30),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Center(
                 child: Text(
                   'Workout Complete!',
@@ -130,7 +155,7 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // Metrics Row
               Container(
@@ -151,7 +176,11 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+
+              // Post-Workout AI Debrief section
+              _buildDebriefSection(context),
+
+              const SizedBox(height: 14),
 
               // How did it feel?
               Text(
@@ -291,6 +320,25 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
                 },
               ),
               const SizedBox(height: 8),
+
+              if (_debrief != null) ...[
+                GlassButton(
+                  text: 'Share Workout Story Card',
+                  icon: Icons.share_rounded,
+                  style: GlassButtonStyle.secondary,
+                  onPressed: () {
+                    AppHaptics.tap();
+                    ShareWorkoutModalDialog.show(
+                      context,
+                      workout: widget.workout,
+                      debrief: _debrief!,
+                      unit: widget.unit,
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text('Keep Logging', style: TextStyle(color: context.textTertiary, fontSize: 13)),
@@ -298,6 +346,161 @@ class _WorkoutSummaryDialogState extends State<WorkoutSummaryDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDebriefSection(BuildContext context) {
+    if (_loadingDebrief) {
+      return Container(
+        margin: const EdgeInsets.only(top: 14),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: context.chipBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.chipBorder),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: context.accent),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Analyzing session volume & PRs...',
+              style: TextStyle(fontSize: 11.5, color: context.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_debrief == null) return const SizedBox.shrink();
+    final debrief = _debrief!;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.chipBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: debrief.hasPrs
+              ? const Color(0xFFF59E0B).withValues(alpha: 0.5)
+              : context.chipBorder,
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.auto_awesome_rounded, color: context.accent, size: 14),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'AI POST-WORKOUT DEBRIEF',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: context.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            debrief.headline,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              color: context.textPrimary,
+            ),
+          ),
+          if (debrief.hasPrs) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: debrief.brokenPrs.map((pr) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.emoji_events_rounded, color: Color(0xFFFBBF24), size: 15),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${pr.exerciseName}: ${UnitConverter.formatWeight(pr.value, unit: widget.unit)} (${pr.formattedKind})',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: context.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                debrief.isVolumeSurge
+                    ? Icons.trending_up_rounded
+                    : (debrief.isVolumeDeload ? Icons.trending_down_rounded : Icons.show_chart_rounded),
+                size: 15,
+                color: debrief.isVolumeSurge
+                    ? const Color(0xFF10B981)
+                    : (debrief.isVolumeDeload ? const Color(0xFF38BDF8) : context.accent),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  debrief.volumeInsight,
+                  style: TextStyle(fontSize: 11, color: context.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.shield_moon_rounded, size: 15, color: context.textTertiary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  debrief.recoveryAdvice,
+                  style: TextStyle(fontSize: 10.5, color: context.textTertiary, height: 1.25),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

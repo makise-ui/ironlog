@@ -2937,9 +2937,14 @@ class _InlineChatExerciseImage extends StatelessWidget {
     );
   }
 
-  void _showFullScreenImage(BuildContext context, String url, String label) {
-    showDialog(
+  Future<void> _showFullScreenImage(BuildContext context, String url, String label) async {
+    // Unfocus any active focus in the sheet before opening the dialog
+    FocusScope.of(context).unfocus(disposition: UnfocusDisposition.scope);
+    FocusManager.instance.primaryFocus?.unfocus(disposition: UnfocusDisposition.scope);
+
+    await showDialog(
       context: context,
+      useRootNavigator: true,
       barrierColor: Colors.black.withValues(alpha: 0.88),
       builder: (ctx) {
         return Dialog(
@@ -2969,7 +2974,10 @@ class _InlineChatExerciseImage extends StatelessWidget {
                 right: 0,
                 child: IconButton(
                   icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
-                  onPressed: () => Navigator.of(ctx).pop(),
+                  onPressed: () {
+                    FocusScope.of(ctx).unfocus(disposition: UnfocusDisposition.scope);
+                    Navigator.of(ctx).pop();
+                  },
                 ),
               ),
             ],
@@ -2977,6 +2985,18 @@ class _InlineChatExerciseImage extends StatelessWidget {
         );
       },
     );
+
+    // After exiting the dialog, ensure input field does not auto-focus and trigger keyboard
+    if (context.mounted) {
+      FocusScope.of(context).unfocus(disposition: UnfocusDisposition.scope);
+      FocusManager.instance.primaryFocus?.unfocus(disposition: UnfocusDisposition.scope);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          FocusScope.of(context).unfocus(disposition: UnfocusDisposition.scope);
+          FocusManager.instance.primaryFocus?.unfocus(disposition: UnfocusDisposition.scope);
+        }
+      });
+    }
   }
 }
 

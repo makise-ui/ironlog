@@ -73,7 +73,7 @@ extension AiProviderExtension on AiProvider {
       case AiProvider.universal:
         return 'https://kilo.ai';
       case AiProvider.agnes:
-        return 'https://platform.agnes-ai.com/';
+        return 'https://platform.agnes-ai.com/settings/apiKeys';
       case AiProvider.gemini:
         return 'https://aistudio.google.com/app/apikey';
       case AiProvider.openai:
@@ -228,7 +228,7 @@ class AiConfigModel {
     AiProvider p = AiProvider.universal;
     final pStr = map['provider'] as String?;
     if (pStr != null) {
-      if (pStr == 'agnes' || pStr == 'custom') {
+      if (pStr == 'custom') {
         p = AiProvider.universal;
       } else {
         p = AiProvider.values.firstWhere(

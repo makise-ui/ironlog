@@ -31,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -53,6 +53,14 @@ class AppDatabase extends _$AppDatabase {
             'CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);',
           );
 
+          // Safe column additions for backward compatibility
+          try {
+            await customStatement('ALTER TABLE exercises ADD COLUMN image_path TEXT;');
+          } catch (_) {}
+          try {
+            await customStatement('ALTER TABLE exercises ADD COLUMN tracking_type TEXT;');
+          } catch (_) {}
+
           // Ensure all seed exercises exist in database (supports newly added defaults)
           for (final ex in SeedData.exercises) {
             await into(exercises).insert(
@@ -73,6 +81,16 @@ class AppDatabase extends _$AppDatabase {
               ),
               mode: InsertMode.insertOrIgnore,
             );
+          }
+        },
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            try {
+              await m.addColumn(exercises, exercises.imagePath);
+            } catch (_) {}
+            try {
+              await m.addColumn(exercises, exercises.trackingType);
+            } catch (_) {}
           }
         },
         onCreate: (m) async {
@@ -160,9 +178,6 @@ class AppDatabase extends _$AppDatabase {
               );
             }
           }
-        },
-        onUpgrade: (m, from, to) async {
-          // Future schema migrations
         },
       );
 }

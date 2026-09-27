@@ -48,7 +48,7 @@ class SettingsRepository {
   }
 
   Future<String> getAccentPreset() async {
-    return await getSetting('accent_preset') ?? 'cobalt';
+    return await getSetting('accent_preset') ?? 'titanium';
   }
 
   Future<void> setAccentPreset(String preset) async {
@@ -71,5 +71,14 @@ class SettingsRepository {
 
   Future<void> setAiSuggestionsEnabled(bool value) async {
     await setSetting('ai_suggestions_enabled', value.toString());
+  }
+
+  Future<bool> getRestTimerNotificationsEnabled() async {
+    final val = await getSetting('rest_timer_notifications_enabled');
+    return val != 'false'; // default true
+  }
+
+  Future<void> setRestTimerNotificationsEnabled(bool value) async {
+    await setSetting('rest_timer_notifications_enabled', value.toString());
   }
 }

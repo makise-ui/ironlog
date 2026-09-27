@@ -321,6 +321,8 @@ class DailyNutritionLog {
 }
 
 class AnalyzedFoodResult {
+  final bool isFood;
+  final String? nonFoodReason;
   final String mealName;
   final double protein;
   final double carbs;
@@ -331,6 +333,8 @@ class AnalyzedFoodResult {
   final List<String> detectedItems;
 
   const AnalyzedFoodResult({
+    this.isFood = true,
+    this.nonFoodReason,
     required this.mealName,
     required this.protein,
     required this.carbs,
@@ -341,8 +345,26 @@ class AnalyzedFoodResult {
     this.detectedItems = const [],
   });
 
+  factory AnalyzedFoodResult.nonFood({String? reason}) {
+    final msg = reason ?? 'No food detected in this image. Please upload a clear photo of a meal or beverage.';
+    return AnalyzedFoodResult(
+      isFood: false,
+      nonFoodReason: msg,
+      mealName: 'No Food Detected',
+      protein: 0.0,
+      carbs: 0.0,
+      fat: 0.0,
+      calories: 0,
+      mealType: MealType.snack,
+      summary: msg,
+      detectedItems: const [],
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
+      'isFood': isFood,
+      if (nonFoodReason != null) 'nonFoodReason': nonFoodReason,
       'mealName': mealName,
       'protein': protein,
       'carbs': carbs,
@@ -355,6 +377,15 @@ class AnalyzedFoodResult {
   }
 
   factory AnalyzedFoodResult.fromMap(Map<String, dynamic> map) {
+    final isFood = map['isFood'] == null || map['isFood'] == true;
+    if (!isFood) {
+      final reason = map['reason'] as String? ??
+          map['nonFoodReason'] as String? ??
+          map['summary'] as String? ??
+          'No food detected in this image.';
+      return AnalyzedFoodResult.nonFood(reason: reason);
+    }
+
     final p = (map['protein'] as num?)?.toDouble() ?? 0.0;
     final c = (map['carbs'] as num?)?.toDouble() ?? 0.0;
     final f = (map['fat'] as num?)?.toDouble() ?? 0.0;
@@ -363,6 +394,7 @@ class AnalyzedFoodResult {
       kcal = (p * 4 + c * 4 + f * 9).round();
     }
     return AnalyzedFoodResult(
+      isFood: true,
       mealName: map['mealName'] as String? ?? 'Analyzed Meal',
       protein: p,
       carbs: c,

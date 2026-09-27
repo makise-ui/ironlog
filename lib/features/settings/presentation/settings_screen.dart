@@ -40,6 +40,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _userGender = 'Male';
   bool _aiNotificationsEnabled = true;
   bool _aiSuggestionsEnabled = true;
+  bool _restTimerNotifsEnabled = true;
 
   AiConfigModel _aiConfig = const AiConfigModel();
 
@@ -73,6 +74,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final gender = await settingsRepo.getSetting('user_gender') ?? 'Male';
     final aiNotifs = await settingsRepo.getAiNotificationsEnabled();
     final aiSuggestions = await settingsRepo.getAiSuggestionsEnabled();
+    final restTimerNotifs = await settingsRepo.getRestTimerNotificationsEnabled();
 
     if (mounted) {
       setState(() {
@@ -86,6 +88,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _userGender = gender;
         _aiNotificationsEnabled = aiNotifs;
         _aiSuggestionsEnabled = aiSuggestions;
+        _restTimerNotifsEnabled = restTimerNotifs;
       });
     }
   }
@@ -132,22 +135,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
 
       if (mounted) {
+        final bool isDowngrade = backupInfo.workoutCount < _totalWorkoutsCount;
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: context.cardBg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: context.cardBorder),
+              side: BorderSide(color: isDowngrade ? AppColors.error : context.cardBorder),
             ),
-            title: Text('Restore from Persistent Storage?', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700)),
-            content: Text(
-              'Found backup file in ${backupInfo.displayDirectory}:\n'
-              '• Workouts: ${backupInfo.workoutCount}\n'
-              '• Logged Sets: ${backupInfo.setCount}'
-              '${backupInfo.athleteName != null && backupInfo.athleteName!.isNotEmpty ? '\n• Athlete: ${backupInfo.athleteName}' : ''}\n\n'
-              'Restoring will load your progress back into the app.',
-              style: TextStyle(color: context.textSecondary, fontSize: 13.5),
+            title: Text(
+              isDowngrade ? 'Restore Older Backup?' : 'Restore from Persistent Storage?',
+              style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Found backup file in ${backupInfo.displayDirectory}:\n'
+                  '• Workouts in backup: ${backupInfo.workoutCount}\n'
+                  '• Logged sets in backup: ${backupInfo.setCount}'
+                  '${backupInfo.athleteName != null && backupInfo.athleteName!.isNotEmpty ? '\n• Athlete: ${backupInfo.athleteName}' : ''}',
+                  style: TextStyle(color: context.textSecondary, fontSize: 13.5),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDowngrade
+                        ? AppColors.error.withValues(alpha: 0.12)
+                        : context.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    isDowngrade
+                        ? 'Warning: Your current app has $_totalWorkoutsCount workouts and $_totalSetsCount sets. Restoring will replace them with this older backup (${backupInfo.workoutCount} workouts).'
+                        : 'Active app database has $_totalWorkoutsCount workouts and $_totalSetsCount sets. Restoring will reload your data.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDowngrade ? AppColors.error : context.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
             actions: [
               TextButton(
@@ -156,12 +188,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: context.accent,
+                  backgroundColor: isDowngrade ? AppColors.error : context.accent,
                   foregroundColor: context.isDark ? Colors.black : Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Restore Progress'),
+                child: Text(isDowngrade ? 'Restore Anyway' : 'Restore Progress'),
               ),
             ],
           ),
@@ -553,6 +585,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     } else {
                       await AppNotificationService.instance.cancelDailyCoachSuggestion();
                     }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          GlassTile(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Rest Timer Notifications', style: AppTypography.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Alert when rest countdown ends while IronLog is in background',
+                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: _restTimerNotifsEnabled,
+                  activeTrackColor: context.accent,
+                  onChanged: (val) async {
+                    AppHaptics.tap();
+                    setState(() => _restTimerNotifsEnabled = val);
+                    await ref.read(settingsRepositoryProvider).setRestTimerNotificationsEnabled(val);
                   },
                 ),
               ],

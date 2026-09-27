@@ -511,6 +511,28 @@ class $ExercisesTable extends Exercises
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _imagePathMeta = const VerificationMeta(
+    'imagePath',
+  );
+  @override
+  late final GeneratedColumn<String> imagePath = GeneratedColumn<String>(
+    'image_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _trackingTypeMeta = const VerificationMeta(
+    'trackingType',
+  );
+  @override
+  late final GeneratedColumn<String> trackingType = GeneratedColumn<String>(
+    'tracking_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -526,6 +548,8 @@ class $ExercisesTable extends Exercises
     restSeconds,
     isCustom,
     archived,
+    imagePath,
+    trackingType,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -634,6 +658,21 @@ class $ExercisesTable extends Exercises
         archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta),
       );
     }
+    if (data.containsKey('image_path')) {
+      context.handle(
+        _imagePathMeta,
+        imagePath.isAcceptableOrUnknown(data['image_path']!, _imagePathMeta),
+      );
+    }
+    if (data.containsKey('tracking_type')) {
+      context.handle(
+        _trackingTypeMeta,
+        trackingType.isAcceptableOrUnknown(
+          data['tracking_type']!,
+          _trackingTypeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -695,6 +734,14 @@ class $ExercisesTable extends Exercises
         DriftSqlType.bool,
         data['${effectivePrefix}archived'],
       )!,
+      imagePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_path'],
+      ),
+      trackingType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tracking_type'],
+      ),
     );
   }
 
@@ -718,6 +765,8 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
   final int restSeconds;
   final bool isCustom;
   final bool archived;
+  final String? imagePath;
+  final String? trackingType;
   const ExerciseData({
     required this.id,
     required this.name,
@@ -732,6 +781,8 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
     required this.restSeconds,
     required this.isCustom,
     required this.archived,
+    this.imagePath,
+    this.trackingType,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -749,6 +800,12 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
     map['rest_seconds'] = Variable<int>(restSeconds);
     map['is_custom'] = Variable<bool>(isCustom);
     map['archived'] = Variable<bool>(archived);
+    if (!nullToAbsent || imagePath != null) {
+      map['image_path'] = Variable<String>(imagePath);
+    }
+    if (!nullToAbsent || trackingType != null) {
+      map['tracking_type'] = Variable<String>(trackingType);
+    }
     return map;
   }
 
@@ -767,6 +824,12 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
       restSeconds: Value(restSeconds),
       isCustom: Value(isCustom),
       archived: Value(archived),
+      imagePath: imagePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imagePath),
+      trackingType: trackingType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trackingType),
     );
   }
 
@@ -789,6 +852,8 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
       restSeconds: serializer.fromJson<int>(json['restSeconds']),
       isCustom: serializer.fromJson<bool>(json['isCustom']),
       archived: serializer.fromJson<bool>(json['archived']),
+      imagePath: serializer.fromJson<String?>(json['imagePath']),
+      trackingType: serializer.fromJson<String?>(json['trackingType']),
     );
   }
   @override
@@ -808,6 +873,8 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
       'restSeconds': serializer.toJson<int>(restSeconds),
       'isCustom': serializer.toJson<bool>(isCustom),
       'archived': serializer.toJson<bool>(archived),
+      'imagePath': serializer.toJson<String?>(imagePath),
+      'trackingType': serializer.toJson<String?>(trackingType),
     };
   }
 
@@ -825,6 +892,8 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
     int? restSeconds,
     bool? isCustom,
     bool? archived,
+    Value<String?> imagePath = const Value.absent(),
+    Value<String?> trackingType = const Value.absent(),
   }) => ExerciseData(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -839,6 +908,8 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
     restSeconds: restSeconds ?? this.restSeconds,
     isCustom: isCustom ?? this.isCustom,
     archived: archived ?? this.archived,
+    imagePath: imagePath.present ? imagePath.value : this.imagePath,
+    trackingType: trackingType.present ? trackingType.value : this.trackingType,
   );
   ExerciseData copyWithCompanion(ExercisesCompanion data) {
     return ExerciseData(
@@ -865,6 +936,10 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
           : this.restSeconds,
       isCustom: data.isCustom.present ? data.isCustom.value : this.isCustom,
       archived: data.archived.present ? data.archived.value : this.archived,
+      imagePath: data.imagePath.present ? data.imagePath.value : this.imagePath,
+      trackingType: data.trackingType.present
+          ? data.trackingType.value
+          : this.trackingType,
     );
   }
 
@@ -883,7 +958,9 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
           ..write('repMax: $repMax, ')
           ..write('restSeconds: $restSeconds, ')
           ..write('isCustom: $isCustom, ')
-          ..write('archived: $archived')
+          ..write('archived: $archived, ')
+          ..write('imagePath: $imagePath, ')
+          ..write('trackingType: $trackingType')
           ..write(')'))
         .toString();
   }
@@ -903,6 +980,8 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
     restSeconds,
     isCustom,
     archived,
+    imagePath,
+    trackingType,
   );
   @override
   bool operator ==(Object other) =>
@@ -920,7 +999,9 @@ class ExerciseData extends DataClass implements Insertable<ExerciseData> {
           other.repMax == this.repMax &&
           other.restSeconds == this.restSeconds &&
           other.isCustom == this.isCustom &&
-          other.archived == this.archived);
+          other.archived == this.archived &&
+          other.imagePath == this.imagePath &&
+          other.trackingType == this.trackingType);
 }
 
 class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
@@ -937,6 +1018,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
   final Value<int> restSeconds;
   final Value<bool> isCustom;
   final Value<bool> archived;
+  final Value<String?> imagePath;
+  final Value<String?> trackingType;
   final Value<int> rowid;
   const ExercisesCompanion({
     this.id = const Value.absent(),
@@ -952,6 +1035,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
     this.restSeconds = const Value.absent(),
     this.isCustom = const Value.absent(),
     this.archived = const Value.absent(),
+    this.imagePath = const Value.absent(),
+    this.trackingType = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ExercisesCompanion.insert({
@@ -968,6 +1053,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
     this.restSeconds = const Value.absent(),
     this.isCustom = const Value.absent(),
     this.archived = const Value.absent(),
+    this.imagePath = const Value.absent(),
+    this.trackingType = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -987,6 +1074,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
     Expression<int>? restSeconds,
     Expression<bool>? isCustom,
     Expression<bool>? archived,
+    Expression<String>? imagePath,
+    Expression<String>? trackingType,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1003,6 +1092,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
       if (restSeconds != null) 'rest_seconds': restSeconds,
       if (isCustom != null) 'is_custom': isCustom,
       if (archived != null) 'archived': archived,
+      if (imagePath != null) 'image_path': imagePath,
+      if (trackingType != null) 'tracking_type': trackingType,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1021,6 +1112,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
     Value<int>? restSeconds,
     Value<bool>? isCustom,
     Value<bool>? archived,
+    Value<String?>? imagePath,
+    Value<String?>? trackingType,
     Value<int>? rowid,
   }) {
     return ExercisesCompanion(
@@ -1037,6 +1130,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
       restSeconds: restSeconds ?? this.restSeconds,
       isCustom: isCustom ?? this.isCustom,
       archived: archived ?? this.archived,
+      imagePath: imagePath ?? this.imagePath,
+      trackingType: trackingType ?? this.trackingType,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1083,6 +1178,12 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
     if (archived.present) {
       map['archived'] = Variable<bool>(archived.value);
     }
+    if (imagePath.present) {
+      map['image_path'] = Variable<String>(imagePath.value);
+    }
+    if (trackingType.present) {
+      map['tracking_type'] = Variable<String>(trackingType.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1105,6 +1206,8 @@ class ExercisesCompanion extends UpdateCompanion<ExerciseData> {
           ..write('restSeconds: $restSeconds, ')
           ..write('isCustom: $isCustom, ')
           ..write('archived: $archived, ')
+          ..write('imagePath: $imagePath, ')
+          ..write('trackingType: $trackingType, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5827,6 +5930,8 @@ typedef $$ExercisesTableCreateCompanionBuilder =
       Value<int> restSeconds,
       Value<bool> isCustom,
       Value<bool> archived,
+      Value<String?> imagePath,
+      Value<String?> trackingType,
       Value<int> rowid,
     });
 typedef $$ExercisesTableUpdateCompanionBuilder =
@@ -5844,6 +5949,8 @@ typedef $$ExercisesTableUpdateCompanionBuilder =
       Value<int> restSeconds,
       Value<bool> isCustom,
       Value<bool> archived,
+      Value<String?> imagePath,
+      Value<String?> trackingType,
       Value<int> rowid,
     });
 
@@ -5981,6 +6088,16 @@ class $$ExercisesTableFilterComposer
 
   ColumnFilters<bool> get archived => $composableBuilder(
     column: $table.archived,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imagePath => $composableBuilder(
+    column: $table.imagePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get trackingType => $composableBuilder(
+    column: $table.trackingType,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6127,6 +6244,16 @@ class $$ExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get imagePath => $composableBuilder(
+    column: $table.imagePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get trackingType => $composableBuilder(
+    column: $table.trackingType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$MuscleGroupsTableOrderingComposer get muscleGroupId {
     final $$MuscleGroupsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6203,6 +6330,14 @@ class $$ExercisesTableAnnotationComposer
 
   GeneratedColumn<bool> get archived =>
       $composableBuilder(column: $table.archived, builder: (column) => column);
+
+  GeneratedColumn<String> get imagePath =>
+      $composableBuilder(column: $table.imagePath, builder: (column) => column);
+
+  GeneratedColumn<String> get trackingType => $composableBuilder(
+    column: $table.trackingType,
+    builder: (column) => column,
+  );
 
   $$MuscleGroupsTableAnnotationComposer get muscleGroupId {
     final $$MuscleGroupsTableAnnotationComposer composer = $composerBuilder(
@@ -6323,6 +6458,8 @@ class $$ExercisesTableTableManager
                 Value<int> restSeconds = const Value.absent(),
                 Value<bool> isCustom = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
+                Value<String?> imagePath = const Value.absent(),
+                Value<String?> trackingType = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExercisesCompanion(
                 id: id,
@@ -6338,6 +6475,8 @@ class $$ExercisesTableTableManager
                 restSeconds: restSeconds,
                 isCustom: isCustom,
                 archived: archived,
+                imagePath: imagePath,
+                trackingType: trackingType,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6355,6 +6494,8 @@ class $$ExercisesTableTableManager
                 Value<int> restSeconds = const Value.absent(),
                 Value<bool> isCustom = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
+                Value<String?> imagePath = const Value.absent(),
+                Value<String?> trackingType = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ExercisesCompanion.insert(
                 id: id,
@@ -6370,6 +6511,8 @@ class $$ExercisesTableTableManager
                 restSeconds: restSeconds,
                 isCustom: isCustom,
                 archived: archived,
+                imagePath: imagePath,
+                trackingType: trackingType,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -410,15 +410,34 @@ ROLE: You are an elite sports nutrition scientist & recovery specialist. Provide
     final aiService = _ref.read(aiAssistantServiceProvider);
 
     final prompt = '''
-Analyze this meal photo as an expert sports nutritionist and physique coach.
-1. Identify all food items visible in the image.
-2. Estimate the portions and weights in grams.
-3. Calculate estimated macronutrients: Protein (g), Carbs (g), Fat (g), and Total Calories (kcal).
-4. Classify which meal category this fits best (breakfast, lunch, dinner, snack, preWorkout, postWorkout).
+You are an expert sports nutritionist and vision AI system.
+Carefully examine this image before estimating any nutrition.
 
-CRITICAL: Return your response with a JSON code block formatted EXACTLY like this:
+MANDATORY VALIDATION RULES:
+1. First, verify whether this image contains EDIBLE FOOD, A MEAL, BEVERAGE, DISH, INGREDIENTS, OR GROCERIES.
+2. If this image depicts a PERSON (face, selfie, full body portrait, group), clothing, gym equipment, pet/animal, electronics, document, or ANY non-food object:
+   - You MUST set "isFood": false.
+   - DO NOT invent, hallucinate, or estimate calories or nutrients for humans or non-food objects under any circumstances.
+3. If and only if the image contains edible food or drinks:
+   - Set "isFood": true.
+   - Identify all visible food items and estimate weights in grams.
+   - Calculate realistic macronutrients: Protein (g), Carbs (g), Fat (g), and Total Calories (kcal).
+   - Classify mealType: breakfast, lunch, dinner, snack, preWorkout, postWorkout.
+
+CRITICAL: Return ONLY a valid JSON code block in one of the two formats:
+
+IF NOT FOOD (e.g. person, selfie, equipment, non-food):
 ```json
 {
+  "isFood": false,
+  "reason": "This image appears to show a person or non-food object instead of a meal. Please upload a clear photo of food or beverages."
+}
+```
+
+IF FOOD DETECTED:
+```json
+{
+  "isFood": true,
   "mealName": "Descriptive food name (e.g. Grilled Chicken Breast with Jasmine Rice & Broccoli)",
   "protein": 45.0,
   "carbs": 52.0,
@@ -429,7 +448,6 @@ CRITICAL: Return your response with a JSON code block formatted EXACTLY like thi
   "detectedItems": ["Chicken breast (160g)", "Jasmine rice (200g)", "Steamed broccoli (80g)"]
 }
 ```
-Only output realistic estimates based on visual portion sizing.
 ''';
 
     final buffer = StringBuffer();
@@ -449,20 +467,31 @@ Only output realistic estimates based on visual portion sizing.
       if (parsed != null) {
         return AnalyzedFoodResult.fromMap(parsed);
       }
+
+      // Check if raw output mentions person / human / non-food / no food
+      final lower = text.toLowerCase();
+      if (lower.contains('person') ||
+          lower.contains('human') ||
+          lower.contains('not food') ||
+          lower.contains('no food') ||
+          lower.contains('selfie') ||
+          lower.contains('face') ||
+          lower.contains('unable to detect food') ||
+          lower.contains('cannot detect any food') ||
+          lower.contains('not a meal') ||
+          lower.contains('gym equipment') ||
+          lower.contains('not contain food')) {
+        return AnalyzedFoodResult.nonFood(
+          reason: 'No food detected in this photo. Please upload a clear photo of food or beverages.',
+        );
+      }
     } catch (e) {
       debugPrint('Error in AI photo analysis: $e');
     }
 
-    // Fallback: sports nutrition heuristic estimate
-    return const AnalyzedFoodResult(
-      mealName: 'Athlete Recovery Bowl',
-      protein: 42.0,
-      carbs: 48.0,
-      fat: 10.0,
-      calories: 450,
-      mealType: MealType.postWorkout,
-      summary: 'High-protein recovery fuel. Visual portions estimated.',
-      detectedItems: ['Lean Protein Source', 'Complex Carbohydrates', 'Fibrous Greens'],
+    // Default to nonFood rather than fabricating a fake 450 kcal meal
+    return AnalyzedFoodResult.nonFood(
+      reason: 'Could not detect food in image or vision service unavailable. Please ensure your photo is clear or enter macros manually.',
     );
   }
 
