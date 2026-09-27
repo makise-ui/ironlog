@@ -14,6 +14,8 @@ import '../../../domain/services/backup_service.dart';
 import '../../../domain/services/app_notification_service.dart';
 import '../../../domain/models/ai_config_model.dart';
 import '../../../domain/services/ai_assistant_service.dart';
+import '../../../domain/services/wakelock_service.dart';
+import 'csv_import_sheet.dart';
 import '../../intro/presentation/onboarding_sheet.dart';
 import '../../today/presentation/widgets/ai_assistant_sheet.dart';
 import 'ai_settings_screen.dart';
@@ -787,6 +789,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: AppSpacing.xs),
+
+          GlassTile(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Keep Screen Awake', style: AppTypography.titleMedium),
+                      SizedBox(height: 2),
+                      Text('Prevent display from sleeping during active workouts', style: AppTypography.labelSmall),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Switch(
+                  value: ref.watch(keepScreenAwakeProvider),
+                  activeThumbColor: context.isDark ? const Color(0xFF171717) : Colors.white,
+                  activeTrackColor: context.accent,
+                  inactiveThumbColor: context.textTertiary,
+                  inactiveTrackColor: context.isDark ? const Color(0xFF383838) : const Color(0xFFE5E5E5),
+                  onChanged: (val) async {
+                    AppHaptics.step();
+                    await ref.read(keepScreenAwakeProvider.notifier).setEnabled(val);
+                  },
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: AppSpacing.lg),
 
           // ── Category 3: Appearance & Theme ───────────────────────
@@ -952,6 +985,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 GlassButton(
+                  text: 'Load Full 1,300+ Exercise Library',
+                  icon: Icons.library_add_rounded,
+                  style: GlassButtonStyle.secondary,
+                  onPressed: () async {
+                    AppHaptics.tap();
+                    final added = await ref.read(exerciseRepositoryProvider).seedOpenGymCatalog();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(added > 0
+                              ? 'Successfully added $added new movements to your exercise catalog!'
+                              : 'All 1,324 movements are already present in your catalog.'),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                GlassButton(
                   text: 'Backup Now to Persistent Storage',
                   icon: Icons.save_alt_rounded,
                   style: GlassButtonStyle.primary,
@@ -987,6 +1039,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                GlassButton(
+                  text: 'Import CSV (Hevy / Strong / FitNotes)',
+                  icon: Icons.table_chart_outlined,
+                  style: GlassButtonStyle.secondary,
+                  onPressed: () {
+                    AppHaptics.tap();
+                    CsvImportSheet.show(context).then((_) => _loadStats());
+                  },
                 ),
                 const SizedBox(height: 12),
                 GlassButton(

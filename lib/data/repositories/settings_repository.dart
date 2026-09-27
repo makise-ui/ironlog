@@ -60,6 +60,15 @@ class SettingsRepository {
     return val != 'false'; // default true
   }
 
+  Future<bool> getKeepScreenAwake() async {
+    final val = await getSetting('keep_screen_awake');
+    return val != 'false'; // default true
+  }
+
+  Future<void> setKeepScreenAwake(bool value) async {
+    await setSetting('keep_screen_awake', value.toString());
+  }
+
   Future<void> setAiNotificationsEnabled(bool value) async {
     await setSetting('ai_notifications_enabled', value.toString());
   }

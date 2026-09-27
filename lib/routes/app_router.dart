@@ -14,6 +14,7 @@ import '../features/today/presentation/exercise_picker_sheet.dart';
 import '../features/today/presentation/widgets/ai_floating_capsule.dart';
 import '../features/ai/presentation/ai_assistant_screen.dart';
 import '../features/nutrition/presentation/nutrition_screen.dart';
+import '../domain/services/wakelock_service.dart';
 import '../data/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,6 +80,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           }
 
           final isWorkoutActive = ref.watch(isWorkoutActiveProvider);
+          final keepAwakeEnabled = ref.watch(keepScreenAwakeProvider);
+          WakelockService.syncWithWorkout(
+            isWorkoutActive: isWorkoutActive,
+            keepAwakeEnabled: keepAwakeEnabled,
+          );
 
           return PopScope(
             canPop: false,

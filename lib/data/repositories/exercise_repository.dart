@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../database/database.dart';
 import '../../domain/models/exercise_model.dart';
@@ -226,5 +229,47 @@ class ExerciseRepository {
     );
     await createExercise(model);
     return model;
+  }
+
+  /// Seeds or updates the comprehensive 1,300+ exercise library from openGym
+  Future<int> seedOpenGymCatalog() async {
+    int insertedCount = 0;
+    try {
+      final jsonStr = await rootBundle.loadString('assets/exercises/opengym_exercises.json');
+      final List<dynamic> list = jsonDecode(jsonStr);
+
+      final existing = await _db.select(_db.exercises).get();
+      final existingNames = existing.map((e) => e.name.toLowerCase().trim()).toSet();
+
+      await _db.transaction(() async {
+        for (final item in list) {
+          final name = (item['name'] as String? ?? '').trim();
+          if (name.isEmpty || existingNames.contains(name.toLowerCase())) continue;
+
+          final mgId = item['muscleGroupId'] as String? ?? 'chest';
+          final eqStr = item['equipment'] as String? ?? 'barbell';
+          final sec = (item['secondaryGroups'] as List<dynamic>? ?? []).join(',');
+
+          await _db.into(_db.exercises).insert(
+            ExercisesCompanion.insert(
+              id: item['id'] as String? ?? 'og_${DateTime.now().microsecondsSinceEpoch}',
+              name: name,
+              muscleGroupId: mgId,
+              secondaryGroups: Value(sec),
+              equipment: eqStr,
+              loadMode: eqStr == 'bodyweight' ? const Value('bodyweight') : const Value('total'),
+              isCustom: const Value(false),
+              archived: const Value(false),
+            ),
+          );
+          existingNames.add(name.toLowerCase());
+          insertedCount++;
+        }
+      });
+      BackupService.scheduleAutoBackup(_db);
+    } catch (e) {
+      debugPrint('[ExerciseRepository] Error seeding openGym catalog: $e');
+    }
+    return insertedCount;
   }
 }

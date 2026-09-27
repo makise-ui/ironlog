@@ -569,6 +569,218 @@ class ReminderRule implements SuggestionRule {
   }
 }
 
+/// Rule 8: Linear Progression (LP) Rule
+/// Hit all reps across all sets -> increment load.
+/// 3 consecutive missed targets -> 10% deload.
+class LinearProgressionRule implements SuggestionRule {
+  @override
+  String get ruleId => 'rule_8_linear_progression';
+
+  @override
+  String get ruleName => 'Linear Progression (LP)';
+
+  @override
+  List<Suggestion> evaluate({
+    required WorkoutModel currentWorkout,
+    required List<WorkoutModel> history,
+  }) {
+    final suggestions = <Suggestion>[];
+
+    for (final item in currentWorkout.exercises) {
+      if (item.archived) continue;
+      final ex = item.exercise;
+
+      final previousSessions = <List<SetModel>>[];
+      for (final w in history) {
+        if (w.id == currentWorkout.id) continue;
+        final match = w.exercises.where((e) => e.exercise.id == ex.id && !e.archived).toList();
+        if (match.isNotEmpty) {
+          final working = match.first.sets.where((s) => !s.archived && s.setType != SetType.warmup && s.reps > 0).toList();
+          if (working.isNotEmpty) {
+            previousSessions.add(working);
+            if (previousSessions.length == 3) break;
+          }
+        }
+      }
+
+      if (previousSessions.isEmpty) continue;
+      final lastSets = previousSessions.first;
+      final targetReps = ex.repMin > 0 ? ex.repMin : 5;
+      final step = ex.weightStep > 0 ? ex.weightStep : 2.5;
+
+      final hitAllReps = lastSets.every((s) => s.reps >= targetReps);
+      final topWeight = lastSets.map((s) => s.weight).reduce(max);
+
+      if (hitAllReps) {
+        final nextWeight = topWeight + step;
+        suggestions.add(Suggestion(
+          id: 'lp_advance_${ex.id}',
+          type: SuggestionType.progress,
+          title: 'LP Advance: ${nextWeight.toStringAsFixed(1)} kg × $targetReps reps',
+          body: 'Hit all prescribed reps ($targetReps) last session. Advance load by $step kg.',
+          reasonCode: 'LINEAR_PROGRESSION_ADVANCE',
+          confidence: 0.94,
+          ruleName: ruleName,
+          explanation: '''
+### Linear Progression (LP)
+- Target: $targetReps reps on all working sets.
+- Previous result: All ${lastSets.length} sets completed successfully.
+- Next prescription: ${nextWeight.toStringAsFixed(1)} kg (+${step.toStringAsFixed(1)} kg).
+''',
+          payload: {
+            'exerciseId': ex.id,
+            'suggestedWeight': nextWeight,
+            'suggestedReps': targetReps,
+          },
+        ));
+      } else if (previousSessions.length == 3) {
+        final all3Failed = previousSessions.every((sets) => sets.any((s) => s.reps < targetReps));
+        if (all3Failed) {
+          final deloadWeight = (topWeight * 0.90).roundToDouble();
+          suggestions.add(Suggestion(
+            id: 'lp_deload_${ex.id}',
+            type: SuggestionType.stall,
+            title: 'LP Deload: Reset to ${deloadWeight.toStringAsFixed(1)} kg (-10%)',
+            body: 'Missed target reps 3 sessions in a row. Reset fatigue with a 10% deload to rebuild momentum.',
+            reasonCode: 'LINEAR_PROGRESSION_DELOAD',
+            confidence: 0.93,
+            ruleName: ruleName,
+            explanation: '''
+### Linear Progression Deload Protocol
+- Failed target reps across 3 consecutive sessions.
+- Recommended deload: 10% reduction from ${topWeight.toStringAsFixed(1)} kg to ${deloadWeight.toStringAsFixed(1)} kg.
+''',
+            payload: {
+              'exerciseId': ex.id,
+              'suggestedWeight': deloadWeight,
+              'suggestedReps': targetReps,
+            },
+          ));
+        }
+      }
+    }
+
+    return suggestions;
+  }
+}
+
+/// Rule 9: Greyskull LP (AMRAP Final Set)
+/// 2 straight sets + final AMRAP set.
+/// Beating target on final set advances weight; beating by 5+ reps doubles the jump.
+class GreyskullLpRule implements SuggestionRule {
+  @override
+  String get ruleId => 'rule_9_greyskull_lp';
+
+  @override
+  String get ruleName => 'Greyskull LP (AMRAP)';
+
+  @override
+  List<Suggestion> evaluate({
+    required WorkoutModel currentWorkout,
+    required List<WorkoutModel> history,
+  }) {
+    final suggestions = <Suggestion>[];
+
+    for (final item in currentWorkout.exercises) {
+      if (item.archived) continue;
+      final ex = item.exercise;
+
+      WorkoutExerciseItem? lastItem;
+      for (final w in history) {
+        if (w.id == currentWorkout.id) continue;
+        final match = w.exercises.where((e) => e.exercise.id == ex.id && !e.archived).toList();
+        if (match.isNotEmpty) {
+          lastItem = match.first;
+          break;
+        }
+      }
+
+      if (lastItem == null) continue;
+      final working = lastItem.sets.where((s) => !s.archived && s.setType != SetType.warmup && s.reps > 0).toList();
+      if (working.isEmpty) continue;
+
+      final targetReps = ex.repMin > 0 ? ex.repMin : 5;
+      final step = ex.weightStep > 0 ? ex.weightStep : 2.5;
+
+      // Greyskull evaluates the final working set (the AMRAP set)
+      final amrapSet = working.last;
+      final topWeight = amrapSet.weight;
+      final amrapReps = amrapSet.reps;
+
+      if (amrapReps >= targetReps + 5) {
+        // Double jump!
+        final doubleStep = step * 2;
+        final nextWeight = topWeight + doubleStep;
+        suggestions.add(Suggestion(
+          id: 'greyskull_double_${ex.id}',
+          type: SuggestionType.progress,
+          title: 'Greyskull Double Jump: +${doubleStep.toStringAsFixed(1)} kg (${nextWeight.toStringAsFixed(1)} kg)',
+          body: 'Crushed AMRAP set with $amrapReps reps (target was $targetReps). Double weight step earned!',
+          reasonCode: 'GREYSKULL_DOUBLE_ADVANCE',
+          confidence: 0.96,
+          ruleName: ruleName,
+          explanation: '''
+### Greyskull AMRAP Super-Compensation
+- Target reps: $targetReps
+- AMRAP completed: $amrapReps reps (+${amrapReps - targetReps} reps above goal).
+- Double progression triggered: +${doubleStep.toStringAsFixed(1)} kg.
+''',
+          payload: {
+            'exerciseId': ex.id,
+            'suggestedWeight': nextWeight,
+            'suggestedReps': targetReps,
+          },
+        ));
+      } else if (amrapReps >= targetReps) {
+        final nextWeight = topWeight + step;
+        suggestions.add(Suggestion(
+          id: 'greyskull_advance_${ex.id}',
+          type: SuggestionType.progress,
+          title: 'Greyskull Advance: +${step.toStringAsFixed(1)} kg (${nextWeight.toStringAsFixed(1)} kg)',
+          body: 'Hit $amrapReps reps on final AMRAP set. Standard progression step unlocked.',
+          reasonCode: 'GREYSKULL_ADVANCE',
+          confidence: 0.92,
+          ruleName: ruleName,
+          explanation: '''
+### Greyskull AMRAP Target Achieved
+- Target reps: $targetReps
+- AMRAP completed: $amrapReps reps.
+- Next weight: ${nextWeight.toStringAsFixed(1)} kg (+${step.toStringAsFixed(1)} kg).
+''',
+          payload: {
+            'exerciseId': ex.id,
+            'suggestedWeight': nextWeight,
+            'suggestedReps': targetReps,
+          },
+        ));
+      } else {
+        final deloadWeight = (topWeight * 0.90).roundToDouble();
+        suggestions.add(Suggestion(
+          id: 'greyskull_reset_${ex.id}',
+          type: SuggestionType.stall,
+          title: 'Greyskull Reset: ${deloadWeight.toStringAsFixed(1)} kg (-10%)',
+          body: 'Missed target ($amrapReps / $targetReps reps). Reset 10% to generate new AMRAP records.',
+          reasonCode: 'GREYSKULL_RESET',
+          confidence: 0.90,
+          ruleName: ruleName,
+          explanation: '''
+### Greyskull Deload & Reset
+- Failed to achieve $targetReps reps on final AMRAP set ($amrapReps logged).
+- Reset working weight by 10% to ${deloadWeight.toStringAsFixed(1)} kg.
+''',
+          payload: {
+            'exerciseId': ex.id,
+            'suggestedWeight': deloadWeight,
+            'suggestedReps': targetReps,
+          },
+        ));
+      }
+    }
+
+    return suggestions;
+  }
+}
+
 /// SuggestionEngine orchestrator that runs all registered rules
 class SuggestionEngine {
   final List<SuggestionRule> rules;
@@ -577,6 +789,8 @@ class SuggestionEngine {
       : rules = customRules ??
             [
               ProgressHoldRule(),
+              LinearProgressionRule(),
+              GreyskullLpRule(),
               StallRule(),
               FatigueRule(),
               ComebackRule(),

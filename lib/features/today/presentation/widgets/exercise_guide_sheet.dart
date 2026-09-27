@@ -6,6 +6,7 @@ import '../../../../core/utils/haptics.dart';
 import '../../../../core/widgets/glass_button.dart';
 import '../../../../data/providers.dart';
 import '../../../../domain/models/exercise_model.dart';
+import '../../../../domain/services/exercise_instructions_service.dart';
 import 'exercise_image_picker_sheet.dart';
 import 'exercise_position_slideshow.dart';
 import 'exercise_web_search_sheet.dart';
@@ -45,6 +46,9 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
   void initState() {
     super.initState();
     _exercise = widget.exercise;
+    ExerciseInstructionsService.init().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _changeImage() async {
@@ -197,6 +201,7 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cues = _getBeginnerCues(exercise);
     final eqInfo = _getDetailedEquipmentInfo(exercise);
+    final customSteps = ExerciseInstructionsService.getInstructions(exercise.name);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
@@ -502,32 +507,49 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
                   ),
                   const SizedBox(height: 12),
 
-                  _buildCueItem(
-                    context,
-                    step: '1',
-                    title: 'Setup & Stance',
-                    desc: cues['setup']!,
-                    icon: Icons.accessibility_rounded,
-                  ),
-                  const SizedBox(height: 10),
+                  if (customSteps != null && customSteps.isNotEmpty) ...[
+                    for (int i = 0; i < customSteps.length; i++) ...[
+                      _buildCueItem(
+                        context,
+                        step: '${i + 1}',
+                        title: i == 0
+                            ? 'Starting Position'
+                            : (i == customSteps.length - 1 ? 'Finishing & Repetition' : 'Execution Step ${i + 1}'),
+                        desc: customSteps[i],
+                        icon: i == 0
+                            ? Icons.accessibility_rounded
+                            : (i == customSteps.length - 1 ? Icons.replay_rounded : Icons.play_arrow_rounded),
+                      ),
+                      if (i < customSteps.length - 1) const SizedBox(height: 10),
+                    ],
+                  ] else ...[
+                    _buildCueItem(
+                      context,
+                      step: '1',
+                      title: 'Setup & Stance',
+                      desc: cues['setup']!,
+                      icon: Icons.accessibility_rounded,
+                    ),
+                    const SizedBox(height: 10),
 
-                  _buildCueItem(
-                    context,
-                    step: '2',
-                    title: 'Movement & Breathing',
-                    desc: cues['execution']!,
-                    icon: Icons.play_arrow_rounded,
-                  ),
-                  const SizedBox(height: 10),
+                    _buildCueItem(
+                      context,
+                      step: '2',
+                      title: 'Movement & Breathing',
+                      desc: cues['execution']!,
+                      icon: Icons.play_arrow_rounded,
+                    ),
+                    const SizedBox(height: 10),
 
-                  _buildCueItem(
-                    context,
-                    step: '3',
-                    title: 'Form Tip (Avoid Mistake)',
-                    desc: cues['mistake']!,
-                    icon: Icons.shield_outlined,
-                    isWarning: true,
-                  ),
+                    _buildCueItem(
+                      context,
+                      step: '3',
+                      title: 'Form Tip (Avoid Mistake)',
+                      desc: cues['mistake']!,
+                      icon: Icons.shield_outlined,
+                      isWarning: true,
+                    ),
+                  ],
 
                   const SizedBox(height: 24),
                 ],

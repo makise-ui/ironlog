@@ -7,6 +7,7 @@ import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/glass_button.dart';
 import '../../../core/widgets/glass_tile.dart';
 import '../../../domain/services/paste_parser.dart';
+import '../../settings/presentation/csv_import_sheet.dart';
 import '../../../data/providers.dart';
 
 class PasteImporterSheet extends ConsumerStatefulWidget {
@@ -157,9 +158,26 @@ Tricep Rope Pushdown: 25/12, 30/10''';
                     ),
                   ],
                 ),
-                IconButton(
-                  icon: Icon(Icons.close_rounded, color: context.textSecondary),
-                  onPressed: () => Navigator.of(context).pop(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        CsvImportSheet.show(context).then((_) => widget.onImportCompleted());
+                      },
+                      icon: Icon(Icons.table_chart_outlined, size: 15, color: context.accent),
+                      label: Text('CSV File', style: TextStyle(fontSize: 12, color: context.accent)),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: context.textSecondary),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
                 ),
               ],
             ),
