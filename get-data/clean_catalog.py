@@ -183,8 +183,79 @@ def normalize_exercise(ex_dict, raw_item):
         "instructions": instructions
     }
 
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "save_clean_exercise",
+            "description": "Saves a cleaned, validated and biomechanically calibrated exercise into IronLog schema",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Accurate standardized exercise name"},
+                    "muscleGroupId": {
+                        "type": "string",
+                        "enum": ["chest", "back", "shoulders", "biceps", "triceps", "legs", "glutes", "core", "forearms", "cardio"],
+                        "description": "Primary targeted muscle group"
+                    },
+                    "secondaryGroups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Secondary or synergist muscle groups"
+                    },
+                    "equipment": {
+                        "type": "string",
+                        "enum": ["barbell", "dumbbell", "machine", "cable", "bodyweight", "assisted", "other"],
+                        "description": "Primary equipment apparatus used"
+                    },
+                    "loadMode": {
+                        "type": "string",
+                        "enum": ["total", "per_hand", "bodyweight", "assisted"],
+                        "description": "How weight load is counted (per_hand for dumbbells, bodyweight for pullups/dips, assisted for offset machines, total for barbell/cables)"
+                    },
+                    "isUnilateral": {
+                        "type": "boolean",
+                        "description": "True if trained one side at a time (single-arm, single-leg, alternating)"
+                    },
+                    "weightStep": {
+                        "type": "number",
+                        "description": "Plate/pin weight step increment (5.0 for machines, 2.5 for barbell/dumbbell/cables, 0.0 for bodyweight)"
+                    },
+                    "repMin": {
+                        "type": "integer",
+                        "description": "Minimum recommended target reps (e.g. 5 for heavy compound, 8-10 for standard, 12 for core)"
+                    },
+                    "repMax": {
+                        "type": "integer",
+                        "description": "Maximum recommended target reps (e.g. 8 for heavy compound, 12 for standard, 20 for core)"
+                    },
+                    "restSeconds": {
+                        "type": "integer",
+                        "description": "Auto rest timer in seconds (120-180 for heavy compounds, 90 for presses/rows, 60 for isolations/arms, 45 for core/cardio)"
+                    },
+                    "trackingType": {
+                        "type": "string",
+                        "enum": ["weightAndReps", "bodyweightReps", "duration", "cardioTime"],
+                        "description": "Tracking mode (duration for isometric holds, bodyweightReps for calisthenics, cardioTime for cardio, weightAndReps for weights)"
+                    },
+                    "instructions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "3-5 concise, practical, step-by-step form execution cues"
+                    }
+                },
+                "required": [
+                    "name", "muscleGroupId", "secondaryGroups", "equipment", "loadMode",
+                    "isUnilateral", "weightStep", "repMin", "repMax", "restSeconds",
+                    "trackingType", "instructions"
+                ]
+            }
+        }
+    }
+]
+
 def clean_exercise_with_ai(raw_item, api_key, model=DEFAULT_MODEL, retries=3):
-    """Sends exercise to Agnes AI and returns cleaned JSON."""
+    """Sends exercise to Agnes AI using strict tool-calling and returns cleaned JSON."""
     user_payload = {
         "id": raw_item.get("id"),
         "name": raw_item.get("name"),
@@ -200,9 +271,11 @@ def clean_exercise_with_ai(raw_item, api_key, model=DEFAULT_MODEL, retries=3):
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": f"Enrich and clean this exercise data into strict JSON:\\n{json.dumps(user_payload)}"
+                "content": f"Clean and calibrate this exercise using save_clean_exercise:\n{json.dumps(user_payload)}"
             }
         ],
+        "tools": TOOLS,
+        "tool_choice": {"type": "function", "function": {"name": "save_clean_exercise"}},
         "temperature": 0.2
     }
 
@@ -216,9 +289,18 @@ def clean_exercise_with_ai(raw_item, api_key, model=DEFAULT_MODEL, retries=3):
             req = urllib.request.Request(API_URL, data=json.dumps(req_data).encode("utf-8"), headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=15) as resp:
                 result = json.loads(resp.read().decode("utf-8"))
-                content = result["choices"][0]["message"]["content"].strip()
+                choice = result["choices"][0]
+                msg = choice.get("message", {})
 
-                # Extract JSON if enclosed in markdown code fences
+                # 1. Native tool calling extraction (100% reliable schema adherence)
+                tool_calls = msg.get("tool_calls", [])
+                if tool_calls and "function" in tool_calls[0]:
+                    args_str = tool_calls[0]["function"].get("arguments", "{}")
+                    parsed = json.loads(args_str)
+                    return normalize_exercise(parsed, raw_item)
+
+                # 2. Fallback to content extraction if tool_calls not returned
+                content = (msg.get("content") or "").strip()
                 match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
                 if match:
                     content = match.group(1).strip()

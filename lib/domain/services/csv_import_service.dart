@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../data/database/database.dart';
+import '../../data/repositories/exercise_repository.dart';
 import '../../domain/models/set_model.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/unit_converter.dart';
@@ -114,9 +115,80 @@ class CsvImportService {
   static String normalizeExerciseName(String raw) {
     var s = raw.trim();
     // Strip common bracketed equipment tags: "Bench Press (Barbell)" -> "Bench Press"
-    s = s.replaceAll(RegExp(r'\s*\((?:barbell|dumbbell|cable|machine|smith machine|bodyweight|pulley|leverage|band)\)', caseSensitive: false), '');
-    // Strip leading equipment prefixes if inverted: "Barbell Bench Press"
+    s = s.replaceAll(RegExp(r'\s*\((?:barbell|dumbbell|cable|machine|smith machine|bodyweight|pulley|leverage|band|plate loaded|selectorized)\)', caseSensitive: false), '');
     return s.trim();
+  }
+
+  /// Automatically infers the targeted muscle group from exercise title cues
+  static String inferMuscleGroup(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('squat') || lower.contains('leg') || lower.contains('lunge') ||
+        lower.contains('calf') || lower.contains('calves') || lower.contains('hamstring') ||
+        lower.contains('quad') || lower.contains('hack') || lower.contains('thigh')) {
+      return 'legs';
+    }
+    if (lower.contains('deadlift') || lower.contains('row') || lower.contains('lat') ||
+        lower.contains('pull-up') || lower.contains('pull up') || lower.contains('chin-up') ||
+        lower.contains('chin up') || lower.contains('pulldown') || lower.contains('back')) {
+      return 'back';
+    }
+    if (lower.contains('bench') || lower.contains('chest') || lower.contains('push-up') ||
+        lower.contains('push up') || lower.contains('dip') || lower.contains('pec') ||
+        lower.contains('fly') || lower.contains('flye')) {
+      return 'chest';
+    }
+    if (lower.contains('shoulder') || lower.contains('overhead') || lower.contains('press') ||
+        lower.contains('delt') || lower.contains('raise') || lower.contains('military')) {
+      return 'shoulders';
+    }
+    if (lower.contains('bicep') || lower.contains('curl')) {
+      return 'biceps';
+    }
+    if (lower.contains('tricep') || lower.contains('skull') || lower.contains('pushdown') ||
+        lower.contains('extension')) {
+      return 'triceps';
+    }
+    if (lower.contains('glute') || lower.contains('hip') || lower.contains('thrust') ||
+        lower.contains('kickback') || lower.contains('abductor') || lower.contains('adductor')) {
+      return 'glutes';
+    }
+    if (lower.contains('ab') || lower.contains('core') || lower.contains('crunch') ||
+        lower.contains('plank') || lower.contains('twist') || lower.contains('sit-up') ||
+        lower.contains('sit up')) {
+      return 'core';
+    }
+    if (lower.contains('run') || lower.contains('walk') || lower.contains('bike') ||
+        lower.contains('rower') || lower.contains('cardio') || lower.contains('jump') ||
+        lower.contains('elliptical') || lower.contains('treadmill')) {
+      return 'cardio';
+    }
+    if (lower.contains('wrist') || lower.contains('forearm') || lower.contains('grip')) {
+      return 'forearms';
+    }
+    return 'chest';
+  }
+
+  /// Automatically infers equipment, loadMode, and weightStep from exercise title cues
+  static (String equipment, String loadMode, double weightStep) inferEquipment(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('dumbbell') || lower.contains('db ')) {
+      return ('dumbbell', 'per_hand', 2.5);
+    }
+    if (lower.contains('cable') || lower.contains('pulley')) {
+      return ('cable', 'total', 2.5);
+    }
+    if (lower.contains('machine') || lower.contains('smith') || lower.contains('selectorized')) {
+      return ('machine', 'total', 5.0);
+    }
+    if (lower.contains('bodyweight') || lower.contains('assisted') ||
+        lower.contains('pull-up') || lower.contains('pull up') ||
+        lower.contains('dip') || lower.contains('push-up') || lower.contains('push up')) {
+      if (lower.contains('assisted')) {
+        return ('assisted', 'assisted', 5.0);
+      }
+      return ('bodyweight', 'bodyweight', 0.0);
+    }
+    return ('barbell', 'total', 2.5);
   }
 
   /// Executes full import of the given CSV string into SQLite within a transaction
@@ -134,16 +206,26 @@ class CsvImportService {
       throw const FormatException('Missing required columns: CSV must contain at least an exercise column and a date column.');
     }
 
-    // Load existing exercises & muscle groups for matching
-    final existingExercises = await _db.select(_db.exercises).get();
-    final exerciseMap = <String, ExerciseData>{};
-    for (final ex in existingExercises) {
-      exerciseMap[ex.name.toLowerCase().trim()] = ex;
-      exerciseMap[normalizeExerciseName(ex.name).toLowerCase()] = ex;
+    // Ensure the comprehensive 1,300+ exercise library is present in SQLite for high match rate
+    var existingExercises = await _db.select(_db.exercises).get();
+    if (existingExercises.length < 500) {
+      await ExerciseRepository(_db).seedOpenGymCatalog();
+      existingExercises = await _db.select(_db.exercises).get();
     }
 
-    final muscleGroups = await _db.select(_db.muscleGroups).get();
-    final defaultMuscleGroup = muscleGroups.isNotEmpty ? muscleGroups.first.id : 'chest';
+    final exerciseMap = <String, ExerciseData>{};
+    for (final ex in existingExercises) {
+      final n1 = ex.name.toLowerCase().trim();
+      final n2 = normalizeExerciseName(ex.name).toLowerCase();
+      final n3 = n1.replaceAll('-', ' ').replaceAll(RegExp(r'\s+'), ' ');
+      final n4 = n2.replaceAll('-', ' ').replaceAll(RegExp(r'\s+'), ' ');
+      exerciseMap[n1] = ex;
+      exerciseMap[n2] = ex;
+      exerciseMap[n3] = ex;
+      exerciseMap[n4] = ex;
+      if (n1.endsWith('s')) exerciseMap[n1.substring(0, n1.length - 1)] = ex;
+      if (n2.endsWith('s')) exerciseMap[n2.substring(0, n2.length - 1)] = ex;
+    }
 
     // Parse data rows
     int matchedCount = 0;
@@ -246,12 +328,20 @@ class CsvImportService {
           final setRows = exEntry.value;
           final cleanName = normalizeExerciseName(rawName);
 
+          final cleanLower = cleanName.toLowerCase();
+          final noHyphen = cleanLower.replaceAll('-', ' ').replaceAll(RegExp(r'\s+'), ' ');
+          final noTrailingS = noHyphen.endsWith('s') ? noHyphen.substring(0, noHyphen.length - 1) : noHyphen;
+
           // Find or create Exercise
-          ExerciseData? exData = exerciseMap[rawName.toLowerCase()] ?? exerciseMap[cleanName.toLowerCase()];
+          ExerciseData? exData = exerciseMap[rawName.toLowerCase()] ??
+              exerciseMap[cleanLower] ??
+              exerciseMap[noHyphen] ??
+              exerciseMap[noTrailingS];
+
           if (exData == null) {
             // Fuzzy search among existing
             for (final k in exerciseMap.keys) {
-              if (cleanName.toLowerCase().contains(k) || k.contains(cleanName.toLowerCase())) {
+              if (k.length >= 4 && (cleanLower.contains(k) || k.contains(cleanLower) || noHyphen.contains(k) || k.contains(noHyphen))) {
                 exData = exerciseMap[k];
                 break;
               }
@@ -266,14 +356,18 @@ class CsvImportService {
             muscleGroupId = exData.muscleGroupId;
             matchedCount++;
           } else {
-            // Create a custom exercise for unmapped lifts
+            // Create a smart custom exercise for unmapped lifts using biomechanical inference
             exId = _uuid.v4();
-            muscleGroupId = defaultMuscleGroup;
+            muscleGroupId = inferMuscleGroup(cleanName);
+            final (inferredEq, inferredLm, inferredStep) = inferEquipment(cleanName);
+
             final newCustom = ExercisesCompanion.insert(
               id: exId,
               name: cleanName.isNotEmpty ? cleanName : rawName,
               muscleGroupId: muscleGroupId,
-              equipment: 'barbell',
+              equipment: inferredEq,
+              loadMode: drift.Value(inferredLm),
+              weightStep: drift.Value(inferredStep),
               isCustom: const drift.Value(true),
               archived: const drift.Value(false),
             );
@@ -283,11 +377,11 @@ class CsvImportService {
               id: exId,
               name: cleanName,
               muscleGroupId: muscleGroupId,
-              equipment: 'barbell',
+              equipment: inferredEq,
               secondaryGroups: '',
-              loadMode: 'weight_reps',
+              loadMode: inferredLm,
               isUnilateral: false,
-              weightStep: 2.5,
+              weightStep: inferredStep,
               repMin: 8,
               repMax: 12,
               restSeconds: 90,
