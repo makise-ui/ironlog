@@ -590,10 +590,13 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Row(
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 3,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: context.isDark
                                   ? const Color(0xFF1E212D)
@@ -604,15 +607,14 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                             child: Text(
                               ex.equipment.name.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 9.5,
+                                fontSize: isCompact ? 9 : 9.5,
                                 fontWeight: FontWeight.w700,
                                 color: context.textTertiary,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(4),
@@ -620,13 +622,12 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                             ),
                             child: Text(
                               '${ex.restSeconds}s rest',
-                              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: context.textTertiary),
+                              style: TextStyle(fontSize: isCompact ? 9 : 9.5, fontWeight: FontWeight.w600, color: context.textTertiary),
                             ),
                           ),
-                          if (bestE1rm > 0) ...[
-                            const SizedBox(width: 6),
+                          if (bestE1rm > 0)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: AppColors.workingSet.withValues(alpha: 0.14),
                                 borderRadius: BorderRadius.circular(4),
@@ -634,21 +635,19 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                               ),
                               child: Text(
                                 'e1RM ${UnitConverter.formatWeight(bestE1rm, unit: widget.unit, includeUnit: false)} ${widget.unit.label}',
-                                style: const TextStyle(
-                                  fontSize: 9.5,
+                                style: TextStyle(
+                                  fontSize: isCompact ? 9 : 9.5,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.workingSet,
                                 ),
                               ),
                             ),
-                          ],
-                          if (widget.item.supersetGroup != null) ...[
-                            const SizedBox(width: 6),
+                          if (widget.item.supersetGroup != null)
                             BouncyPressable(
                               onTap: _handleSupersetToggle,
                               scaleDown: 0.90,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: AppColors.accentViolet.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(4),
@@ -661,8 +660,8 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                                     const SizedBox(width: 2),
                                     Text(
                                       'SUPERSET ${widget.item.supersetGroup}',
-                                      style: const TextStyle(
-                                        fontSize: 9,
+                                      style: TextStyle(
+                                        fontSize: isCompact ? 8.5 : 9,
                                         fontWeight: FontWeight.w800,
                                         color: AppColors.accentViolet,
                                       ),
@@ -671,7 +670,6 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                                 ),
                               ),
                             ),
-                          ],
                         ],
                       ),
                     ],
