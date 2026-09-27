@@ -34,6 +34,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isClearing = false;
   int _totalSetsCount = 0;
   int _totalWorkoutsCount = 0;
+  int _totalExercisesCount = 0;
 
   String _userAge = '25';
   String _userWeight = '75';
@@ -66,6 +67,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final db = ref.read(databaseProvider);
     final sets = await (db.select(db.sets)..where((t) => t.archived.equals(false))).get();
     final workouts = await (db.select(db.workouts)..where((t) => t.archived.equals(false))).get();
+    final exercises = await ref.read(exerciseRepositoryProvider).getExercises();
     final warmupPref = await ref.read(settingsRepositoryProvider).getIncludeWarmupInVolume();
 
     final settingsRepo = ref.read(settingsRepositoryProvider);
@@ -82,6 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() {
         _totalSetsCount = sets.length;
         _totalWorkoutsCount = workouts.length;
+        _totalExercisesCount = exercises.length;
         _includeWarmup = warmupPref;
         _userAge = age;
         _userWeight = weight;
@@ -975,7 +978,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     _buildStatPill('Logged Sets', '$_totalSetsCount'),
                     const SizedBox(width: AppSpacing.sm),
-                    _buildStatPill('Exercises', '162'),
+                    _buildStatPill('Exercises', '$_totalExercisesCount'),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -991,11 +994,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onPressed: () async {
                     AppHaptics.tap();
                     final added = await ref.read(exerciseRepositoryProvider).seedOpenGymCatalog();
+                    await _loadStats();
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(added > 0
-                              ? 'Successfully added $added new movements to your exercise catalog!'
+                              ? 'Successfully added $added new movements! Total exercises: $_totalExercisesCount'
                               : 'All 1,324 movements are already present in your catalog.'),
                         ),
                       );

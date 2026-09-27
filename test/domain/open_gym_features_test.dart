@@ -111,7 +111,7 @@ void main() {
 
       expect(results.length, 1);
       expect(results.first.reasonCode, 'LINEAR_PROGRESSION_ADVANCE');
-      expect(results.first.payload?['suggestedWeight'], 102.5);
+      expect(results.first.payload['suggestedWeight'], 102.5);
     });
 
     test('Greyskull LP Rule: Beating AMRAP target by 5+ reps triggers double jump', () {
@@ -160,7 +160,7 @@ void main() {
 
       expect(results.length, 1);
       expect(results.first.reasonCode, 'GREYSKULL_DOUBLE_ADVANCE');
-      expect(results.first.payload?['suggestedWeight'], 105.0); // +5.0 kg double jump
+      expect(results.first.payload['suggestedWeight'], 105.0); // +5.0 kg double jump
     });
   });
 }

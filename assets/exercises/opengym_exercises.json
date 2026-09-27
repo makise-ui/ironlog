@@ -101,10 +101,11 @@
   {
     "id": "og_1368",
     "name": "Ankle Circles",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
-      "ankle stabilizers"
+      "ankle stabilizers",
+      "calves"
     ],
     "instructions": [
       "Sit on the ground with your legs extended in front of you.",
@@ -269,10 +270,11 @@
   {
     "id": "og_1708",
     "name": "Assisted Lying Calves Stretch",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "assisted",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Lie on your back with your legs extended.",
@@ -1345,11 +1347,12 @@
   {
     "id": "og_0999",
     "name": "Band Single Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "other",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet hip-width apart and place the band around the ball of your left foot.",
@@ -1362,11 +1365,12 @@
   {
     "id": "og_1000",
     "name": "Band Single Leg Reverse Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "other",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet hip-width apart and place the band around the ball of your foot.",
@@ -1582,11 +1586,12 @@
   {
     "id": "og_1369",
     "name": "Band Two Legs Calf Raise - (Band Under Both Legs) V. 2",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "other",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart and place a resistance band under both feet.",
@@ -2026,10 +2031,11 @@
   {
     "id": "og_1370",
     "name": "Barbell Floor Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "barbell",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Place a barbell on the floor in front of you.",
@@ -3294,11 +3300,12 @@
   {
     "id": "og_0088",
     "name": "Barbell Seated Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "barbell",
     "secondaryGroups": [
       "hamstrings",
-      "quadriceps"
+      "quadriceps",
+      "calves"
     ],
     "instructions": [
       "Sit on a bench with your feet flat on the floor and a barbell resting on your thighs.",
@@ -3312,10 +3319,11 @@
   {
     "id": "og_1371",
     "name": "Barbell Seated Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "barbell",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Sit on a bench with your feet flat on the floor and a barbell resting on your thighs.",
@@ -3715,11 +3723,12 @@
   {
     "id": "og_1372",
     "name": "Barbell Standing Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "barbell",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart and place a barbell across your upper back.",
@@ -3800,11 +3809,12 @@
   {
     "id": "og_0108",
     "name": "Barbell Standing Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "barbell",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart and place a barbell across your upper back.",
@@ -3849,11 +3859,12 @@
   {
     "id": "og_0111",
     "name": "Barbell Standing Rocking Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "barbell",
     "secondaryGroups": [
       "hamstrings",
-      "quadriceps"
+      "quadriceps",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart and hold a barbell across your upper back.",
@@ -4532,11 +4543,12 @@
   {
     "id": "og_1373",
     "name": "Bodyweight Standing Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart, toes pointing forward.",
@@ -4673,12 +4685,13 @@
   {
     "id": "og_1374",
     "name": "Box Jump Down With One Leg Stabilization",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "quadriceps",
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand in front of a box or platform with your feet shoulder-width apart.",
@@ -6940,11 +6953,12 @@
   {
     "id": "og_1375",
     "name": "Cable Standing Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "cable",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand facing a cable machine with your feet shoulder-width apart.",
@@ -7104,11 +7118,12 @@
   {
     "id": "og_1376",
     "name": "Cable Standing One Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "cable",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Stand facing a cable machine with your feet shoulder-width apart.",
@@ -7601,10 +7616,11 @@
   {
     "id": "og_1407",
     "name": "Calf Push Stretch With Hands Against Wall",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Stand facing a wall with your feet hip-width apart.",
@@ -7618,10 +7634,11 @@
   {
     "id": "og_1377",
     "name": "Calf Stretch With Hands Against Wall",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Stand facing a wall with your feet hip-width apart.",
@@ -7635,10 +7652,11 @@
   {
     "id": "og_1378",
     "name": "Calf Stretch With Rope",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "other",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Stand facing a wall or sturdy object with your feet hip-width apart.",
@@ -7843,11 +7861,12 @@
   {
     "id": "og_0257",
     "name": "Circles Knee Stretch",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "hamstrings",
-      "quadriceps"
+      "quadriceps",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart and your hands on your hips.",
@@ -8218,11 +8237,12 @@
   {
     "id": "og_0284",
     "name": "Donkey Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand with your toes on an elevated surface, such as a step or block.",
@@ -11850,10 +11870,11 @@
   {
     "id": "og_1379",
     "name": "Dumbbell Seated Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Sit on a bench or chair with your feet flat on the ground and a dumbbell resting on your thighs.",
@@ -12053,11 +12074,12 @@
   {
     "id": "og_0400",
     "name": "Dumbbell Seated One Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Sit on a bench or chair with your feet flat on the ground and a dumbbell resting on your right thigh.",
@@ -12071,11 +12093,12 @@
   {
     "id": "og_1380",
     "name": "Dumbbell Seated One Leg Calf Raise - Hammer Grip",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Sit on a bench or chair with your feet flat on the ground and a dumbbell resting on your thighs.",
@@ -12089,11 +12112,12 @@
   {
     "id": "og_1381",
     "name": "Dumbbell Seated One Leg Calf Raise - Palm Up",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Sit on a bench or chair with your back straight and your feet flat on the ground.",
@@ -12307,10 +12331,11 @@
   {
     "id": "og_0409",
     "name": "Dumbbell Single Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
-      "ankles"
+      "ankles",
+      "calves"
     ],
     "instructions": [
       "Stand on the edge of a step or platform with your heels hanging off and your toes on the step.",
@@ -12558,10 +12583,11 @@
   {
     "id": "og_0417",
     "name": "Dumbbell Standing Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
-      "ankles"
+      "ankles",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart, holding a dumbbell in each hand.",
@@ -13472,11 +13498,12 @@
   {
     "id": "og_1382",
     "name": "Exercise Ball On The Wall Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
       "hamstrings",
-      "quadriceps"
+      "quadriceps",
+      "calves"
     ],
     "instructions": [
       "Stand with your back against a wall and place an exercise ball between your lower back and the wall.",
@@ -13490,11 +13517,12 @@
   {
     "id": "og_3241",
     "name": "Exercise Ball On The Wall Calf Raise (Tennis Ball Between Ankles)",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
       "hamstrings",
-      "quadriceps"
+      "quadriceps",
+      "calves"
     ],
     "instructions": [
       "Stand facing a wall with your feet shoulder-width apart.",
@@ -13509,11 +13537,12 @@
   {
     "id": "og_3240",
     "name": "Exercise Ball On The Wall Calf Raise (Tennis Ball Between Knees)",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
       "quadriceps",
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Stand with your back against a wall and place an exercise ball between your lower back and the wall.",
@@ -14476,11 +14505,12 @@
   {
     "id": "og_1383",
     "name": "Hack Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the sled machine to a comfortable weight.",
@@ -14494,11 +14524,12 @@
   {
     "id": "og_1384",
     "name": "Hack One Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the sled machine to an appropriate weight.",
@@ -16548,10 +16579,11 @@
   {
     "id": "og_2289",
     "name": "Lever Calf Press",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Adjust the seat of the leverage machine so that your shoulders are aligned with the lever pad.",
@@ -16639,11 +16671,12 @@
   {
     "id": "og_1253",
     "name": "Lever Donkey Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the leverage machine to the appropriate height for your body.",
@@ -17213,11 +17246,12 @@
   {
     "id": "og_2315",
     "name": "Lever Rotary Calf",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "soleus",
-      "ankle stabilizers"
+      "ankle stabilizers",
+      "calves"
     ],
     "instructions": [
       "Adjust the seat height so that your knees are slightly bent and your feet are flat on the footplate.",
@@ -17231,11 +17265,12 @@
   {
     "id": "og_2335",
     "name": "Lever Seated Calf Press",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "soleus",
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Adjust the seat of the machine so that your shoulders are aligned with the lever pad.",
@@ -17249,11 +17284,12 @@
   {
     "id": "og_0594",
     "name": "Lever Seated Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "soleus",
-      "ankle stabilizers"
+      "ankle stabilizers",
+      "calves"
     ],
     "instructions": [
       "Adjust the seat height so that your knees are slightly bent and your feet are flat on the footplate.",
@@ -17496,12 +17532,13 @@
   {
     "id": "og_1385",
     "name": "Lever Seated Squat Calf Raise On Leg Press Machine",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "quadriceps",
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the seat of the leg press machine so that your knees are slightly bent when your feet are on the footplate.",
@@ -17585,11 +17622,12 @@
   {
     "id": "og_0605",
     "name": "Lever Standing Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "soleus",
-      "ankle stabilizers"
+      "ankle stabilizers",
+      "calves"
     ],
     "instructions": [
       "Adjust the machine to your height and stand with your feet shoulder-width apart.",
@@ -18368,11 +18406,12 @@
   {
     "id": "og_1386",
     "name": "One Leg Donkey Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart, toes pointing forward.",
@@ -18386,11 +18425,12 @@
   {
     "id": "og_1387",
     "name": "One Leg Floor Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet hip-width apart and place your hands on a wall or sturdy object for balance.",
@@ -18509,11 +18549,12 @@
   {
     "id": "og_1388",
     "name": "Peroneals Stretch",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "other",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Sit on the ground with your legs extended in front of you.",
@@ -18587,11 +18628,12 @@
   {
     "id": "og_1389",
     "name": "Posterior Tibialis Stretch",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "other",
     "secondaryGroups": [
       "hamstrings",
-      "quadriceps"
+      "quadriceps",
+      "calves"
     ],
     "instructions": [
       "Sit on the ground with your legs extended in front of you.",
@@ -19775,10 +19817,11 @@
   {
     "id": "og_1390",
     "name": "Seated Calf Stretch (Male)",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Sit on the edge of a chair or bench with your feet flat on the ground.",
@@ -20283,11 +20326,12 @@
   {
     "id": "og_0727",
     "name": "Single Leg Calf Raise (On A Dumbbell)",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "dumbbell",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet hip-width apart and hold a dumbbell in one hand.",
@@ -20484,10 +20528,11 @@
   {
     "id": "og_0738",
     "name": "Sled 45\u0412\u00b0 Calf Press",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Adjust the sled machine to a 45-degree angle.",
@@ -20578,11 +20623,12 @@
   {
     "id": "og_1391",
     "name": "Sled Calf Press On Leg Press",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "quadriceps"
+      "quadriceps",
+      "calves"
     ],
     "instructions": [
       "Adjust the seat of the leg press machine so that your knees are slightly bent when your feet are on the sled.",
@@ -20615,11 +20661,12 @@
   {
     "id": "og_0742",
     "name": "Sled Forward Angled Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the sled machine to a comfortable weight and position yourself on the machine with your toes on the platform and your heels hanging off.",
@@ -20652,11 +20699,12 @@
   {
     "id": "og_2334",
     "name": "Sled Lying Calf Press",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the sled machine to a comfortable weight.",
@@ -20692,11 +20740,12 @@
   {
     "id": "og_1392",
     "name": "Sled One Leg Calf Press On Leg Press",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the seat of the leg press machine so that your knees are slightly bent when your feet are on the sled.",
@@ -21209,11 +21258,12 @@
   {
     "id": "og_1393",
     "name": "Smith One Leg Floor Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Position yourself on the floor under the smith machine bar, facing away from the machine.",
@@ -21246,10 +21296,11 @@
   {
     "id": "og_0763",
     "name": "Smith Reverse Calf Raises",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Adjust the smith machine bar to a height just below your shoulders.",
@@ -21264,10 +21315,11 @@
   {
     "id": "og_1394",
     "name": "Smith Reverse Calf Raises",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Adjust the smith machine bar to a height just below your shoulders.",
@@ -21321,10 +21373,11 @@
   {
     "id": "og_1395",
     "name": "Smith Seated One Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
-      "hamstrings"
+      "hamstrings",
+      "calves"
     ],
     "instructions": [
       "Sit on the machine with your back against the pad and your feet on the footrest.",
@@ -21508,11 +21561,12 @@
   {
     "id": "og_0773",
     "name": "Smith Standing Leg Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Adjust the smith machine bar to a height that allows you to stand with your feet flat on the ground and your shoulders under the bar.",
@@ -21564,11 +21618,12 @@
   {
     "id": "og_1396",
     "name": "Smith Toe Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "machine",
     "secondaryGroups": [
       "ankles",
-      "shins"
+      "shins",
+      "calves"
     ],
     "instructions": [
       "Adjust the smith machine bar to a height that allows you to comfortably stand with your feet flat on the ground.",
@@ -21918,11 +21973,12 @@
   {
     "id": "og_1490",
     "name": "Standing Calf Raise (On A Staircase)",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "ankles",
-      "feet"
+      "feet",
+      "calves"
     ],
     "instructions": [
       "Stand on the edge of a step or a sturdy platform with your heels hanging off and your toes on the step.",
@@ -21935,11 +21991,12 @@
   {
     "id": "og_1397",
     "name": "Standing Calves",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand with your feet shoulder-width apart, toes pointing forward.",
@@ -21951,11 +22008,12 @@
   {
     "id": "og_1398",
     "name": "Standing Calves Calf Stretch",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "bodyweight",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand facing a wall or sturdy object, about an arm's length away.",
@@ -22829,11 +22887,12 @@
   {
     "id": "og_0833",
     "name": "Weighted Donkey Calf Raise",
-    "muscleGroupId": "calves",
+    "muscleGroupId": "legs",
     "equipment": "other",
     "secondaryGroups": [
       "hamstrings",
-      "glutes"
+      "glutes",
+      "calves"
     ],
     "instructions": [
       "Stand on a raised platform with your toes on the edge and your heels hanging off.",

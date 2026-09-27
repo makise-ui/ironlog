@@ -146,5 +146,17 @@ void main() {
       // High performance verification: batch query must complete swiftly
       expect(stopwatch.elapsedMilliseconds, lessThan(3000));
     });
+
+    test('seedOpenGymCatalog loads 1,000+ openGym exercises without Foreign Key error', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final count = await exerciseRepo.seedOpenGymCatalog();
+      expect(count, greaterThan(1000));
+      final all = await exerciseRepo.getExercises();
+      expect(all.length, greaterThan(1200));
+
+      // Re-running seed should be idempotent
+      final reseedCount = await exerciseRepo.seedOpenGymCatalog();
+      expect(reseedCount, 0);
+    });
   });
 }

@@ -47,7 +47,13 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
 
   Future<void> _loadExercises() async {
     final repo = ref.read(exerciseRepositoryProvider);
-    final exercises = await repo.getExercises();
+    var exercises = await repo.getExercises();
+
+    // Auto-seed openGym catalog if needed (< 500 exercises currently loaded)
+    if (exercises.length < 500) {
+      await repo.seedOpenGymCatalog();
+      exercises = await repo.getExercises();
+    }
 
     // Find recently trained exercises
     try {
@@ -260,7 +266,7 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                   fontSize: 14.5,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Search exercise by name...',
+                  hintText: _allExercises.isNotEmpty ? 'Search ${_allExercises.length}+ exercises...' : 'Search exercises...',
                   hintStyle: TextStyle(color: context.textTertiary, fontSize: 13.5),
                   prefixIcon: Icon(Icons.search_rounded, color: context.accent, size: 20),
                   suffixIcon: query.isNotEmpty

@@ -240,29 +240,51 @@ class ExerciseRepository {
 
       final existing = await _db.select(_db.exercises).get();
       final existingNames = existing.map((e) => e.name.toLowerCase().trim()).toSet();
+      final existingIds = existing.map((e) => e.id).toSet();
+
+      const validMuscleGroups = {
+        'chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'core', 'forearms', 'cardio'
+      };
+      const validEquipments = {
+        'barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'assisted', 'other'
+      };
 
       await _db.transaction(() async {
         for (final item in list) {
           final name = (item['name'] as String? ?? '').trim();
-          if (name.isEmpty || existingNames.contains(name.toLowerCase())) continue;
+          final id = (item['id'] as String? ?? '').trim();
+          if (name.isEmpty || existingNames.contains(name.toLowerCase()) || (id.isNotEmpty && existingIds.contains(id))) {
+            continue;
+          }
 
-          final mgId = item['muscleGroupId'] as String? ?? 'chest';
-          final eqStr = item['equipment'] as String? ?? 'barbell';
-          final sec = (item['secondaryGroups'] as List<dynamic>? ?? []).join(',');
+          String rawMgId = (item['muscleGroupId'] as String? ?? 'legs').trim().toLowerCase();
+          final secList = List<String>.from((item['secondaryGroups'] as List<dynamic>? ?? []).map((e) => e.toString()));
+          if (rawMgId == 'calves') {
+            rawMgId = 'legs';
+            if (!secList.contains('calves')) {
+              secList.add('calves');
+            }
+          }
+          final mgId = validMuscleGroups.contains(rawMgId) ? rawMgId : 'legs';
+
+          String rawEq = (item['equipment'] as String? ?? 'barbell').trim().toLowerCase();
+          final eqStr = validEquipments.contains(rawEq) ? rawEq : 'other';
 
           await _db.into(_db.exercises).insert(
             ExercisesCompanion.insert(
-              id: item['id'] as String? ?? 'og_${DateTime.now().microsecondsSinceEpoch}',
+              id: id.isNotEmpty ? id : 'og_${DateTime.now().microsecondsSinceEpoch}',
               name: name,
               muscleGroupId: mgId,
-              secondaryGroups: Value(sec),
+              secondaryGroups: Value(secList.join(',')),
               equipment: eqStr,
               loadMode: eqStr == 'bodyweight' ? const Value('bodyweight') : const Value('total'),
               isCustom: const Value(false),
               archived: const Value(false),
             ),
+            mode: InsertMode.insertOrIgnore,
           );
           existingNames.add(name.toLowerCase());
+          if (id.isNotEmpty) existingIds.add(id);
           insertedCount++;
         }
       });
