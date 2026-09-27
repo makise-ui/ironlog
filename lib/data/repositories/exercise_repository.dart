@@ -239,8 +239,12 @@ class ExerciseRepository {
       final List<dynamic> list = jsonDecode(jsonStr);
 
       final existing = await _db.select(_db.exercises).get();
-      final existingNames = existing.map((e) => e.name.toLowerCase().trim()).toSet();
-      final existingIds = existing.map((e) => e.id).toSet();
+      final Map<String, ExerciseData> existingByName = {
+        for (final e in existing) e.name.toLowerCase().trim(): e
+      };
+      final Map<String, ExerciseData> existingById = {
+        for (final e in existing) e.id: e
+      };
 
       const validMuscleGroups = {
         'chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'core', 'forearms', 'cardio'
@@ -253,9 +257,7 @@ class ExerciseRepository {
         for (final item in list) {
           final name = (item['name'] as String? ?? '').trim();
           final id = (item['id'] as String? ?? '').trim();
-          if (name.isEmpty || existingNames.contains(name.toLowerCase()) || (id.isNotEmpty && existingIds.contains(id))) {
-            continue;
-          }
+          if (name.isEmpty) continue;
 
           String rawMgId = (item['muscleGroupId'] as String? ?? 'legs').trim().toLowerCase();
           final secList = List<String>.from((item['secondaryGroups'] as List<dynamic>? ?? []).map((e) => e.toString()));
@@ -270,6 +272,105 @@ class ExerciseRepository {
           String rawEq = (item['equipment'] as String? ?? 'barbell').trim().toLowerCase();
           final eqStr = validEquipments.contains(rawEq) ? rawEq : 'other';
 
+          // --- Intelligent Gym Specification Inference ---
+          final lowerName = name.toLowerCase();
+          final isUnilateral = lowerName.contains('single') ||
+              lowerName.contains('one-arm') ||
+              lowerName.contains('one arm') ||
+              lowerName.contains('one-leg') ||
+              lowerName.contains('one leg') ||
+              lowerName.contains('alternating');
+
+          final isHold = lowerName.contains('plank') ||
+              lowerName.contains('hang') ||
+              lowerName.contains('wall sit') ||
+              lowerName.contains('hold') ||
+              lowerName.contains('l-sit');
+
+          final isHeavyCompound = lowerName.contains('squat') ||
+              lowerName.contains('deadlift') ||
+              lowerName.contains('clean') ||
+              lowerName.contains('snatch');
+
+          final isPressOrRow = lowerName.contains('bench press') ||
+              lowerName.contains('overhead press') ||
+              lowerName.contains('military press') ||
+              lowerName.contains('barbell row');
+
+          // Rest time
+          int restSeconds = 90;
+          if (isHeavyCompound) {
+            restSeconds = 120;
+          } else if (isPressOrRow) {
+            restSeconds = 90;
+          } else if (mgId == 'core' || mgId == 'cardio' || isHold) {
+            restSeconds = 45;
+          } else if (eqStr == 'cable' || mgId == 'biceps' || mgId == 'triceps' || mgId == 'forearms') {
+            restSeconds = 60;
+          }
+
+          // Rep ranges
+          int repMin = 8;
+          int repMax = 12;
+          if (isHeavyCompound) {
+            repMin = 5;
+            repMax = 8;
+          } else if (isPressOrRow) {
+            repMin = 6;
+            repMax = 10;
+          } else if (mgId == 'core' || mgId == 'cardio') {
+            repMin = 12;
+            repMax = 20;
+          } else if (eqStr == 'cable' || lowerName.contains('raise') || lowerName.contains('fly')) {
+            repMin = 10;
+            repMax = 15;
+          }
+
+          // Weight step
+          double weightStep = 2.5;
+          if (eqStr == 'machine') {
+            weightStep = 5.0;
+          } else if (eqStr == 'bodyweight') {
+            weightStep = 0.0;
+          }
+
+          // Load mode
+          String loadMode = 'total';
+          if (eqStr == 'bodyweight') {
+            loadMode = 'bodyweight';
+          } else if (eqStr == 'assisted') {
+            loadMode = 'assisted';
+          } else if (eqStr == 'dumbbell') {
+            loadMode = 'per_hand';
+          }
+
+          // Custom tracking type
+          String? trackingType;
+          if (isHold) {
+            trackingType = ExerciseTrackingType.duration.name;
+          } else if (eqStr == 'bodyweight' && (mgId == 'core' || mgId == 'cardio')) {
+            trackingType = ExerciseTrackingType.bodyweightReps.name;
+          }
+
+          final existingEx = existingByName[name.toLowerCase()] ?? (id.isNotEmpty ? existingById[id] : null);
+          if (existingEx != null) {
+            // If already in database and from openGym, update its specs to the smart inferred values
+            if (existingEx.id.startsWith('og_')) {
+              await (_db.update(_db.exercises)..where((t) => t.id.equals(existingEx.id))).write(
+                ExercisesCompanion(
+                  loadMode: Value(loadMode),
+                  isUnilateral: Value(isUnilateral),
+                  weightStep: Value(weightStep),
+                  repMin: Value(repMin),
+                  repMax: Value(repMax),
+                  restSeconds: Value(restSeconds),
+                  trackingType: Value(trackingType),
+                ),
+              );
+            }
+            continue;
+          }
+
           await _db.into(_db.exercises).insert(
             ExercisesCompanion.insert(
               id: id.isNotEmpty ? id : 'og_${DateTime.now().microsecondsSinceEpoch}',
@@ -277,14 +378,34 @@ class ExerciseRepository {
               muscleGroupId: mgId,
               secondaryGroups: Value(secList.join(',')),
               equipment: eqStr,
-              loadMode: eqStr == 'bodyweight' ? const Value('bodyweight') : const Value('total'),
+              loadMode: Value(loadMode),
+              isUnilateral: Value(isUnilateral),
+              weightStep: Value(weightStep),
+              repMin: Value(repMin),
+              repMax: Value(repMax),
+              restSeconds: Value(restSeconds),
+              trackingType: Value(trackingType),
               isCustom: const Value(false),
               archived: const Value(false),
             ),
             mode: InsertMode.insertOrIgnore,
           );
-          existingNames.add(name.toLowerCase());
-          if (id.isNotEmpty) existingIds.add(id);
+          existingByName[name.toLowerCase()] = ExerciseData(
+            id: id,
+            name: name,
+            muscleGroupId: mgId,
+            secondaryGroups: secList.join(','),
+            equipment: eqStr,
+            loadMode: loadMode,
+            isUnilateral: isUnilateral,
+            weightStep: weightStep,
+            repMin: repMin,
+            repMax: repMax,
+            restSeconds: restSeconds,
+            isCustom: false,
+            archived: false,
+            trackingType: trackingType,
+          );
           insertedCount++;
         }
       });
