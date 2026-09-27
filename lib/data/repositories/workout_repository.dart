@@ -871,6 +871,16 @@ class WorkoutRepository {
     return results;
   }
 
+  /// Analytics: Get recent working sets for effort/RIR and volume analysis
+  Future<List<SetModel>> getRecentWorkingSets({int days = 30}) async {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final setsQuery = _db.select(_db.sets)
+      ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff))
+      ..orderBy([(t) => OrderingTerm.desc(t.date)]);
+    final rows = await setsQuery.get();
+    return rows.map(_mapSet).toList();
+  }
+
   /// Analytics: Overview metrics
   Future<AnalyticsOverviewData> getAnalyticsOverview() async {
 

@@ -5,6 +5,7 @@ import '../../../core/utils/haptics.dart';
 import '../../../core/utils/unit_converter.dart';
 import '../../../core/widgets/glass_button.dart';
 import '../../../domain/models/exercise_model.dart';
+import '../../../domain/services/warmup_generator.dart';
 import '../../../domain/services/weight_step_learner.dart';
 
 class WarmupRampSet {
@@ -59,60 +60,22 @@ class _WarmupCalculatorSheetState extends State<WarmupCalculatorSheet> {
   }
 
   List<WarmupRampSet> _calculateRamp() {
-    final barWeight = widget.exercise.equipment == EquipmentType.barbell ? 20.0 : 10.0;
-    final step = widget.exercise.weightStep > 0 ? widget.exercise.weightStep : 2.5;
-
-    double roundToStep(double val) {
-      if (val <= barWeight) return barWeight;
-      return (val / step).round() * step;
-    }
-
-    final sets = <WarmupRampSet>[];
-
-    // Ramp 1: Empty Bar / Light (40%)
-    sets.add(WarmupRampSet(
-      percentage: 0.2,
-      weight: barWeight,
-      reps: 10,
-      label: 'Bar Primer',
-    ));
-
-    // Ramp 2: 50%
-    if (_targetWeight > barWeight * 1.5) {
-      final w50 = roundToStep(_targetWeight * 0.50);
-      if (w50 > barWeight) {
-        sets.add(WarmupRampSet(
-          percentage: 0.50,
-          weight: w50,
-          reps: 5,
-          label: 'Moderate Potentiation',
-        ));
-      }
-    }
-
-    // Ramp 3: 75%
-    if (_targetWeight > barWeight * 1.8) {
-      final w75 = roundToStep(_targetWeight * 0.75);
-      sets.add(WarmupRampSet(
-        percentage: 0.75,
-        weight: w75,
-        reps: 3,
-        label: 'Heavy Acclimation',
-      ));
-    }
-
-    // Ramp 4: 90%
-    if (_targetWeight > barWeight * 2.2) {
-      final w90 = roundToStep(_targetWeight * 0.90);
-      sets.add(WarmupRampSet(
-        percentage: 0.90,
-        weight: w90,
-        reps: 1,
-        label: 'Neural Activation',
-      ));
-    }
-
-    return sets;
+    final isBarbell = widget.exercise.equipment == EquipmentType.barbell;
+    final proposals = WarmupGenerator.generate(
+      targetWeight: _targetWeight,
+      barWeight: isBarbell ? 20.0 : 0.0,
+      weightStep: widget.exercise.weightStep > 0 ? widget.exercise.weightStep : 2.5,
+      isBarbell: isBarbell,
+      isBodyweight: widget.exercise.loadMode == LoadMode.bodyweight,
+    );
+    return proposals
+        .map((p) => WarmupRampSet(
+              percentage: p.percentage / 100.0,
+              weight: p.weight,
+              reps: p.reps,
+              label: p.label,
+            ))
+        .toList();
   }
 
   @override

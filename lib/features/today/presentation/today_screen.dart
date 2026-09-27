@@ -973,7 +973,20 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       AppHaptics.success();
     }
 
-    _activeWorkoutExerciseId = target.exerciseItem.id;
+    // Superset Execution Flow: If part of a superset group, auto-advance to next exercise in circuit
+    if (target.exerciseItem.supersetGroup != null) {
+      final activeExs = _workout?.exercises.where((e) => !e.archived).toList() ?? [];
+      final groupMembers = activeExs.where((e) => e.supersetGroup == target.exerciseItem.supersetGroup).toList();
+      if (groupMembers.length > 1) {
+        final currentIdx = groupMembers.indexWhere((e) => e.id == target.exerciseItem.id);
+        final nextMember = groupMembers[(currentIdx + 1) % groupMembers.length];
+        _activeWorkoutExerciseId = nextMember.id;
+      } else {
+        _activeWorkoutExerciseId = target.exerciseItem.id;
+      }
+    } else {
+      _activeWorkoutExerciseId = target.exerciseItem.id;
+    }
     await _refreshWorkout();
   }
 
@@ -2108,6 +2121,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   Widget build(BuildContext context) {
     C.isDark = Theme.of(context).brightness == Brightness.dark;
     final unit = ref.watch(weightUnitNotifierProvider);
+    final isCompact = ref.watch(compactWorkoutModeProvider);
     final streakAsync = ref.watch(streakAndWeekProvider);
     final streakData = streakAsync.valueOrNull;
     final routinesAsync = ref.watch(routinesProvider);
@@ -2804,6 +2818,26 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       border: Border.all(color: C.hairline),
                     ),
                     child: Icon(Icons.edit_note_rounded, color: C.text2, size: 18),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ScaleTap(
+                  onPressed: () {
+                    AppHaptics.selection();
+                    ref.read(compactWorkoutModeProvider.notifier).state = !isCompact;
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: isCompact ? context.accent.withValues(alpha: 0.2) : C.surfaceHi,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isCompact ? context.accent : C.hairline),
+                    ),
+                    child: Icon(
+                      isCompact ? Icons.density_small_rounded : Icons.density_medium_rounded,
+                      color: isCompact ? context.accent : C.text2,
+                      size: 18,
+                    ),
                   ),
                 ),
               ],

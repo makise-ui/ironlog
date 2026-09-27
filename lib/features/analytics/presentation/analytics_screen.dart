@@ -12,6 +12,8 @@ import '../../../core/widgets/scale_tap.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/analytics_model.dart';
 import '../../../domain/models/muscle_recovery_model.dart';
+import '../../../domain/models/set_model.dart';
+import 'widgets/effort_distribution_card.dart';
 import 'widgets/realistic_body_heatmap.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
@@ -31,6 +33,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   Map<String, int> _muscleSplit = {};
   Map<String, MuscleRecoveryData> _muscleRecovery = {};
   List<PrItemData> _recentPrs = [];
+  List<SetModel> _recentWorkingSets = [];
 
   // Advanced analytics state
   List<WeeklyFrequencyStat> _weeklyFrequency = [];
@@ -55,6 +58,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     final muscleSplit = await repo.getMuscleGroupBreakdown(days: _selectedDaysWindow);
     final muscleRecovery = await repo.getMuscleRecoveryStatus();
     final prs = await repo.getRecentPrs(limit: 8);
+    final recentSets = await repo.getRecentWorkingSets(days: _selectedDaysWindow);
 
     // Advanced analytics queries
     final weeklyFreq = await repo.getWeeklyFrequency(weeks: 8);
@@ -71,6 +75,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         _muscleSplit = muscleSplit;
         _muscleRecovery = muscleRecovery;
         _recentPrs = prs;
+        _recentWorkingSets = recentSets;
         _weeklyFrequency = weeklyFreq;
         _topExercises = topExercises;
         _bestSets = bestSets;
@@ -509,6 +514,17 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+              // Training Effort & Stimulating Reps (RIR / Hypertrophy)
+              if (_recentWorkingSets.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: EffortDistributionCard(sets: _recentWorkingSets),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              ],
 
               // 4. Personal Records (PR) Hall of Fame
               SliverToBoxAdapter(

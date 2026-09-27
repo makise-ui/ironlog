@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/haptics.dart';
@@ -65,6 +66,7 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
   RestTimerState _state = const RestTimerState();
   bool _isAppInBackground = false;
   bool _warningHapticGiven = false;
+  int? _lastCountdownSecond;
 
   RestTimerState get state => _state;
   bool get isAppInBackground => _isAppInBackground;
@@ -205,12 +207,14 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
     _cancelNotification();
     _ticker?.cancel();
     _warningHapticGiven = false;
+    _lastCountdownSecond = null;
     _state = const RestTimerState();
     notifyListeners();
   }
 
   void _startTicker() {
     _ticker?.cancel();
+    _lastCountdownSecond = null;
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_state.endsAt != null) {
         final now = DateTime.now();
@@ -218,12 +222,17 @@ class RestTimerService extends ChangeNotifier with WidgetsBindingObserver {
           final finishedEx = _state.exerciseName;
           stop();
           AppHaptics.timerFinished();
+          SystemSound.play(SystemSoundType.alert);
           if (_isAppInBackground) {
             _showRestFinishedNotification(finishedEx);
           }
         } else {
           final remaining = _state.endsAt!.difference(now).inSeconds;
-          if (remaining <= 10 && remaining > 0 && !_warningHapticGiven) {
+          if (remaining <= 3 && remaining > 0 && remaining != _lastCountdownSecond) {
+            _lastCountdownSecond = remaining;
+            SystemSound.play(SystemSoundType.click);
+            AppHaptics.tap();
+          } else if (remaining <= 10 && remaining > 0 && !_warningHapticGiven) {
             _warningHapticGiven = true;
             AppHaptics.timerWarning();
           }

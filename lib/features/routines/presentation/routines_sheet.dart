@@ -6,6 +6,7 @@ import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/glass_tile.dart';
 import '../../../domain/models/routine_model.dart';
 import '../../../data/providers.dart';
+import '../../today/presentation/widgets/routine_qr_share_dialog.dart';
 import 'create_preset_sheet.dart';
 
 class RoutinesSheet extends ConsumerStatefulWidget {
@@ -219,6 +220,19 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
     );
   }
 
+  void _shareRoutineQr(RoutineModel? routine) {
+    AppHaptics.tap();
+    final db = ref.read(databaseProvider);
+    RoutineQrShareDialog.show(
+      context,
+      routineToShare: routine,
+      db: db,
+      onRoutineImported: (imported) {
+        _loadInitialRoutines();
+      },
+    );
+  }
+
   bool _isCustom(RoutineModel routine) {
     // Custom presets have UUID IDs (> 20 characters)
     return routine.id.length > 20;
@@ -271,6 +285,11 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      icon: Icon(Icons.qr_code_2_rounded, color: context.accent, size: 22),
+                      tooltip: 'Scan or Share QR Routine',
+                      onPressed: () => _shareRoutineQr(null),
+                    ),
                     TextButton.icon(
                       onPressed: _openCreatePreset,
                       icon: Icon(Icons.add_rounded, size: 16, color: context.accent),
@@ -465,7 +484,14 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
                   visualDensity: VisualDensity.compact,
                   tooltip: 'Delete preset',
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 2),
+                IconButton(
+                  icon: Icon(Icons.qr_code_2_rounded, size: 20, color: context.textSecondary),
+                  onPressed: () => _shareRoutineQr(r),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Share QR code',
+                ),
+                const SizedBox(width: 2),
                 IconButton(
                   icon: Icon(Icons.play_circle_fill_rounded, size: 22, color: context.accent),
                   onPressed: () => _confirmApplyRoutine(r),

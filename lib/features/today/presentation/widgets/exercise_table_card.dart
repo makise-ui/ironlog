@@ -200,6 +200,48 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     widget.onRefresh();
   }
 
+  Future<void> _handleSupersetToggle() async {
+    final repo = ref.read(workoutRepositoryProvider);
+    if (widget.item.supersetGroup != null) {
+      await repo.setSupersetGroup(widget.item.id, null);
+      widget.onRefresh();
+      return;
+    }
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: context.cardBorder),
+        ),
+        title: Text('Link as Superset', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Select superset pair / circuit group tag for ${widget.item.exercise.name}:',
+          style: TextStyle(color: context.textSecondary, fontSize: 13.5),
+        ),
+        actions: ['A', 'B', 'C'].map((tag) => ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accentViolet.withValues(alpha: 0.25),
+            foregroundColor: AppColors.accentViolet,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: AppColors.accentViolet),
+            ),
+          ),
+          onPressed: () => Navigator.pop(ctx, tag),
+          child: Text('Group $tag', style: const TextStyle(fontWeight: FontWeight.w700)),
+        )).toList(),
+      ),
+    );
+
+    if (choice != null) {
+      await repo.setSupersetGroup(widget.item.id, choice);
+      widget.onRefresh();
+    }
+  }
+
   void _cyclePlannedSetType(int setIndex) {
     AppHaptics.selection();
     final current = _getTargetTypeForSet(setIndex);
@@ -466,12 +508,13 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         ? (List.of(activeSets)..sort((a, b) => E1rmCalculator.calculateEpley(b.weight, b.reps).compareTo(E1rmCalculator.calculateEpley(a.weight, a.reps)))).first
         : null;
     final bestE1rm = bestSet != null ? E1rmCalculator.calculateEpley(bestSet.weight, bestSet.reps) : 0.0;
+    final isCompact = ref.watch(compactWorkoutModeProvider);
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTapDown: (_) => widget.onExerciseFocused?.call(),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
+        margin: EdgeInsets.only(bottom: isCompact ? 8 : 14),
       decoration: BoxDecoration(
         color: context.cardBg,
         borderRadius: BorderRadius.circular(16),
@@ -500,7 +543,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         children: [
           // Header: Muscle dot, Title, Equipment, e1RM, Menu
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 10, 8),
+            padding: EdgeInsets.fromLTRB(isCompact ? 10 : 14, isCompact ? 8 : 14, isCompact ? 6 : 10, isCompact ? 4 : 8),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -509,7 +552,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                   imagePath: ex.imagePath,
                   muscleGroupId: ex.muscleGroupId,
                   equipment: ex.equipment.name,
-                  size: 38,
+                  size: isCompact ? 30 : 38,
                   onTap: () async {
                     AppHaptics.tap();
                     await ExerciseGuideSheet.show(context, ex, () {});
@@ -601,19 +644,30 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                           ],
                           if (widget.item.supersetGroup != null) ...[
                             const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.accentViolet.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.5)),
-                              ),
-                              child: Text(
-                                'LINK',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  color: context.accent,
+                            BouncyPressable(
+                              onTap: _handleSupersetToggle,
+                              scaleDown: 0.90,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentViolet.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.5)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.link_rounded, size: 10, color: AppColors.accentViolet),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      'SUPERSET ${widget.item.supersetGroup}',
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.accentViolet,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -723,11 +777,28 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                           },
                         ),
                       );
+                    } else if (val == 'superset') {
+                      _handleSupersetToggle();
                     } else if (val == 'delete') {
                       widget.onRemoveExercise();
                     }
                   },
                   itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'superset',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.link_rounded, color: AppColors.accentViolet, size: 16),
+                          const SizedBox(width: 10),
+                          Text(
+                            widget.item.supersetGroup != null
+                                ? 'Unlink Superset (${widget.item.supersetGroup})'
+                                : 'Link as Superset',
+                            style: TextStyle(color: context.textPrimary, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'plate_calc',
                       child: Row(
@@ -1275,6 +1346,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final tracking = ex.trackingType;
 
     final activeInput = ref.watch(activeWorkoutInputProvider);
+    final isCompact = ref.watch(compactWorkoutModeProvider);
     final isRowActive = activeInput?.workoutExerciseId == widget.item.id &&
         activeInput?.setIndex == index &&
         activeInput?.existingSetId == set.id;
@@ -1288,7 +1360,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final displayedTime = isRowActive ? activeInput!.repsInput : SetModel.formatDuration(set.reps);
 
     final rowContent = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 14, vertical: isCompact ? 3 : 6),
       decoration: BoxDecoration(
         color: isRowActive ? context.accent.withValues(alpha: isDark ? 0.08 : 0.04) : null,
         border: Border(
@@ -1306,8 +1378,8 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
             onLongPress: () => _showSetTypePicker(set),
             scaleDown: 0.90,
             child: Container(
-              width: 32,
-              height: 26,
+              width: isCompact ? 28 : 32,
+              height: isCompact ? 22 : 26,
               decoration: BoxDecoration(
                 color: typeColor.withValues(alpha: isDark ? 0.20 : 0.14),
                 borderRadius: BorderRadius.circular(7),
@@ -1768,6 +1840,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final tracking = ex.trackingType;
 
     final activeInput = ref.watch(activeWorkoutInputProvider);
+    final isCompact = ref.watch(compactWorkoutModeProvider);
     final isRowActive = activeInput?.workoutExerciseId == widget.item.id &&
         activeInput?.setIndex == setIndex &&
         activeInput?.existingSetId == null;
@@ -1787,7 +1860,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final isStopwatchActive = _activeHoldSetIndex == setIndex;
 
     final rowContent = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 14, vertical: isCompact ? 3 : 6),
       decoration: BoxDecoration(
         color: isStopwatchActive
             ? context.accent.withValues(alpha: isDark ? 0.12 : 0.08)
@@ -1808,8 +1881,8 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
             onTap: () => _cyclePlannedSetType(setIndex),
             scaleDown: 0.90,
             child: Container(
-              width: 32,
-              height: 26,
+              width: isCompact ? 28 : 32,
+              height: isCompact ? 22 : 26,
               decoration: BoxDecoration(
                 color: targetType != SetType.working
                     ? typeColor.withValues(alpha: isDark ? 0.18 : 0.12)

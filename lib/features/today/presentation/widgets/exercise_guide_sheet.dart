@@ -1,12 +1,15 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/haptics.dart';
+import '../../../../core/utils/unit_converter.dart';
 import '../../../../core/widgets/glass_button.dart';
 import '../../../../data/providers.dart';
 import '../../../../domain/models/exercise_model.dart';
 import '../../../../domain/services/exercise_instructions_service.dart';
+import '../../../../domain/services/strength_decay_service.dart';
 import 'exercise_image_picker_sheet.dart';
 import 'exercise_position_slideshow.dart';
 import 'exercise_web_search_sheet.dart';
@@ -41,6 +44,7 @@ class ExerciseGuideSheet extends ConsumerStatefulWidget {
 
 class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
   late ExerciseModel _exercise;
+  RetainedStrengthAnalysis? _decayAnalysis;
 
   @override
   void initState() {
@@ -49,6 +53,26 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
     ExerciseInstructionsService.init().then((_) {
       if (mounted) setState(() {});
     });
+    _loadStrengthHistory();
+  }
+
+  Future<void> _loadStrengthHistory() async {
+    try {
+      final sets = await ref.read(workoutRepositoryProvider).getAllHistoricalSetsForExercise(_exercise.id);
+      final workingSets = sets.where((s) => !s.archived && !s.isWarmup && s.weight > 0 && s.reps > 0).toList();
+      if (workingSets.isNotEmpty) {
+        final peak1Rm = workingSets.map((s) => s.e1rm).reduce(math.max);
+        final latestDate = workingSets.map((s) => s.date).reduce((a, b) => a.isAfter(b) ? a : b);
+        final analysis = StrengthDecayService.evaluate(
+          peak1Rm: peak1Rm,
+          lastTrainedDate: latestDate,
+          weightStep: _exercise.weightStep > 0 ? _exercise.weightStep : 2.5,
+        );
+        if (mounted) {
+          setState(() => _decayAnalysis = analysis);
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _changeImage() async {
@@ -418,6 +442,11 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
                     ],
                   ),
 
+                  if (_decayAnalysis != null) ...[
+                    const SizedBox(height: 14),
+                    _buildStrengthDecayCard(context, _decayAnalysis!, isDark),
+                  ],
+
                   const SizedBox(height: 20),
                   const Divider(height: 1),
                   const SizedBox(height: 16),
@@ -707,6 +736,128 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStrengthDecayCard(BuildContext context, RetainedStrengthAnalysis analysis, bool isDark) {
+    final unit = ref.watch(weightUnitNotifierProvider);
+    final decayPct = ((1.0 - analysis.decayFactor) * 100).round();
+    final badgeColor = analysis.isDetrained
+        ? AppColors.warning
+        : (analysis.daysElapsed <= 7 ? AppColors.accentEmerald : context.accent);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF242424) : const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: analysis.isDetrained
+              ? AppColors.warning.withValues(alpha: 0.5)
+              : (isDark ? const Color(0xFF383838) : const Color(0xFFE5E5EB)),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.speed_rounded, size: 16, color: badgeColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'NEUROMUSCULAR READINESS',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: isDark ? const Color(0xFFA3A3A3) : const Color(0xFF71717A),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  analysis.statusLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: badgeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDecayMetricItem(
+                  context,
+                  label: 'Peak 1RM',
+                  value: UnitConverter.formatWeight(analysis.peak1Rm, unit: unit),
+                  subtitle: '${analysis.daysElapsed}d ago',
+                ),
+              ),
+              Container(width: 1, height: 36, color: isDark ? const Color(0xFF383838) : const Color(0xFFE5E5EB)),
+              Expanded(
+                child: _buildDecayMetricItem(
+                  context,
+                  label: 'Current Expected',
+                  value: UnitConverter.formatWeight(analysis.currentExpected1Rm, unit: unit),
+                  subtitle: decayPct > 0 ? '-$decayPct% decay' : '100% capacity',
+                  valueColor: analysis.isDetrained ? AppColors.warning : AppColors.accentEmerald,
+                ),
+              ),
+              if (analysis.isDetrained) ...[
+                Container(width: 1, height: 36, color: isDark ? const Color(0xFF383838) : const Color(0xFFE5E5EB)),
+                Expanded(
+                  child: _buildDecayMetricItem(
+                    context,
+                    label: 'Re-entry Target',
+                    value: UnitConverter.formatWeight(analysis.suggestedReentryWeight, unit: unit),
+                    subtitle: '~8 reps safe',
+                    valueColor: context.accent,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDecayMetricItem(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required String subtitle,
+    Color? valueColor,
+  }) {
+    return Column(
+      children: [
+        Text(label, style: TextStyle(fontSize: 11, color: context.textTertiary)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: valueColor ?? context.textPrimary,
+          ),
+        ),
+        Text(subtitle, style: TextStyle(fontSize: 10, color: context.textSecondary)),
+      ],
     );
   }
 }

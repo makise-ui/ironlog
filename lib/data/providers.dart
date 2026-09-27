@@ -51,6 +51,9 @@ final routinesProvider = StreamProvider<List<RoutineModel>>((ref) {
   return ref.watch(routineRepositoryProvider).watchRoutines();
 });
 
+/// OpenGym-style Ultra-Dense / Compact Set Logging View Mode
+final compactWorkoutModeProvider = StateProvider<bool>((ref) => false);
+
 final weightUnitNotifierProvider = StateNotifierProvider<WeightUnitNotifier, WeightUnit>((ref) {
   final repo = ref.watch(settingsRepositoryProvider);
   return WeightUnitNotifier(repo);
