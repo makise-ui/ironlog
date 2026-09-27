@@ -60,6 +60,9 @@ class _IronLogAppState extends ConsumerState<IronLogApp> {
   void initState() {
     super.initState();
     _initWidgetNavigation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(exerciseRepositoryProvider).seedOpenGymCatalog();
+    });
   }
 
   void _initWidgetNavigation() {
