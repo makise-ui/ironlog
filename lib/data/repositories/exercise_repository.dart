@@ -298,58 +298,78 @@ class ExerciseRepository {
               lowerName.contains('barbell row');
 
           // Rest time
-          int restSeconds = 90;
-          if (isHeavyCompound) {
-            restSeconds = 120;
-          } else if (isPressOrRow) {
-            restSeconds = 90;
-          } else if (mgId == 'core' || mgId == 'cardio' || isHold) {
-            restSeconds = 45;
-          } else if (eqStr == 'cable' || mgId == 'biceps' || mgId == 'triceps' || mgId == 'forearms') {
-            restSeconds = 60;
+          final jsonRest = (item['restSeconds'] as num?)?.toInt();
+          int restSeconds = jsonRest ?? 90;
+          if (jsonRest == null) {
+            if (isHeavyCompound) {
+              restSeconds = 120;
+            } else if (isPressOrRow) {
+              restSeconds = 90;
+            } else if (mgId == 'core' || mgId == 'cardio' || isHold) {
+              restSeconds = 45;
+            } else if (eqStr == 'cable' || mgId == 'biceps' || mgId == 'triceps' || mgId == 'forearms') {
+              restSeconds = 60;
+            }
           }
 
           // Rep ranges
-          int repMin = 8;
-          int repMax = 12;
-          if (isHeavyCompound) {
-            repMin = 5;
-            repMax = 8;
-          } else if (isPressOrRow) {
-            repMin = 6;
-            repMax = 10;
-          } else if (mgId == 'core' || mgId == 'cardio') {
-            repMin = 12;
-            repMax = 20;
-          } else if (eqStr == 'cable' || lowerName.contains('raise') || lowerName.contains('fly')) {
-            repMin = 10;
-            repMax = 15;
+          final jsonRepMin = (item['repMin'] as num?)?.toInt();
+          final jsonRepMax = (item['repMax'] as num?)?.toInt();
+          int repMin = jsonRepMin ?? 8;
+          int repMax = jsonRepMax ?? 12;
+          if (jsonRepMin == null) {
+            if (isHeavyCompound) {
+              repMin = 5;
+              repMax = 8;
+            } else if (isPressOrRow) {
+              repMin = 6;
+              repMax = 10;
+            } else if (mgId == 'core' || mgId == 'cardio') {
+              repMin = 12;
+              repMax = 20;
+            } else if (eqStr == 'cable' || lowerName.contains('raise') || lowerName.contains('fly')) {
+              repMin = 10;
+              repMax = 15;
+            }
           }
 
           // Weight step
-          double weightStep = 2.5;
-          if (eqStr == 'machine') {
-            weightStep = 5.0;
-          } else if (eqStr == 'bodyweight') {
-            weightStep = 0.0;
+          final jsonStep = (item['weightStep'] as num?)?.toDouble();
+          double weightStep = jsonStep ?? 2.5;
+          if (jsonStep == null) {
+            if (eqStr == 'machine') {
+              weightStep = 5.0;
+            } else if (eqStr == 'bodyweight') {
+              weightStep = 0.0;
+            }
           }
 
           // Load mode
-          String loadMode = 'total';
-          if (eqStr == 'bodyweight') {
-            loadMode = 'bodyweight';
-          } else if (eqStr == 'assisted') {
-            loadMode = 'assisted';
-          } else if (eqStr == 'dumbbell') {
-            loadMode = 'per_hand';
+          final jsonLoadMode = item['loadMode'] as String?;
+          String loadMode = jsonLoadMode ?? 'total';
+          if (jsonLoadMode == null) {
+            if (eqStr == 'bodyweight') {
+              loadMode = 'bodyweight';
+            } else if (eqStr == 'assisted') {
+              loadMode = 'assisted';
+            } else if (eqStr == 'dumbbell') {
+              loadMode = 'per_hand';
+            }
           }
 
+          // Unilateral
+          final jsonUnilateral = item['isUnilateral'] as bool?;
+          final isUnilateralFinal = jsonUnilateral ?? isUnilateral;
+
           // Custom tracking type
-          String? trackingType;
-          if (isHold) {
-            trackingType = ExerciseTrackingType.duration.name;
-          } else if (eqStr == 'bodyweight' && (mgId == 'core' || mgId == 'cardio')) {
-            trackingType = ExerciseTrackingType.bodyweightReps.name;
+          final jsonTrackingType = item['trackingType'] as String?;
+          String? trackingType = jsonTrackingType;
+          if (trackingType == null) {
+            if (isHold) {
+              trackingType = ExerciseTrackingType.duration.name;
+            } else if (eqStr == 'bodyweight' && (mgId == 'core' || mgId == 'cardio')) {
+              trackingType = ExerciseTrackingType.bodyweightReps.name;
+            }
           }
 
           final existingEx = existingByName[name.toLowerCase()] ?? (id.isNotEmpty ? existingById[id] : null);
@@ -359,7 +379,7 @@ class ExerciseRepository {
               await (_db.update(_db.exercises)..where((t) => t.id.equals(existingEx.id))).write(
                 ExercisesCompanion(
                   loadMode: Value(loadMode),
-                  isUnilateral: Value(isUnilateral),
+                  isUnilateral: Value(isUnilateralFinal),
                   weightStep: Value(weightStep),
                   repMin: Value(repMin),
                   repMax: Value(repMax),
@@ -379,7 +399,7 @@ class ExerciseRepository {
               secondaryGroups: Value(secList.join(',')),
               equipment: eqStr,
               loadMode: Value(loadMode),
-              isUnilateral: Value(isUnilateral),
+              isUnilateral: Value(isUnilateralFinal),
               weightStep: Value(weightStep),
               repMin: Value(repMin),
               repMax: Value(repMax),
@@ -397,7 +417,7 @@ class ExerciseRepository {
             secondaryGroups: secList.join(','),
             equipment: eqStr,
             loadMode: loadMode,
-            isUnilateral: isUnilateral,
+            isUnilateral: isUnilateralFinal,
             weightStep: weightStep,
             repMin: repMin,
             repMax: repMax,
