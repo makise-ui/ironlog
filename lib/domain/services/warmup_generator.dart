@@ -37,9 +37,20 @@ class WarmupGenerator {
 
     final proposals = <WarmupSetProposal>[];
 
-    if (isBarbell && targetWeight >= (barWeight + 20.0)) {
-      // 4-stage Olympic Barbell ramp
-      // 1. Empty Bar
+    if (isBarbell) {
+      if (targetWeight <= barWeight) {
+        // Target is at or below bar weight: empty bar mobilization only
+        proposals.add(WarmupSetProposal(
+          setIndex: 1,
+          weight: barWeight,
+          reps: 10,
+          percentage: 100.0,
+          label: 'Empty Bar Mobilization',
+        ));
+        return proposals;
+      }
+
+      // 1. Empty Bar Mobilization
       proposals.add(WarmupSetProposal(
         setIndex: 1,
         weight: barWeight,
@@ -48,40 +59,55 @@ class WarmupGenerator {
         label: 'Empty Bar Mobilization',
       ));
 
-      // 2. 50% Target
-      final w50 = _roundToStep(targetWeight * 0.50, weightStep);
-      if (w50 > barWeight) {
-        proposals.add(WarmupSetProposal(
-          setIndex: proposals.length + 1,
-          weight: w50,
-          reps: 5,
-          percentage: 50.0,
-          label: 'Pattern Priming',
-        ));
-      }
+      if (targetWeight >= (barWeight + 20.0)) {
+        // 4-stage Olympic Barbell ramp
+        // 2. 50% Target
+        final w50 = _roundToStep(targetWeight * 0.50, weightStep);
+        if (w50 > barWeight) {
+          proposals.add(WarmupSetProposal(
+            setIndex: proposals.length + 1,
+            weight: w50,
+            reps: 5,
+            percentage: 50.0,
+            label: 'Pattern Priming',
+          ));
+        }
 
-      // 3. 70% Target
-      final w70 = _roundToStep(targetWeight * 0.70, weightStep);
-      if (w70 > (proposals.lastOrNull?.weight ?? 0)) {
-        proposals.add(WarmupSetProposal(
-          setIndex: proposals.length + 1,
-          weight: w70,
-          reps: 3,
-          percentage: 70.0,
-          label: 'CNS Preparation',
-        ));
-      }
+        // 3. 70% Target
+        final w70 = _roundToStep(targetWeight * 0.70, weightStep);
+        if (w70 > (proposals.lastOrNull?.weight ?? 0)) {
+          proposals.add(WarmupSetProposal(
+            setIndex: proposals.length + 1,
+            weight: w70,
+            reps: 3,
+            percentage: 70.0,
+            label: 'CNS Preparation',
+          ));
+        }
 
-      // 4. 85% Target
-      final w85 = _roundToStep(targetWeight * 0.85, weightStep);
-      if (w85 > (proposals.lastOrNull?.weight ?? 0) && w85 < targetWeight) {
-        proposals.add(WarmupSetProposal(
-          setIndex: proposals.length + 1,
-          weight: w85,
-          reps: 1,
-          percentage: 85.0,
-          label: 'Neural Potentiation',
-        ));
+        // 4. 85% Target
+        final w85 = _roundToStep(targetWeight * 0.85, weightStep);
+        if (w85 > (proposals.lastOrNull?.weight ?? 0) && w85 < targetWeight) {
+          proposals.add(WarmupSetProposal(
+            setIndex: proposals.length + 1,
+            weight: w85,
+            reps: 1,
+            percentage: 85.0,
+            label: 'Neural Potentiation',
+          ));
+        }
+      } else {
+        // Light barbell ramp: one single acclimation set between bar weight and target
+        final wMid = _roundToStep((barWeight + targetWeight) / 2.0, weightStep);
+        if (wMid > barWeight && wMid < targetWeight) {
+          proposals.add(WarmupSetProposal(
+            setIndex: proposals.length + 1,
+            weight: wMid,
+            reps: 4,
+            percentage: (wMid / targetWeight) * 100,
+            label: 'Acclimatization',
+          ));
+        }
       }
     } else {
       // Dumbbells / Cables / Machines / Lighter compound ramp

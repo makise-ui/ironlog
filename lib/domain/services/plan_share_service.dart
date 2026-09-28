@@ -93,7 +93,14 @@ class PlanShareService {
         if (exId == null) {
           exId = _uuid.v4();
           final muscle = itemMap['muscle'] as String? ?? CsvImportService.inferMuscleGroup(exName);
-          final (eq, lm, step) = CsvImportService.inferEquipment(exName);
+          final inferred = CsvImportService.inferEquipment(exName);
+          final rawEq = (itemMap['equipment'] as String?)?.trim();
+          final rawLm = (itemMap['loadMode'] as String?)?.trim();
+          final rawStep = (itemMap['weightStep'] as num?)?.toDouble();
+
+          final eq = (rawEq != null && rawEq.isNotEmpty) ? rawEq : inferred.$1;
+          final lm = (rawLm != null && rawLm.isNotEmpty) ? rawLm : inferred.$2;
+          final step = (rawStep != null && rawStep > 0) ? rawStep : inferred.$3;
 
           await db.into(db.exercises).insert(
                 ExercisesCompanion.insert(

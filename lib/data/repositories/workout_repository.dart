@@ -720,10 +720,14 @@ class WorkoutRepository {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final startDate = today.subtract(Duration(days: days - 1));
+    final startDate = DateTime(today.year, today.month, today.day - (days - 1));
 
     final query = _db.select(_db.sets)
-      ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(startDate))
+      ..where((t) =>
+          t.archived.equals(false) &
+          t.setType.equals('warmup').not() &
+          (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0)) &
+          t.date.isBiggerOrEqualValue(startDate))
       ..orderBy([(t) => OrderingTerm(expression: t.date, mode: OrderingMode.asc)]);
     final rows = await query.get();
 
@@ -731,16 +735,24 @@ class WorkoutRepository {
     final Map<DateTime, int> setsMap = {};
 
     for (int i = 0; i < days; i++) {
-      final d = startDate.add(Duration(days: i));
-      final norm = DateTime(d.year, d.month, d.day);
+      final norm = DateTime(startDate.year, startDate.month, startDate.day + i);
       volumeMap[norm] = 0.0;
       setsMap[norm] = 0;
     }
 
+    final weRows = await _db.select(_db.workoutExercises).get();
+    final weMap = {for (final e in weRows) e.id: e.exerciseId};
+    final exRows = await _db.select(_db.exercises).get();
+    final exMap = {for (final e in exRows) e.id: e};
+
     for (final s in rows) {
       final norm = DateTime(s.date.year, s.date.month, s.date.day);
       if (volumeMap.containsKey(norm)) {
-        volumeMap[norm] = (volumeMap[norm] ?? 0.0) + (s.weight * s.reps);
+        final exId = weMap[s.workoutExerciseId];
+        final ex = exMap[exId];
+        final isPerHand = ex?.loadMode == 'per_hand' || ex?.equipment == 'dumbbell';
+        final multiplier = isPerHand ? 2.0 : 1.0;
+        volumeMap[norm] = (volumeMap[norm] ?? 0.0) + (s.weight * s.reps * multiplier);
         setsMap[norm] = (setsMap[norm] ?? 0) + 1;
       }
     }
@@ -758,10 +770,14 @@ class WorkoutRepository {
   Future<Map<String, int>> getMuscleGroupBreakdown({int days = 30}) async {
 
     final now = DateTime.now();
-    final cutoff = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+    final cutoff = DateTime(now.year, now.month, now.day - days);
 
     final query = _db.select(_db.sets)
-      ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff));
+      ..where((t) =>
+          t.archived.equals(false) &
+          t.setType.equals('warmup').not() &
+          (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0)) &
+          t.date.isBiggerOrEqualValue(cutoff));
     final rows = await query.get();
 
     final mgQuery = await _db.select(_db.muscleGroups).get();
@@ -873,9 +889,14 @@ class WorkoutRepository {
 
   /// Analytics: Get recent working sets for effort/RIR and volume analysis
   Future<List<SetModel>> getRecentWorkingSets({int days = 30}) async {
-    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final now = DateTime.now();
+    final cutoff = DateTime(now.year, now.month, now.day - days);
     final setsQuery = _db.select(_db.sets)
-      ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff))
+      ..where((t) =>
+          t.archived.equals(false) &
+          t.setType.equals('warmup').not() &
+          (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0)) &
+          t.date.isBiggerOrEqualValue(cutoff))
       ..orderBy([(t) => OrderingTerm.desc(t.date)]);
     final rows = await setsQuery.get();
     return rows.map(_mapSet).toList();
@@ -884,23 +905,37 @@ class WorkoutRepository {
   /// Analytics: Overview metrics
   Future<AnalyticsOverviewData> getAnalyticsOverview() async {
 
-    final sets = await (_db.select(_db.sets)..where((t) => t.archived.equals(false))).get();
+    final sets = await (_db.select(_db.sets)
+          ..where((t) =>
+              t.archived.equals(false) &
+              t.setType.equals('warmup').not() &
+              (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0))))
+        .get();
     final allWorkouts = await (_db.select(_db.workouts)..where((t) => t.archived.equals(false))).get();
 
     final activeSetWorkouts = await _db.customSelect(
       'SELECT DISTINCT we.workout_id FROM sets s '
       'INNER JOIN workout_exercises we ON s.workout_exercise_id = we.id '
-      'WHERE s.archived = 0 AND (s.reps > 0 OR s.weight > 0)',
+      'WHERE s.archived = 0 AND s.set_type != \'warmup\' AND (s.reps > 0 OR s.weight > 0)',
     ).get();
     final workoutIdsWithCompletedSets = activeSetWorkouts.map((row) => row.read<String>('workout_id')).toSet();
 
     final workouts = allWorkouts.where((w) => workoutIdsWithCompletedSets.contains(w.id) && !w.title.toLowerCase().contains('rest')).toList();
     final restWorkouts = allWorkouts.where((w) => w.title.toLowerCase().contains('rest')).toList();
 
+    final weRows = await _db.select(_db.workoutExercises).get();
+    final weMap = {for (final e in weRows) e.id: e.exerciseId};
+    final exRows = await _db.select(_db.exercises).get();
+    final exMap = {for (final e in exRows) e.id: e};
+
     double totalVol = 0.0;
     int totalReps = 0;
     for (final s in sets) {
-      totalVol += (s.weight * s.reps);
+      final exId = weMap[s.workoutExerciseId];
+      final ex = exMap[exId];
+      final isPerHand = ex?.loadMode == 'per_hand' || ex?.equipment == 'dumbbell';
+      final multiplier = isPerHand ? 2.0 : 1.0;
+      totalVol += (s.weight * s.reps * multiplier);
       totalReps += s.reps;
     }
 
@@ -913,11 +948,11 @@ class WorkoutRepository {
     final now = DateTime.now();
     DateTime checkDate = DateTime(now.year, now.month, now.day);
     if (!activeOrRestDates.contains(checkDate)) {
-      checkDate = checkDate.subtract(const Duration(days: 1));
+      checkDate = DateTime(checkDate.year, checkDate.month, checkDate.day - 1);
     }
     while (activeOrRestDates.contains(checkDate)) {
       streak++;
-      checkDate = checkDate.subtract(const Duration(days: 1));
+      checkDate = DateTime(checkDate.year, checkDate.month, checkDate.day - 1);
     }
 
     return AnalyticsOverviewData(
@@ -1164,9 +1199,8 @@ class WorkoutRepository {
   Future<StreakAndWeekData> getStreakAndWeekData() async {
 
     final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
-    final weekStart = DateTime(monday.year, monday.month, monday.day);
-    final weekEnd = weekStart.add(const Duration(days: 7));
+    final weekStart = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    final weekEnd = DateTime(weekStart.year, weekStart.month, weekStart.day + 7);
 
     final weekWorkouts = await (_db.select(_db.workouts)
           ..where((t) => t.date.isBiggerOrEqualValue(weekStart) & t.date.isSmallerThanValue(weekEnd) & t.archived.equals(false)))
@@ -1175,7 +1209,7 @@ class WorkoutRepository {
     final activeSetWorkouts = await _db.customSelect(
       'SELECT DISTINCT we.workout_id FROM sets s '
       'INNER JOIN workout_exercises we ON s.workout_exercise_id = we.id '
-      'WHERE s.archived = 0 AND (s.reps > 0 OR s.weight > 0)',
+      'WHERE s.archived = 0 AND s.set_type != \'warmup\' AND (s.reps > 0 OR s.weight > 0)',
     ).get();
     final workoutIdsWithCompletedSets = activeSetWorkouts.map((row) => row.read<String>('workout_id')).toSet();
 
@@ -1200,11 +1234,11 @@ class WorkoutRepository {
     int streak = 0;
     DateTime checkDate = DateTime(now.year, now.month, now.day);
     if (!activeOrRestDates.contains(checkDate)) {
-      checkDate = checkDate.subtract(const Duration(days: 1));
+      checkDate = DateTime(checkDate.year, checkDate.month, checkDate.day - 1);
     }
     while (activeOrRestDates.contains(checkDate)) {
       streak++;
-      checkDate = checkDate.subtract(const Duration(days: 1));
+      checkDate = DateTime(checkDate.year, checkDate.month, checkDate.day - 1);
     }
 
     final nonRestCount = weekWorkouts
@@ -1222,8 +1256,14 @@ class WorkoutRepository {
   Future<Map<String, double>> getAvgRepsPerMuscleGroup({int days = 30}) async {
 
     final now = DateTime.now();
-    final cutoff = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
-    final rows = await (_db.select(_db.sets)..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff))).get();
+    final cutoff = DateTime(now.year, now.month, now.day - days);
+    final rows = await (_db.select(_db.sets)
+          ..where((t) =>
+              t.archived.equals(false) &
+              t.setType.equals('warmup').not() &
+              (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0)) &
+              t.date.isBiggerOrEqualValue(cutoff)))
+        .get();
     final mgQuery = await _db.select(_db.muscleGroups).get();
     final mgNameMap = {for (final m in mgQuery) m.id: m.name};
     final Map<String, List<int>> repsByMg = {};
@@ -1240,15 +1280,15 @@ class WorkoutRepository {
     final now = DateTime.now();
     final result = <WeeklyFrequencyStat>[];
     for (int w = weeks - 1; w >= 0; w--) {
-      final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1 + w * 7));
-      final weekEnd = weekStart.add(const Duration(days: 7));
+      final weekStart = DateTime(now.year, now.month, now.day - (now.weekday - 1 + w * 7));
+      final weekEnd = DateTime(weekStart.year, weekStart.month, weekStart.day + 7);
       final rows = await (_db.select(_db.workouts)
             ..where((t) => t.date.isBiggerOrEqualValue(weekStart) & t.date.isSmallerThanValue(weekEnd) & t.archived.equals(false)))
           .get();
       final activeSetRows = await _db.customSelect(
         'SELECT DISTINCT we.workout_id FROM sets s '
         'INNER JOIN workout_exercises we ON s.workout_exercise_id = we.id '
-        'WHERE s.archived = 0 AND (s.reps > 0 OR s.weight > 0)',
+        'WHERE s.archived = 0 AND s.set_type != \'warmup\' AND (s.reps > 0 OR s.weight > 0)',
       ).get();
       final activeIds = activeSetRows.map((r) => r.read<String>('workout_id')).toSet();
       final activeCount = rows.where((r) => activeIds.contains(r.id) && !r.title.toLowerCase().contains('rest')).length;
@@ -1261,18 +1301,27 @@ class WorkoutRepository {
   Future<List<ExerciseVolumeStat>> getTopExercisesByVolume({int days = 30, int limit = 5}) async {
 
     final now = DateTime.now();
-    final cutoff = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
-    final rows = await (_db.select(_db.sets)..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff))).get();
+    final cutoff = DateTime(now.year, now.month, now.day - days);
+    final rows = await (_db.select(_db.sets)
+          ..where((t) =>
+              t.archived.equals(false) &
+              t.setType.equals('warmup').not() &
+              (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0)) &
+              t.date.isBiggerOrEqualValue(cutoff)))
+        .get();
     final exRows = await _db.select(_db.exercises).get();
-    final exMap = {for (final e in exRows) e.id: e.name};
+    final exMap = {for (final e in exRows) e.id: e};
     final weRows = await _db.select(_db.workoutExercises).get();
     final weMap = {for (final e in weRows) e.id: e.exerciseId};
     final Map<String, double> volByEx = {};
     final Map<String, int> setsByEx = {};
     for (final s in rows) {
       final exId = weMap[s.workoutExerciseId] ?? '';
-      final name = exMap[exId] ?? 'Unknown';
-      volByEx[name] = (volByEx[name] ?? 0) + s.weight * s.reps;
+      final ex = exMap[exId];
+      final name = ex?.name ?? 'Unknown';
+      final isPerHand = ex?.loadMode == 'per_hand' || ex?.equipment == 'dumbbell';
+      final multiplier = isPerHand ? 2.0 : 1.0;
+      volByEx[name] = (volByEx[name] ?? 0) + (s.weight * s.reps * multiplier);
       setsByEx[name] = (setsByEx[name] ?? 0) + 1;
     }
     final sorted = volByEx.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -1283,7 +1332,7 @@ class WorkoutRepository {
   Future<double> getAvgWorkoutDurationMinutes({int days = 30}) async {
 
     final now = DateTime.now();
-    final cutoff = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+    final cutoff = DateTime(now.year, now.month, now.day - days);
     final rows = await (_db.select(_db.workouts)
           ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff)))
         .get();
@@ -1296,8 +1345,14 @@ class WorkoutRepository {
   Future<List<BestSetStat>> getBestSetsPerExercise({int days = 30, int limit = 8}) async {
 
     final now = DateTime.now();
-    final cutoff = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
-    final rows = await (_db.select(_db.sets)..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff))).get();
+    final cutoff = DateTime(now.year, now.month, now.day - days);
+    final rows = await (_db.select(_db.sets)
+          ..where((t) =>
+              t.archived.equals(false) &
+              t.setType.equals('warmup').not() &
+              (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0)) &
+              t.date.isBiggerOrEqualValue(cutoff)))
+        .get();
     final exRows = await _db.select(_db.exercises).get();
     final exMap = {for (final e in exRows) e.id: e.name};
     final weRows = await _db.select(_db.workoutExercises).get();
@@ -1320,9 +1375,13 @@ class WorkoutRepository {
   Future<List<RepRangeStat>> getRepRangeDistribution({int days = 30}) async {
 
     final now = DateTime.now();
-    final cutoff = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+    final cutoff = DateTime(now.year, now.month, now.day - days);
     final rows = await (_db.select(_db.sets)
-          ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff)))
+          ..where((t) =>
+              t.archived.equals(false) &
+              t.setType.equals('warmup').not() &
+              (t.reps.isBiggerThanValue(0) | t.weight.isBiggerThanValue(0)) &
+              t.date.isBiggerOrEqualValue(cutoff)))
         .get();
 
     int strength = 0; // 1-5 reps

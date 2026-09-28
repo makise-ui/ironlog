@@ -101,12 +101,13 @@ class PlateCalculator {
     final sortedPlates = List<PlateSpec>.from(plates)..sort((a, b) => b.weight.compareTo(a.weight));
 
     if (targetWeight <= barWeight) {
+      final deficit = double.parse((targetWeight - barWeight).toStringAsFixed(2));
       return PlateCalculationResult(
         targetWeight: targetWeight,
         barWeight: barWeight,
         weightPerSide: 0.0,
         totalLoadedWeight: barWeight,
-        remainder: 0.0,
+        remainder: deficit,
         isExact: targetWeight == barWeight,
         platesPerSide: const [],
         individualPlatesPerSide: const [],

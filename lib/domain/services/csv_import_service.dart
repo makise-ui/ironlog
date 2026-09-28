@@ -253,7 +253,9 @@ class CsvImportService {
 
       final weightRaw = _getField(row, colMap['weightKg']).isNotEmpty
           ? _getField(row, colMap['weightKg'])
-          : _getField(row, colMap['weight']);
+          : _getField(row, colMap['weightLb']).isNotEmpty
+              ? _getField(row, colMap['weightLb'])
+              : _getField(row, colMap['weight']);
 
       final isLb = _getField(row, colMap['weightLb']).isNotEmpty ||
           _getField(row, colMap['weightUnit']).toLowerCase().contains('lb');

@@ -39,8 +39,9 @@ class StrengthDecayService {
     double weightStep = 2.5,
   }) {
     final currentDate = now ?? DateTime.now();
-    final difference = currentDate.difference(lastTrainedDate);
-    final daysElapsed = math.max(0, difference.inDays);
+    final currentMidnight = DateTime(currentDate.year, currentDate.month, currentDate.day);
+    final lastMidnight = DateTime(lastTrainedDate.year, lastTrainedDate.month, lastTrainedDate.day);
+    final daysElapsed = math.max(0, currentMidnight.difference(lastMidnight).inDays);
 
     double decay = 1.0;
     if (daysElapsed > plateauDays) {

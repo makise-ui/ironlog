@@ -1595,12 +1595,18 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                   ),
                 ),
                 child: Text(
-                  set.weight > 0 ? '+${UnitConverter.formatWeight(set.weight, unit: widget.unit, includeUnit: false)}' : 'BW',
+                  set.weight > 0
+                      ? '+${UnitConverter.formatWeight(set.weight, unit: widget.unit, includeUnit: false)}'
+                      : (set.weight < 0
+                          ? '-${UnitConverter.formatWeight(set.weight.abs(), unit: widget.unit, includeUnit: false)}'
+                          : 'BW'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: isWeightActive ? context.accent : (set.weight > 0 ? context.textPrimary : context.textSecondary),
+                    color: isWeightActive
+                        ? context.accent
+                        : (set.weight != 0 ? context.textPrimary : context.textSecondary),
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -2124,7 +2130,11 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                   ),
                 ),
                 child: Text(
-                  effectiveW > 0 ? '+${UnitConverter.formatWeight(effectiveW, unit: widget.unit, includeUnit: false)}' : '+0',
+                  effectiveW > 0
+                      ? '+${UnitConverter.formatWeight(effectiveW, unit: widget.unit, includeUnit: false)}'
+                      : (effectiveW < 0
+                          ? '-${UnitConverter.formatWeight(effectiveW.abs(), unit: widget.unit, includeUnit: false)}'
+                          : '+0'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
