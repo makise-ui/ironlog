@@ -292,7 +292,7 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Need a custom routine? Agnes AI designs science-based splits personalized to you.',
+                                    'Need a custom routine? The AI Coach designs science-based splits personalized to you.',
                                     style: TextStyle(fontSize: 11.5, color: context.textSecondary, height: 1.3),
                                   ),
                                 ],

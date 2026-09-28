@@ -169,7 +169,7 @@ class _CreatePresetSheetState extends ConsumerState<CreatePresetSheet> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Let Agnes AI Build Your Routine',
+                              'Let AI Build Your Routine',
                               style: TextStyle(
                                 fontFamily: AppTypography.fontFamily,
                                 fontWeight: FontWeight.w800,
@@ -182,7 +182,7 @@ class _CreatePresetSheetState extends ConsumerState<CreatePresetSheet> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Don\'t know which exercises to pick? Agnes can formulate an evidence-based workout split based on your target muscle focus and equipment.',
+                        'Don\'t know which exercises to pick? The AI Coach can formulate an evidence-based workout split based on your target muscle focus and equipment.',
                         style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.35),
                       ),
                       const SizedBox(height: 10),
