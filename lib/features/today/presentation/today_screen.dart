@@ -39,10 +39,10 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/scale_tap.dart';
 import 'widgets/today_hero_session_card.dart';
 import 'widgets/this_week_progress_bar.dart';
-import 'widgets/section_header.dart';
 import 'widgets/routine_card.dart';
 import '../../routines/presentation/create_preset_sheet.dart';
 import '../../intro/presentation/onboarding_sheet.dart';
+import 'widgets/routine_qr_share_dialog.dart';
 
 class _NextTargetInfo {
   final WorkoutExerciseItem exerciseItem;
@@ -552,6 +552,19 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     );
   }
 
+  void _shareRoutineQr(RoutineModel? routine) {
+    AppHaptics.tap();
+    final db = ref.read(databaseProvider);
+    RoutineQrShareDialog.show(
+      context,
+      routineToShare: routine,
+      db: db,
+      onRoutineImported: (imported) {
+        _refreshWorkout();
+      },
+    );
+  }
+
   void _openCopySession() async {
     AppHaptics.tap();
     await _ensureWorkoutCreated();
@@ -659,15 +672,38 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: context.cardBorder),
           ),
-          title: Text(
-            'Load "${routine.name}"?',
-            style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Load "${routine.name}"?',
+                  style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.qr_code_2_rounded, color: context.accent, size: 22),
+                tooltip: 'Share Routine via QR',
+                onPressed: () {
+                  Navigator.pop(ctx, 'qr');
+                  _shareRoutineQr(routine);
+                },
+              ),
+            ],
           ),
           content: Text(
             'Your session already has ${activeExercises.length} active exercise(s). Would you like to append these ${routine.items.length} exercises or replace the current session?',
             style: TextStyle(color: context.textSecondary, fontSize: 13),
           ),
           actions: [
+            TextButton.icon(
+              icon: Icon(Icons.qr_code_2_rounded, size: 16, color: context.accent),
+              label: Text('Share QR', style: TextStyle(color: context.accent, fontSize: 13, fontWeight: FontWeight.w600)),
+              onPressed: () {
+                Navigator.pop(ctx, 'qr');
+                _shareRoutineQr(routine);
+              },
+            ),
+            const SizedBox(width: 8),
             TextButton(
               onPressed: () => Navigator.pop(ctx, 'cancel'),
               child: Text('Cancel', style: TextStyle(color: context.textTertiary)),
@@ -689,7 +725,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         ),
       );
 
-      if (choice == null || choice == 'cancel' || !mounted) return;
+      if (choice == null || choice == 'cancel' || choice == 'qr' || !mounted) return;
 
       if (choice == 'replace') {
         final repo = ref.read(workoutRepositoryProvider);
@@ -707,15 +743,38 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: context.cardBorder),
           ),
-          title: Text(
-            'Load "${routine.name}"?',
-            style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Load "${routine.name}"?',
+                  style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.qr_code_2_rounded, color: context.accent, size: 22),
+                tooltip: 'Share Routine via QR',
+                onPressed: () {
+                  Navigator.pop(ctx, false);
+                  _shareRoutineQr(routine);
+                },
+              ),
+            ],
           ),
           content: Text(
             'Load ${routine.items.length} exercise(s) into today\'s session:\n• ${routine.items.map((i) => i.exercise.name).join('\n• ')}\n\nThe timer will only start when you tap Start or log a set.',
             style: TextStyle(color: context.textSecondary, fontSize: 13),
           ),
           actions: [
+            TextButton.icon(
+              icon: Icon(Icons.qr_code_2_rounded, size: 16, color: context.accent),
+              label: Text('Share QR', style: TextStyle(color: context.accent, fontSize: 13, fontWeight: FontWeight.w600)),
+              onPressed: () {
+                Navigator.pop(ctx, false);
+                _shareRoutineQr(routine);
+              },
+            ),
+            const SizedBox(width: 8),
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text('Cancel', style: TextStyle(color: context.textTertiary)),
@@ -2231,6 +2290,41 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   children: [
                     ScaleTap(
                       onPressed: () {
+                        AppHaptics.selection();
+                        ref.read(compactWorkoutModeProvider.notifier).state = !isCompact;
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isCompact ? context.accent.withValues(alpha: 0.18) : C.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isCompact ? context.accent : C.hairline),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isCompact ? Icons.density_small_rounded : Icons.density_medium_rounded,
+                              size: 14,
+                              color: isCompact ? context.accent : C.text2,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isCompact ? 'Compact' : 'Standard',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: isCompact ? context.accent : C.text2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ScaleTap(
+                      onPressed: () {
                         AppHaptics.tap();
                         context.push('/nutrition');
                       },
@@ -2530,10 +2624,55 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: S.xl),
-            child: SectionHeader(
-              'YOUR ROUTINES',
-              action: 'See all',
-              onAction: _openRoutines,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'YOUR ROUTINES',
+                  style: T.label.copyWith(color: C.text2),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ScaleTap(
+                      onPressed: () => _shareRoutineQr(null),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.qr_code_2_rounded, size: 15, color: C.accent),
+                            const SizedBox(width: 4),
+                            Text(
+                              'QR Share',
+                              style: T.body.copyWith(
+                                color: C.accent,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ScaleTap(
+                      onPressed: _openRoutines,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                        child: Text(
+                          'See all',
+                          style: T.body.copyWith(
+                            color: C.accent,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
