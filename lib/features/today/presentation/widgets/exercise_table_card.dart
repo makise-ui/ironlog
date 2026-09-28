@@ -548,6 +548,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ExerciseVisualThumbnail(
+                  exerciseId: ex.id,
                   exerciseName: ex.name,
                   imagePath: ex.imagePath,
                   muscleGroupId: ex.muscleGroupId,

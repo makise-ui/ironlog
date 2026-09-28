@@ -463,6 +463,7 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                                 Stack(
                                   children: [
                                     ExerciseVisualThumbnail(
+                                      exerciseId: ex.id,
                                       exerciseName: ex.name,
                                       imagePath: ex.imagePath,
                                       muscleGroupId: ex.muscleGroupId,

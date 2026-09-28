@@ -7,6 +7,7 @@ import '../../../core/widgets/glass_button.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/exercise_model.dart';
 import '../../today/presentation/exercise_picker_sheet.dart';
+import '../../today/presentation/widgets/ai_assistant_sheet.dart';
 
 class CreatePresetSheet extends ConsumerStatefulWidget {
   const CreatePresetSheet({super.key});
@@ -136,6 +137,85 @@ class _CreatePresetSheetState extends ConsumerState<CreatePresetSheet> {
               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
+                // AI Routine Builder Banner
+                Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.accentViolet.withValues(alpha: 0.16),
+                        context.accent.withValues(alpha: 0.08),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.35), width: 1.2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentViolet.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.auto_awesome_rounded, color: AppColors.accentViolet, size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Let Agnes AI Build Your Routine',
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13.5,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Don\'t know which exercises to pick? Agnes can formulate an evidence-based workout split based on your target muscle focus and equipment.',
+                        style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.35),
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentViolet,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            AppHaptics.tap();
+                            Navigator.pop(context);
+                            AiAssistantSheet.show(
+                              context,
+                              initialPrompt:
+                                  'Can you design a balanced, evidence-based workout routine for me? Ask me any questions you need about my weekly frequency, training experience, and available gym equipment.',
+                            );
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
+                          label: const Text(
+                            'Ask AI Coach',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 // Preset Name
                 Text(
                   'PRESET NAME',

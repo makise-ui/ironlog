@@ -135,4 +135,89 @@ class PlanShareService {
     final allRoutines = await routineRepo.getRoutines();
     return allRoutines.firstWhere((r) => r.id == newRoutineId);
   }
+
+  /// Parses a QR payload or JSON string into a preview model without modifying the database
+  static RoutinePreviewModel parsePreview(String payload) {
+    final Map<String, dynamic> data = jsonDecode(payload.trim());
+
+    if (!data.containsKey('ironlog_plan') && !data.containsKey('title')) {
+      throw const FormatException('Invalid routine format: Missing required IronLog plan headers.');
+    }
+
+    final title = data['title'] as String? ?? 'Imported Routine';
+    final description = data['description'] as String? ?? '';
+    final unit = data['unit'] as String? ?? 'kg';
+    final rawExercises = data['exercises'] as List<dynamic>? ?? [];
+
+    if (rawExercises.isEmpty) {
+      throw const FormatException('Routine contains no exercises.');
+    }
+
+    final exercises = rawExercises.map((raw) {
+      final map = raw as Map<String, dynamic>;
+      final exName = (map['name'] as String? ?? 'Exercise').trim();
+      final muscle = map['muscle'] as String? ?? CsvImportService.inferMuscleGroup(exName);
+      final (eq, _, _) = CsvImportService.inferEquipment(exName);
+      final eqName = map['equipment'] as String? ?? eq;
+      final sets = (map['sets'] as num?)?.toInt() ?? 3;
+      final repMin = (map['repMin'] as num?)?.toInt() ?? 8;
+      final repMax = (map['repMax'] as num?)?.toInt() ?? 12;
+      final rest = (map['rest'] as num?)?.toInt() ?? 90;
+
+      return RoutinePreviewExercise(
+        name: exName,
+        muscle: muscle,
+        equipment: eqName,
+        sets: sets,
+        repMin: repMin,
+        repMax: repMax,
+        rest: rest,
+      );
+    }).toList();
+
+    return RoutinePreviewModel(
+      title: title,
+      description: description,
+      unit: unit,
+      exercises: exercises,
+      rawPayload: payload,
+    );
+  }
 }
+
+class RoutinePreviewExercise {
+  final String name;
+  final String muscle;
+  final String equipment;
+  final int sets;
+  final int repMin;
+  final int repMax;
+  final int rest;
+
+  const RoutinePreviewExercise({
+    required this.name,
+    required this.muscle,
+    required this.equipment,
+    required this.sets,
+    required this.repMin,
+    required this.repMax,
+    required this.rest,
+  });
+}
+
+class RoutinePreviewModel {
+  final String title;
+  final String description;
+  final String unit;
+  final List<RoutinePreviewExercise> exercises;
+  final String rawPayload;
+
+  const RoutinePreviewModel({
+    required this.title,
+    required this.description,
+    required this.unit,
+    required this.exercises,
+    required this.rawPayload,
+  });
+}
+

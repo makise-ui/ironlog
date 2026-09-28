@@ -7,6 +7,8 @@ import '../../../core/widgets/glass_tile.dart';
 import '../../../domain/models/routine_model.dart';
 import '../../../data/providers.dart';
 import '../../today/presentation/widgets/routine_qr_share_dialog.dart';
+import '../../today/presentation/widgets/routine_preview_sheet.dart';
+import '../../today/presentation/widgets/ai_assistant_sheet.dart';
 import 'create_preset_sheet.dart';
 
 class RoutinesSheet extends ConsumerStatefulWidget {
@@ -75,91 +77,20 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
 
     if (!mounted) return;
 
-    if (activeExercises.isNotEmpty) {
-      final choice = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: context.cardBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: context.cardBorder),
-          ),
-          title: Text(
-            'Load "${routine.name}"?',
-            style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
-          ),
-          content: Text(
-            'Your today session already has ${activeExercises.length} exercise(s). Would you like to add these ${routine.items.length} exercises or replace existing ones?',
-            style: TextStyle(color: context.textSecondary, fontSize: 13),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'cancel'),
-              child: Text('Cancel', style: TextStyle(color: context.textTertiary)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'replace'),
-              child: const Text('Replace Existing', style: TextStyle(color: AppColors.error)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accent,
-                foregroundColor: context.isDark ? Colors.black : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () => Navigator.pop(ctx, 'append'),
-              child: const Text('Add to Workout'),
-            ),
-          ],
-        ),
-      );
-
-      if (choice == null || choice == 'cancel' || !mounted) return;
-
-      if (choice == 'replace') {
-        for (final ex in activeExercises) {
-          await workoutRepo.removeExerciseFromWorkout(ex.id);
+    RoutinePreviewSheet.showForRoutine(
+      context,
+      routine: routine,
+      hasActiveExercises: activeExercises.isNotEmpty,
+      onApplyAction: (action) async {
+        if (!mounted) return;
+        if (action == 'replace') {
+          for (final ex in activeExercises) {
+            await workoutRepo.removeExerciseFromWorkout(ex.id);
+          }
         }
-      }
-      await _applyRoutine(routine);
-    } else {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: context.cardBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: context.cardBorder),
-          ),
-          title: Text(
-            'Load "${routine.name}"?',
-            style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
-          ),
-          content: Text(
-            'Load ${routine.items.length} exercise(s) into today\'s session:\n• ${routine.items.map((i) => i.exercise.name).join('\n• ')}\n\nThe timer will only start when you tap Start or log a set.',
-            style: TextStyle(color: context.textSecondary, fontSize: 13),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel', style: TextStyle(color: context.textTertiary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accent,
-                foregroundColor: context.isDark ? Colors.black : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Load Routine'),
-            ),
-          ],
-        ),
-      );
-      if (confirm == true && mounted) {
         await _applyRoutine(routine);
-      }
-    }
+      },
+    );
   }
 
   void _openCreatePreset() async {
@@ -319,6 +250,78 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
                     physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
+                      // AI Routine Designer Banner
+                      Container(
+                        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.accentViolet.withValues(alpha: 0.16),
+                              context.accent.withValues(alpha: 0.08),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentViolet.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.auto_awesome_rounded, color: AppColors.accentViolet, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'AI Workout Split Designer',
+                                    style: TextStyle(
+                                      fontFamily: AppTypography.fontFamily,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                      color: context.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Need a custom routine? Agnes AI designs science-based splits personalized to you.',
+                                    style: TextStyle(fontSize: 11.5, color: context.textSecondary, height: 1.3),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.accentViolet,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                AppHaptics.tap();
+                                Navigator.pop(context);
+                                AiAssistantSheet.show(
+                                  context,
+                                  initialPrompt:
+                                      'Can you design a balanced, evidence-based workout routine for me? Ask me any questions you need about my weekly frequency, training experience, and available gym equipment.',
+                                );
+                              },
+                              child: const Text('Ask AI', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // Custom Presets Section
                       if (customRoutines.isNotEmpty) ...[
                         Row(

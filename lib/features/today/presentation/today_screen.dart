@@ -43,6 +43,8 @@ import 'widgets/routine_card.dart';
 import '../../routines/presentation/create_preset_sheet.dart';
 import '../../intro/presentation/onboarding_sheet.dart';
 import 'widgets/routine_qr_share_dialog.dart';
+import 'widgets/routine_preview_sheet.dart';
+import '../../../domain/services/exercise_auto_image_service.dart';
 
 class _NextTargetInfo {
   final WorkoutExerciseItem exerciseItem;
@@ -400,6 +402,12 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         _isLoading = false;
         _elapsedDuration = _calculateElapsedDuration(w);
       });
+      if (w != null && w.exercises.isNotEmpty) {
+        ExerciseAutoImageService.prefetchBatch(
+          w.exercises.where((e) => !e.archived).map((e) => (name: e.exercise.name, id: e.exercise.id)).toList(),
+          ref.read(databaseProvider),
+        );
+      }
     }
   }
 
@@ -423,6 +431,12 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         _suggestions = suggestions;
         _elapsedDuration = _calculateElapsedDuration(w);
       });
+      if (w.exercises.isNotEmpty) {
+        ExerciseAutoImageService.prefetchBatch(
+          w.exercises.where((e) => !e.archived).map((e) => (name: e.exercise.name, id: e.exercise.id)).toList(),
+          ref.read(databaseProvider),
+        );
+      }
       unawaited(_syncHomeWidgets());
     }
   }
@@ -525,6 +539,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           final weId = await repo.addExerciseToWorkout(
             workoutId: _workout!.id,
             exerciseId: ex.id,
+          );
+          ExerciseAutoImageService.prefetch(
+            exerciseName: ex.name,
+            exerciseId: ex.id,
+            db: ref.read(databaseProvider),
           );
           ExerciseTableCard.setExerciseExpanded(weId, true);
           _selectedMuscleGroupIds.add(ex.muscleGroupId);
@@ -663,139 +682,22 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     AppHaptics.tap();
 
     final activeExercises = _workout!.exercises.where((e) => !e.archived).toList();
-    if (activeExercises.isNotEmpty) {
-      final choice = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: context.cardBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: context.cardBorder),
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Load "${routine.name}"?',
-                  style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.qr_code_2_rounded, color: context.accent, size: 22),
-                tooltip: 'Share Routine via QR',
-                onPressed: () {
-                  Navigator.pop(ctx, 'qr');
-                  _shareRoutineQr(routine);
-                },
-              ),
-            ],
-          ),
-          content: Text(
-            'Your session already has ${activeExercises.length} active exercise(s). Would you like to append these ${routine.items.length} exercises or replace the current session?',
-            style: TextStyle(color: context.textSecondary, fontSize: 13),
-          ),
-          actions: [
-            TextButton.icon(
-              icon: Icon(Icons.qr_code_2_rounded, size: 16, color: context.accent),
-              label: Text('Share QR', style: TextStyle(color: context.accent, fontSize: 13, fontWeight: FontWeight.w600)),
-              onPressed: () {
-                Navigator.pop(ctx, 'qr');
-                _shareRoutineQr(routine);
-              },
-            ),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'cancel'),
-              child: Text('Cancel', style: TextStyle(color: context.textTertiary)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'replace'),
-              child: const Text('Replace Existing', style: TextStyle(color: AppColors.error)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accent,
-                foregroundColor: context.isDark ? Colors.black : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () => Navigator.pop(ctx, 'append'),
-              child: const Text('Add to Workout'),
-            ),
-          ],
-        ),
-      );
 
-      if (choice == null || choice == 'cancel' || choice == 'qr' || !mounted) return;
-
-      if (choice == 'replace') {
-        final repo = ref.read(workoutRepositoryProvider);
-        for (final ex in activeExercises) {
-          await repo.removeExerciseFromWorkout(ex.id);
+    RoutinePreviewSheet.showForRoutine(
+      context,
+      routine: routine,
+      hasActiveExercises: activeExercises.isNotEmpty,
+      onApplyAction: (action) async {
+        if (!mounted || _workout == null) return;
+        if (action == 'replace') {
+          final repo = ref.read(workoutRepositoryProvider);
+          for (final ex in activeExercises) {
+            await repo.removeExerciseFromWorkout(ex.id);
+          }
         }
-      }
-      _applySpecificRoutine(routine.id);
-    } else {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: context.cardBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: context.cardBorder),
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Load "${routine.name}"?',
-                  style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.qr_code_2_rounded, color: context.accent, size: 22),
-                tooltip: 'Share Routine via QR',
-                onPressed: () {
-                  Navigator.pop(ctx, false);
-                  _shareRoutineQr(routine);
-                },
-              ),
-            ],
-          ),
-          content: Text(
-            'Load ${routine.items.length} exercise(s) into today\'s session:\n• ${routine.items.map((i) => i.exercise.name).join('\n• ')}\n\nThe timer will only start when you tap Start or log a set.',
-            style: TextStyle(color: context.textSecondary, fontSize: 13),
-          ),
-          actions: [
-            TextButton.icon(
-              icon: Icon(Icons.qr_code_2_rounded, size: 16, color: context.accent),
-              label: Text('Share QR', style: TextStyle(color: context.accent, fontSize: 13, fontWeight: FontWeight.w600)),
-              onPressed: () {
-                Navigator.pop(ctx, false);
-                _shareRoutineQr(routine);
-              },
-            ),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel', style: TextStyle(color: context.textTertiary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.accent,
-                foregroundColor: context.isDark ? Colors.black : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Load Routine'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirm == true && mounted) {
         _applySpecificRoutine(routine.id);
-      }
-    }
+      },
+    );
   }
 
   void _finishWorkout() {
