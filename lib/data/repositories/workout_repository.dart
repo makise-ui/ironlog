@@ -72,7 +72,11 @@ class WorkoutRepository {
     final normDate = AppDateUtils.normalizeDate(date);
     final existingList = await (_db.select(_db.workouts)
           ..where((t) => t.date.equals(normDate) & t.archived.equals(false))
-          ..orderBy([(t) => OrderingTerm(expression: t.date, mode: OrderingMode.desc)]))
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.endedAt.isNull(), mode: OrderingMode.desc),
+            (t) => OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc),
+            (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+          ]))
         .get();
     final existing = existingList.firstOrNull;
     if (existing == null) return null;
@@ -931,8 +935,15 @@ class WorkoutRepository {
     final cutoff = now.subtract(const Duration(days: 7));
 
     final setsQuery = _db.select(_db.sets)
-      ..where((t) => t.archived.equals(false) & t.date.isBiggerOrEqualValue(cutoff))
-      ..orderBy([(t) => OrderingTerm.desc(t.date)]);
+      ..where((t) =>
+          t.archived.equals(false) &
+          t.setType.equals('warmup').not() &
+          t.reps.isBiggerThanValue(0) &
+          t.date.isBiggerOrEqualValue(cutoff))
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.completedAt),
+        (t) => OrderingTerm.desc(t.date),
+      ]);
     final recentSets = await setsQuery.get();
 
     final allMuscleGroups = await _db.select(_db.muscleGroups).get();
@@ -970,8 +981,8 @@ class WorkoutRepository {
         continue;
       }
 
-      // Most recent set date
-      final lastDate = sets.first.date;
+      // Most recent set date (use completedAt timestamp for exact hours)
+      final lastDate = sets.first.completedAt;
       final hoursAgo = math.max(0.0, now.difference(lastDate).inMinutes / 60.0);
 
       // Full recovery duration scaled by set volume (36h to 72h)

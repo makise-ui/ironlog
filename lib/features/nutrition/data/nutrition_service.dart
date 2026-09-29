@@ -37,7 +37,12 @@ class NutritionService {
   }) async {
     final settings = _ref.read(settingsRepositoryProvider);
     final weightStr = await settings.getSetting('user_weight') ?? '75';
-    final userWeightKg = double.tryParse(weightStr) ?? 75.0;
+    final unitStr = await settings.getSetting('weight_unit') ?? 'kg';
+    double parsedWeight = double.tryParse(weightStr) ?? 75.0;
+    if (unitStr.toLowerCase().contains('lb') && parsedWeight > 0) {
+      parsedWeight = parsedWeight / 2.20462262185;
+    }
+    final userWeightKg = parsedWeight.clamp(30.0, 300.0);
     final userGoal = await settings.getSetting('user_goal') ?? 'Build Muscle';
 
     final activeExercises = workout?.exercises.where((e) => !e.archived).toList() ?? [];

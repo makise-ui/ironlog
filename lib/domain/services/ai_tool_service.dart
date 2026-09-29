@@ -711,6 +711,32 @@ class AiToolService {
       ];
 
   /// Execute a tool by name with arguments
+  static double? _asDouble(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val.replaceAll(',', '.').trim());
+    return null;
+  }
+
+  static int? _asInt(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toInt();
+    if (val is String) return int.tryParse(val.trim());
+    return null;
+  }
+
+  static bool? _asBool(dynamic val) {
+    if (val == null) return null;
+    if (val is bool) return val;
+    if (val is String) {
+      final s = val.toLowerCase().trim();
+      if (s == 'true' || s == '1' || s == 'yes') return true;
+      if (s == 'false' || s == '0' || s == 'no') return false;
+    }
+    if (val is num) return val != 0;
+    return null;
+  }
+
   Future<AiToolExecutionResult> executeTool(AiToolCall call) async {
     try {
       switch (call.name) {
@@ -718,19 +744,19 @@ class AiToolService {
           return await _executeQueryWorkoutHistory(
             muscleGroup: call.arguments['muscleGroup']?.toString(),
             exerciseName: call.arguments['exerciseName']?.toString(),
-            limit: (call.arguments['limit'] as num?)?.toInt() ?? 10,
-            offset: (call.arguments['offset'] as num?)?.toInt() ?? 0,
+            limit: _asInt(call.arguments['limit']) ?? 10,
+            offset: _asInt(call.arguments['offset']) ?? 0,
           );
         case 'calculate_warmup_sets':
           return await _executeCalculateWarmupSets(
             exerciseName: call.arguments['exerciseName']?.toString() ?? '',
-            targetWeight: (call.arguments['targetWeight'] as num?)?.toDouble() ?? 0.0,
-            barWeight: (call.arguments['barWeight'] as num?)?.toDouble(),
-            addToWorkout: call.arguments['addToWorkout'] as bool? ?? false,
+            targetWeight: _asDouble(call.arguments['targetWeight']) ?? 0.0,
+            barWeight: _asDouble(call.arguments['barWeight']),
+            addToWorkout: _asBool(call.arguments['addToWorkout']) ?? false,
           );
         case 'analyze_muscle_balance':
           return await _executeAnalyzeMuscleBalance(
-            days: (call.arguments['days'] as num?)?.toInt() ?? 14,
+            days: _asInt(call.arguments['days']) ?? 14,
           );
         case 'get_exercise_technique':
           return await _executeGetExerciseTechnique(
@@ -748,26 +774,26 @@ class AiToolService {
         case 'log_set':
           return await _executeLogSet(
             exerciseName: call.arguments['exerciseName']?.toString() ?? '',
-            weight: (call.arguments['weight'] as num?)?.toDouble() ?? 0.0,
-            reps: (call.arguments['reps'] as num?)?.toInt(),
-            durationSeconds: (call.arguments['durationSeconds'] as num?)?.toInt(),
-            durationMinutes: (call.arguments['durationMinutes'] as num?)?.toInt(),
+            weight: _asDouble(call.arguments['weight']) ?? 0.0,
+            reps: _asInt(call.arguments['reps']),
+            durationSeconds: _asInt(call.arguments['durationSeconds']),
+            durationMinutes: _asInt(call.arguments['durationMinutes']),
             setTypeStr: call.arguments['setType']?.toString(),
             dateStr: call.arguments['date']?.toString(),
           );
         case 'edit_set':
           return await _executeEditSet(
             exerciseName: call.arguments['exerciseName']?.toString() ?? '',
-            setIndex: (call.arguments['setIndex'] as num?)?.toInt(),
-            weight: (call.arguments['weight'] as num?)?.toDouble(),
-            reps: (call.arguments['reps'] as num?)?.toInt(),
+            setIndex: _asInt(call.arguments['setIndex']),
+            weight: _asDouble(call.arguments['weight']),
+            reps: _asInt(call.arguments['reps']),
             setTypeStr: call.arguments['setType']?.toString(),
-            rpe: (call.arguments['rpe'] as num?)?.toDouble(),
+            rpe: _asDouble(call.arguments['rpe']),
           );
         case 'delete_set':
           return await _executeDeleteSet(
             exerciseName: call.arguments['exerciseName']?.toString(),
-            setIndex: (call.arguments['setIndex'] as num?)?.toInt(),
+            setIndex: _asInt(call.arguments['setIndex']),
           );
         case 'add_exercise':
           return await _executeAddExercise(call.arguments['exerciseName']?.toString() ?? '');
@@ -780,7 +806,7 @@ class AiToolService {
         case 'set_rest_day':
           return await _executeSetRestDay(
             dateStr: call.arguments['date']?.toString(),
-            isRest: call.arguments['isRest'] as bool? ?? true,
+            isRest: _asBool(call.arguments['isRest']) ?? true,
             note: call.arguments['note']?.toString(),
           );
         case 'remove_exercise':
@@ -801,13 +827,13 @@ class AiToolService {
           return await _executeEditWorkout(
             title: call.arguments['title']?.toString(),
             note: call.arguments['note']?.toString(),
-            feel: (call.arguments['feel'] as num?)?.toInt(),
+            feel: _asInt(call.arguments['feel']),
           );
         case 'delete_workout':
           return await _executeDeleteWorkout(
             workoutId: call.arguments['workoutId']?.toString(),
             date: call.arguments['date']?.toString(),
-            confirmed: call.arguments['confirmed'] as bool?,
+            confirmed: _asBool(call.arguments['confirmed']),
           );
         case 'create_routine':
           final exerciseNamesRaw = call.arguments['exerciseNames'];
@@ -838,10 +864,10 @@ class AiToolService {
             exerciseName: call.arguments['exerciseName']?.toString() ?? '',
             newName: call.arguments['newName']?.toString(),
             muscleGroup: call.arguments['muscleGroup']?.toString(),
-            restSeconds: (call.arguments['restSeconds'] as num?)?.toInt(),
-            repMin: (call.arguments['repMin'] as num?)?.toInt(),
-            repMax: (call.arguments['repMax'] as num?)?.toInt(),
-            archive: call.arguments['archive'] as bool?,
+            restSeconds: _asInt(call.arguments['restSeconds']),
+            repMin: _asInt(call.arguments['repMin']),
+            repMax: _asInt(call.arguments['repMax']),
+            archive: _asBool(call.arguments['archive']),
           );
         case 'edit_setting':
           return await _executeEditSetting(
@@ -849,7 +875,7 @@ class AiToolService {
             value: call.arguments['value']?.toString() ?? '',
           );
         case 'start_rest_timer':
-          final secs = (call.arguments['seconds'] as num?)?.toInt() ?? 90;
+          final secs = _asInt(call.arguments['seconds']) ?? 90;
           final exName = call.arguments['exerciseName']?.toString();
           return await _executeStartRestTimer(secs, exName);
         case 'recommend_weights':
@@ -1091,9 +1117,12 @@ class AiToolService {
     String? muscleGroupId,
     EquipmentType? equipment,
   }) async {
+    final cleanName = exerciseName.trim();
+    if (cleanName.isEmpty) {
+      throw ArgumentError('Exercise name cannot be empty');
+    }
     final exRepo = _ref.read(exerciseRepositoryProvider);
     final allEx = await exRepo.getExercises();
-    final cleanName = exerciseName.trim();
     final cleanLower = cleanName.toLowerCase();
 
     // 1. Exact match
@@ -1411,12 +1440,19 @@ class AiToolService {
     final workoutRepo = _ref.read(workoutRepositoryProvider);
     final workout = await workoutRepo.getOrCreateTodayWorkout();
 
+    final note = (workout.note != null && workout.note!.isNotEmpty)
+        ? '${workout.note}\nFinished via AI Assistant'
+        : 'Finished via AI Assistant';
+
     await workoutRepo.updateWorkoutMeta(
       workoutId: workout.id,
       endedAt: DateTime.now(),
-      feel: 3,
-      note: 'Finished via AI Assistant',
+      feel: workout.feel ?? 3,
+      note: note,
     );
+
+    _ref.read(isWorkoutActiveProvider.notifier).state = false;
+    _ref.read(restTimerProvider).stop();
 
     return AiToolExecutionResult(
       toolName: 'finish_workout',
@@ -2062,6 +2098,8 @@ class AiToolService {
     final workoutRepo = _ref.read(workoutRepositoryProvider);
 
     WorkoutModel? targetWorkout;
+    final bool hasSpecificTarget = (workoutId != null && workoutId.isNotEmpty) || (date != null && date.isNotEmpty);
+
     if (workoutId != null && workoutId.isNotEmpty) {
       targetWorkout = await workoutRepo.getWorkoutByIdOrNull(workoutId);
     }
@@ -2077,13 +2115,18 @@ class AiToolService {
       }
       targetWorkout = await workoutRepo.getWorkoutForDate(targetDate);
     }
-    targetWorkout ??= await workoutRepo.getTodayWorkout();
+
+    if (!hasSpecificTarget) {
+      targetWorkout = await workoutRepo.getTodayWorkout();
+    }
 
     if (targetWorkout == null) {
       return AiToolExecutionResult(
         toolName: 'delete_workout',
         success: false,
-        summary: 'No workout found to delete.',
+        summary: hasSpecificTarget
+            ? 'No workout found matching the specified date/id.'
+            : 'No active workout found for today to delete.',
         data: {'error': 'No workout found'},
       );
     }
@@ -2114,9 +2157,13 @@ class AiToolService {
 
     // Deletion confirmed by user
     final title = targetWorkout.title;
+    final todayWorkout = await workoutRepo.getTodayWorkout();
     await workoutRepo.deleteWorkout(targetWorkout.id);
     _ref.invalidate(streakAndWeekProvider);
-    _ref.read(isWorkoutActiveProvider.notifier).state = false;
+    if (todayWorkout?.id == targetWorkout.id) {
+      _ref.read(isWorkoutActiveProvider.notifier).state = false;
+      _ref.read(restTimerProvider).stop();
+    }
 
     return AiToolExecutionResult(
       toolName: 'delete_workout',
@@ -2326,19 +2373,12 @@ class AiToolService {
       await exRepo.archiveExercise(target.id, archive);
     }
 
-    final updated = ExerciseModel(
-      id: target.id,
+    final updated = target.copyWith(
       name: newName != null && newName.trim().isNotEmpty ? newName.trim() : target.name,
       muscleGroupId: muscleGroup ?? target.muscleGroupId,
-      secondaryGroups: target.secondaryGroups,
-      equipment: target.equipment,
-      loadMode: target.loadMode,
-      isUnilateral: target.isUnilateral,
-      weightStep: target.weightStep,
       repMin: repMin ?? target.repMin,
       repMax: repMax ?? target.repMax,
       restSeconds: restSeconds ?? target.restSeconds,
-      isCustom: target.isCustom,
       archived: archive ?? target.archived,
     );
 

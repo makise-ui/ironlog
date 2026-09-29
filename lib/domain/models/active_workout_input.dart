@@ -46,6 +46,9 @@ class ActiveWorkoutInput {
   double get effectiveWeight => double.tryParse(weightInput.replaceAll(',', '.').trim()) ?? 0.0;
   int get effectiveReps => int.tryParse(repsInput.trim()) ?? 0;
 
+  /// Effective weight normalized to kg for database persistence and math
+  double get weightInKg => UnitConverter.toKg(effectiveWeight, unit);
+
   /// Formatted breakdown of plates per side for barbell / plate loaded exercises
   String? get plateBreakdownSummary {
     if (equipment != EquipmentType.barbell) return null;

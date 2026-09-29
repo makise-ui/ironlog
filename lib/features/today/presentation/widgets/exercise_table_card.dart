@@ -28,6 +28,7 @@ import '../../../../domain/services/e1rm_calculator.dart';
 class ExerciseTableCard extends ConsumerStatefulWidget {
   final WorkoutExerciseItem item;
   final WeightUnit unit;
+  final DateTime? workoutDate;
   final Suggestion? suggestion;
   final VoidCallback onRefresh;
   final Function(PrResult pr) onPrAchieved;
@@ -38,6 +39,7 @@ class ExerciseTableCard extends ConsumerStatefulWidget {
     super.key,
     required this.item,
     required this.unit,
+    this.workoutDate,
     this.suggestion,
     required this.onRefresh,
     required this.onPrAchieved,
@@ -321,11 +323,12 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     AppHaptics.tap();
     final repo = ref.read(workoutRepositoryProvider);
 
+    final setDate = widget.workoutDate ?? DateTime.now();
     final newSetId = await repo.logSet(
       workoutExerciseId: widget.item.id,
       exerciseId: widget.item.exercise.id,
       muscleGroupId: widget.item.exercise.muscleGroupId,
-      date: DateTime.now(),
+      date: setDate,
       weight: weight,
       reps: reps,
       setType: setType,
@@ -344,7 +347,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
       workoutExerciseId: widget.item.id,
       exerciseId: widget.item.exercise.id,
       muscleGroupId: widget.item.exercise.muscleGroupId,
-      date: DateTime.now(),
+      date: setDate,
       setIndex: widget.item.sets.length + 1,
       weight: weight,
       reps: reps,
@@ -682,10 +685,10 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                   onTap: () {
                     PlateCalculatorSheet.show(
                       context: context,
-                      initialWeight: effectiveTargetWeight,
+                      initialWeight: UnitConverter.fromKg(effectiveTargetWeight, widget.unit),
                       unit: widget.unit,
                       exerciseName: ex.name,
-                      onWeightSelected: (w) => setState(() => _customNextWeight = w),
+                      onWeightSelected: (w) => setState(() => _customNextWeight = UnitConverter.toKg(w, widget.unit)),
                     );
                   },
                   scaleDown: 0.88,
@@ -746,10 +749,10 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     } else if (val == 'plate_calc') {
                       PlateCalculatorSheet.show(
                         context: context,
-                        initialWeight: effectiveTargetWeight,
+                        initialWeight: UnitConverter.fromKg(effectiveTargetWeight, widget.unit),
                         unit: widget.unit,
                         exerciseName: ex.name,
-                        onWeightSelected: (w) => setState(() => _customNextWeight = w),
+                        onWeightSelected: (w) => setState(() => _customNextWeight = UnitConverter.toKg(w, widget.unit)),
                       );
                     } else if (val == 'warmup') {
                       showModalBottomSheet(
@@ -1853,7 +1856,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final isWeightActive = isRowActive && activeInput?.activeField == WorkoutInputField.weight;
     final isRepsActive = isRowActive && activeInput?.activeField == WorkoutInputField.reps;
 
-    final effectiveW = isRowActive ? activeInput!.effectiveWeight : targetWeight;
+    final effectiveW = isRowActive ? activeInput!.weightInKg : targetWeight;
     final effectiveR = isRowActive ? activeInput!.effectiveReps : targetReps;
     final effectiveT = isRowActive ? activeInput!.setType : targetType;
 

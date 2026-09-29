@@ -83,14 +83,21 @@ class PrDetector {
         .where((s) => s.id != newSet.id && !s.archived && s.setType != SetType.warmup && s.reps > 0)
         .toList();
 
+    final isLb = weightUnit.toLowerCase() == 'lb';
+    double toDisplay(double kg) => isLb ? kg * 2.20462262185 : kg;
+    String formatVal(double kg) {
+      final v = toDisplay(kg);
+      return (v == v.roundToDouble()) ? v.toInt().toString() : v.toStringAsFixed(1);
+    }
+
     if (validHistory.isEmpty) {
       // First time logging this exercise!
       return PrResult(
         isPr: true,
         prType: PrType.maxWeight,
         title: 'First Baseline Record!',
-        description: '${newSet.weight} $weightUnit × ${newSet.reps} reps sets your starting baseline.',
-        currentValue: newSet.weight,
+        description: '${formatVal(newSet.weight)} $weightUnit × ${newSet.reps} reps sets your starting baseline.',
+        currentValue: toDisplay(newSet.weight),
         previousRecord: 0,
         unit: weightUnit,
       );
@@ -110,9 +117,9 @@ class PrDetector {
         isPr: true,
         prType: PrType.maxWeight,
         title: 'New Heaviest Weight PR!',
-        description: '${newSet.weight} $weightUnit beats your previous best of $prevMaxWeight $weightUnit (+${diff.toStringAsFixed(1)} $weightUnit)!',
-        currentValue: newSet.weight,
-        previousRecord: prevMaxWeight,
+        description: '${formatVal(newSet.weight)} $weightUnit beats your previous best of ${formatVal(prevMaxWeight)} $weightUnit (+${formatVal(diff)} $weightUnit)!',
+        currentValue: toDisplay(newSet.weight),
+        previousRecord: toDisplay(prevMaxWeight),
         unit: weightUnit,
       );
     }
@@ -132,9 +139,9 @@ class PrDetector {
         isPr: true,
         prType: PrType.bestE1rm,
         title: 'New Est. 1RM PR!',
-        description: '${newE1rm.toStringAsFixed(1)} $weightUnit e1RM beats your previous ${prevBestE1rm.toStringAsFixed(1)} $weightUnit.',
-        currentValue: newE1rm,
-        previousRecord: prevBestE1rm,
+        description: '${formatVal(newE1rm)} $weightUnit e1RM beats your previous ${formatVal(prevBestE1rm)} $weightUnit.',
+        currentValue: toDisplay(newE1rm),
+        previousRecord: toDisplay(prevBestE1rm),
         unit: weightUnit,
       );
     }
@@ -153,7 +160,7 @@ class PrDetector {
         return PrResult(
           isPr: true,
           prType: PrType.repsAtWeight,
-          title: 'New Rep Record at ${newSet.weight} $weightUnit!',
+          title: 'New Rep Record at ${formatVal(newSet.weight)} $weightUnit!',
           description: '${newSet.reps} reps beats your previous record of $prevMaxRepsAtWeight reps.',
           currentValue: newSet.reps.toDouble(),
           previousRecord: prevMaxRepsAtWeight.toDouble(),

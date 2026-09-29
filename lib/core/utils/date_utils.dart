@@ -40,14 +40,14 @@ class AppDateUtils {
   /// Returns Monday of the week for a given date
   static DateTime startOfWeek(DateTime dt) {
     final normalized = normalizeDate(dt);
-    // In Dart weekday 1 = Monday, 7 = Sunday
-    return normalized.subtract(Duration(days: normalized.weekday - 1));
+    // In Dart weekday 1 = Monday, 7 = Sunday. Use calendar day arithmetic to prevent DST offset drift.
+    return DateTime(normalized.year, normalized.month, normalized.day - (normalized.weekday - 1));
   }
 
   /// Returns Sunday of the week for a given date
   static DateTime endOfWeek(DateTime dt) {
     final start = startOfWeek(dt);
-    return start.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+    return DateTime(start.year, start.month, start.day + 6, 23, 59, 59, 999);
   }
 
   /// Returns duration formatted as mm:ss or hh:mm:ss

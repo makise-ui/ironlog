@@ -656,6 +656,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
     final routineRepo = ref.read(routineRepositoryProvider);
     final allRoutines = await routineRepo.getRoutines();
+    if (allRoutines.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No routines available to apply.')),
+        );
+      }
+      return;
+    }
     final targetRoutine = allRoutines.where((r) => r.id == routineKey).firstOrNull ?? allRoutines.first;
 
     final repo = ref.read(workoutRepositoryProvider);
@@ -834,12 +842,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       return;
     }
 
+    final setDate = _workout?.date ?? DateTime.now();
     final newSetId = await repo.logSet(
       workoutExerciseId: input.workoutExerciseId,
       exerciseId: input.exerciseId,
       muscleGroupId: targetItem.exercise.muscleGroupId,
-      date: DateTime.now(),
-      weight: input.effectiveWeight,
+      date: setDate,
+      weight: input.weightInKg,
       reps: input.effectiveReps,
       setType: input.setType,
     );
@@ -857,9 +866,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       workoutExerciseId: input.workoutExerciseId,
       exerciseId: input.exerciseId,
       muscleGroupId: targetItem.exercise.muscleGroupId,
-      date: DateTime.now(),
+      date: setDate,
       setIndex: input.setIndex,
-      weight: input.effectiveWeight,
+      weight: input.weightInKg,
       reps: input.effectiveReps,
       setType: input.setType,
       completedAt: DateTime.now(),
@@ -880,7 +889,53 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
     await _refreshWorkout();
 
-    // Auto-advance to next set
+    // Superset circuit navigation: cycle through exercises in the same superset group
+    final activeExercises = _workout?.exercises.where((e) => !e.archived).toList() ?? [];
+    final currentSupersetGroup = targetItem.supersetGroup;
+    if (currentSupersetGroup != null && currentSupersetGroup.isNotEmpty) {
+      final supersetExercises = activeExercises.where((e) => e.supersetGroup == currentSupersetGroup).toList();
+      if (supersetExercises.length > 1) {
+        final currentExIdx = supersetExercises.indexWhere((e) => e.id == targetItem.id);
+        if (currentExIdx >= 0) {
+          final nextExIdx = (currentExIdx + 1) % supersetExercises.length;
+          final nextExercise = supersetExercises[nextExIdx];
+          final isCyclingBack = nextExIdx == 0;
+          final nextSetIdx = isCyclingBack ? input.setIndex + 1 : input.setIndex;
+
+          final nextCompletedSets = nextExercise.sets.where((s) => !s.archived).toList();
+          final nextWeightKg = nextCompletedSets.isNotEmpty
+              ? nextCompletedSets.last.weight
+              : (nextExercise.exercise.equipment == EquipmentType.barbell ? 20.0 : 0.0);
+          final nextReps = nextCompletedSets.isNotEmpty
+              ? nextCompletedSets.last.reps
+              : (nextExercise.exercise.trackingType == ExerciseTrackingType.duration ? 30 : 10);
+
+          _activeWorkoutExerciseId = nextExercise.id;
+          ref.read(activeWorkoutInputProvider.notifier).startEditing(
+            workoutExerciseId: nextExercise.id,
+            exerciseId: nextExercise.exercise.id,
+            exerciseName: nextExercise.exercise.name,
+            equipment: nextExercise.exercise.equipment,
+            trackingType: nextExercise.exercise.trackingType,
+            setIndex: nextSetIdx,
+            existingSetId: null,
+            setType: SetType.working,
+            field: nextExercise.exercise.trackingType != ExerciseTrackingType.weightAndReps
+                ? WorkoutInputField.reps
+                : WorkoutInputField.weight,
+            initialWeight: nextWeightKg,
+            initialReps: nextReps,
+            unit: input.unit,
+            isCompleted: false,
+            targetWeight: nextWeightKg,
+            targetReps: nextReps,
+          );
+          return;
+        }
+      }
+    }
+
+    // Auto-advance to next set of current exercise
     ref.read(activeWorkoutInputProvider.notifier).startEditing(
       workoutExerciseId: input.workoutExerciseId,
       exerciseId: input.exerciseId,
@@ -893,11 +948,11 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       field: input.trackingType != ExerciseTrackingType.weightAndReps
           ? WorkoutInputField.reps
           : WorkoutInputField.weight,
-      initialWeight: input.effectiveWeight,
+      initialWeight: input.weightInKg,
       initialReps: input.effectiveReps,
       unit: input.unit,
       isCompleted: false,
-      targetWeight: input.effectiveWeight,
+      targetWeight: input.weightInKg,
       targetReps: input.effectiveReps,
     );
   }
@@ -911,7 +966,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final repo = ref.read(workoutRepositoryProvider);
     await repo.updateSet(
       setId: input.existingSetId!,
-      weight: input.effectiveWeight,
+      weight: input.weightInKg,
       reps: input.effectiveReps,
       setType: input.setType,
     );
@@ -921,11 +976,12 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
   Future<void> _quickLogTargetSet(_NextTargetInfo target, WeightUnit unit) async {
     final repo = ref.read(workoutRepositoryProvider);
+    final setDate = _workout?.date ?? DateTime.now();
     final newSetId = await repo.logSet(
       workoutExerciseId: target.exerciseItem.id,
       exerciseId: target.exerciseItem.exercise.id,
       muscleGroupId: target.exerciseItem.exercise.muscleGroupId,
-      date: DateTime.now(),
+      date: setDate,
       weight: target.targetWeight,
       reps: target.targetReps,
       setType: target.targetType,
@@ -942,7 +998,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       workoutExerciseId: target.exerciseItem.id,
       exerciseId: target.exerciseItem.exercise.id,
       muscleGroupId: target.exerciseItem.exercise.muscleGroupId,
-      date: DateTime.now(),
+      date: setDate,
       setIndex: target.setIndex,
       weight: target.targetWeight,
       reps: target.targetReps,
@@ -1161,7 +1217,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       final exSug = _suggestions.where((s) => s.payload['exerciseId'] == currentItem!.exercise.id).firstOrNull;
       final sw = exSug?.payload['suggestedWeight'] as num?;
       final sr = exSug?.payload['suggestedReps'] as num?;
-      targetW = sw?.toDouble() ?? (currentItem.exercise.equipment == EquipmentType.barbell ? (unit == WeightUnit.kg ? 20.0 : 45.0) : 0.0);
+      targetW = sw?.toDouble() ?? (currentItem.exercise.equipment == EquipmentType.barbell ? 20.0 : 0.0);
       targetR = sr?.toInt() ?? (currentItem.exercise.trackingType == ExerciseTrackingType.duration ? 30 : 10);
     }
 
@@ -3015,6 +3071,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     key: ValueKey(item.id),
                     item: item,
                     unit: unit,
+                    workoutDate: _selectedDate,
                     suggestion: exSug,
                     onRefresh: _refreshWorkout,
                     onPrAchieved: (pr) {

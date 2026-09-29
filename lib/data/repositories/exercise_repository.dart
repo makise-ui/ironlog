@@ -6,6 +6,7 @@ import '../database/database.dart';
 import '../../domain/models/exercise_model.dart';
 import '../../domain/services/weight_step_learner.dart';
 import '../../domain/services/backup_service.dart';
+import 'workout_repository.dart';
 
 class ExerciseRepository {
   final AppDatabase _db;
@@ -178,6 +179,10 @@ class ExerciseRepository {
         await (_db.delete(_db.prs)..where((t) => t.exerciseId.equals(id))).go();
       }
     });
+    if (!archive) {
+      final workoutRepo = WorkoutRepository(_db);
+      await workoutRepo.recalculatePrsForExercise(id);
+    }
     BackupService.scheduleAutoBackup(_db);
   }
 

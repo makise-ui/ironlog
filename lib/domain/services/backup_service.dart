@@ -244,8 +244,18 @@ class BackupService {
         'id': e.id,
         'name': e.name,
         'muscle_group_id': e.muscleGroupId,
+        'secondary_groups': e.secondaryGroups,
         'equipment': e.equipment,
+        'load_mode': e.loadMode,
+        'is_unilateral': e.isUnilateral,
+        'weight_step': e.weightStep,
+        'rep_min': e.repMin,
+        'rep_max': e.repMax,
+        'rest_seconds': e.restSeconds,
         'is_custom': e.isCustom,
+        'image_path': e.imagePath,
+        'tracking_type': e.trackingType,
+        'archived': e.archived,
       }).toList(),
       'workouts': workouts.map((w) => {
         'id': w.id,
@@ -477,50 +487,15 @@ class BackupService {
     final settingsMap = (data['settings'] as Map<String, dynamic>? ?? {});
     final profile = (data['profile'] as Map<String, dynamic>? ?? {});
 
-    // Restore SharedPreferences profile for backward compatibility
-    final prefs = await SharedPreferences.getInstance();
-    if (profile['user_name'] != null) await prefs.setString('user_name', profile['user_name'].toString());
-    if (profile['user_weight_kg'] != null) {
-      await prefs.setDouble('user_weight_kg', (profile['user_weight_kg'] as num).toDouble());
-    }
-    if (profile['user_age'] != null) {
-      await prefs.setInt('user_age', (profile['user_age'] as num).toInt());
-    }
-    if (profile['user_height_cm'] != null) {
-      await prefs.setDouble('user_height_cm', (profile['user_height_cm'] as num).toDouble());
-    }
-    if (profile['user_gender'] != null) {
-      await prefs.setString('user_gender', profile['user_gender'].toString());
-    }
-    if (profile['user_fitness_goal'] != null) {
-      await prefs.setString('user_fitness_goal', profile['user_fitness_goal'].toString());
-    }
-    if (profile['user_experience_level'] != null) {
-      await prefs.setString('user_experience_level', profile['user_experience_level'].toString());
-    }
-    if (profile['weight_unit'] != null) {
-      await prefs.setString('weight_unit', profile['weight_unit'].toString());
-    }
-    await prefs.setBool('user_onboarded', true);
-
-    // Restore nutrition logs if present in backup
-    final nutritionLogs = (data['nutrition_logs'] as Map<String, dynamic>? ?? {});
-    for (final entry in nutritionLogs.entries) {
-      final val = entry.value;
-      if (val is String) {
-        await prefs.setString(entry.key, val);
-      } else {
-        await prefs.setString(entry.key, jsonEncode(val));
-      }
-    }
-
-    // Insert into DB inside a transaction
+    // Insert into DB inside a transaction first so failures roll back cleanly
     await db.transaction(() async {
       // Clear existing log tables (leave exercises catalog)
       await db.delete(db.sets).go();
       await db.delete(db.workoutExercises).go();
       await db.delete(db.workouts).go();
       await db.delete(db.prs).go();
+      await db.delete(db.routineItems).go();
+      await db.delete(db.routines).go();
       await db.delete(db.bodyMetrics).go();
       await db.delete(db.achievements).go();
       await db.delete(db.photos).go();
@@ -532,8 +507,18 @@ class BackupService {
             id: ex['id'] as String,
             name: (ex['name'] ?? 'Custom Exercise') as String,
             muscleGroupId: (ex['muscle_group_id'] ?? 'chest') as String,
+            secondaryGroups: Value((ex['secondary_groups'] as String?) ?? ''),
             equipment: (ex['equipment'] as String?) ?? 'other',
+            loadMode: Value(ex['load_mode'] as String? ?? 'bilateral'),
+            isUnilateral: Value(ex['is_unilateral'] as bool? ?? false),
+            weightStep: Value((ex['weight_step'] as num?)?.toDouble() ?? 2.5),
+            repMin: Value((ex['rep_min'] as num?)?.toInt() ?? 8),
+            repMax: Value((ex['rep_max'] as num?)?.toInt() ?? 12),
+            restSeconds: Value((ex['rest_seconds'] as num?)?.toInt() ?? 90),
             isCustom: const Value(true),
+            imagePath: Value(ex['image_path'] as String?),
+            trackingType: Value(ex['tracking_type'] as String? ?? 'weightAndReps'),
+            archived: Value(ex['archived'] as bool? ?? false),
           ),
         );
       }
@@ -717,6 +702,42 @@ class BackupService {
         SettingsCompanion.insert(k: 'initial_backup_restore_checked', v: 'true'),
       );
     });
+
+    // Restore SharedPreferences profile and nutrition logs after DB transaction succeeds
+    final prefs = await SharedPreferences.getInstance();
+    if (profile['user_name'] != null) await prefs.setString('user_name', profile['user_name'].toString());
+    if (profile['user_weight_kg'] != null) {
+      await prefs.setDouble('user_weight_kg', (profile['user_weight_kg'] as num).toDouble());
+    }
+    if (profile['user_age'] != null) {
+      await prefs.setInt('user_age', (profile['user_age'] as num).toInt());
+    }
+    if (profile['user_height_cm'] != null) {
+      await prefs.setDouble('user_height_cm', (profile['user_height_cm'] as num).toDouble());
+    }
+    if (profile['user_gender'] != null) {
+      await prefs.setString('user_gender', profile['user_gender'].toString());
+    }
+    if (profile['user_fitness_goal'] != null) {
+      await prefs.setString('user_fitness_goal', profile['user_fitness_goal'].toString());
+    }
+    if (profile['user_experience_level'] != null) {
+      await prefs.setString('user_experience_level', profile['user_experience_level'].toString());
+    }
+    if (profile['weight_unit'] != null) {
+      await prefs.setString('weight_unit', profile['weight_unit'].toString());
+    }
+    await prefs.setBool('user_onboarded', true);
+
+    final nutritionLogs = (data['nutrition_logs'] as Map<String, dynamic>? ?? {});
+    for (final entry in nutritionLogs.entries) {
+      final val = entry.value;
+      if (val is String) {
+        await prefs.setString(entry.key, val);
+      } else {
+        await prefs.setString(entry.key, jsonEncode(val));
+      }
+    }
 
     return workoutsList.length;
   }

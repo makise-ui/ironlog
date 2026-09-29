@@ -56,9 +56,10 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
         ? widget.learnedWeightStep
         : widget.exercise.weightStep;
 
+    final unit = ref.read(weightUnitNotifierProvider);
     if (widget.existingSetToEdit != null) {
       final s = widget.existingSetToEdit!;
-      _weightInput = UnitConverter.formatWeight(s.weight, includeUnit: false);
+      _weightInput = UnitConverter.formatWeight(s.weight, unit: unit, includeUnit: false);
       _repsInput = s.reps.toString();
       _setType = s.setType;
       _rpe = s.rpe;
@@ -81,11 +82,12 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
     }
   }
 
-  double get _effectiveWeight {
+  double _effectiveWeight(WeightUnit unit) {
     if (_weightInput.isNotEmpty) {
-      return double.tryParse(_weightInput) ?? 0.0;
+      return double.tryParse(_weightInput.replaceAll(',', '.').trim()) ?? 0.0;
     }
-    return widget.previousSessionSet?.weight ?? 0.0;
+    final ghostKg = widget.previousSessionSet?.weight ?? 0.0;
+    return UnitConverter.fromKg(ghostKg, unit);
   }
 
   int get _effectiveReps {
@@ -161,12 +163,13 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
   }
 
   void _stepWeight(double delta) {
+    final unit = ref.read(weightUnitNotifierProvider);
     AppHaptics.step();
     setState(() {
       _replaceWeightOnInput = false;
-      final current = _effectiveWeight;
+      final current = _effectiveWeight(unit);
       final next = (current + delta).clamp(0.0, 999.0);
-      _weightInput = UnitConverter.formatWeight(next, includeUnit: false);
+      _weightInput = (next == next.roundToDouble()) ? next.toInt().toString() : next.toStringAsFixed(1);
     });
   }
 
@@ -181,18 +184,20 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
   }
 
   Future<void> _saveSet() async {
-    final weight = _effectiveWeight;
+    final unit = ref.read(weightUnitNotifierProvider);
+    final userWeight = _effectiveWeight(unit);
     final reps = _effectiveReps;
 
     if (reps <= 0) return;
 
     AppHaptics.save();
     final repo = ref.read(workoutRepositoryProvider);
+    final weightInKg = UnitConverter.toKg(userWeight, unit);
 
     if (widget.existingSetToEdit != null) {
       await repo.updateSet(
         setId: widget.existingSetToEdit!.id,
-        weight: weight,
+        weight: weightInKg,
         reps: reps,
         setType: _setType,
         rpe: _rpe,
@@ -203,7 +208,7 @@ class _SetEntrySheetState extends ConsumerState<SetEntrySheet> {
         exerciseId: widget.exercise.id,
         muscleGroupId: widget.exercise.muscleGroupId,
         date: DateTime.now(),
-        weight: weight,
+        weight: weightInKg,
         reps: reps,
         setType: _setType,
         rpe: _rpe,

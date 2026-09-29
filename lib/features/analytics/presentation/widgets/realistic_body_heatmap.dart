@@ -127,10 +127,11 @@ class _RealisticBodyHeatmapState extends State<RealisticBodyHeatmap>
     final key = muscleId.toLowerCase().trim();
 
     if (_postWorkoutHeatMode) {
+      final displayName = key.isNotEmpty ? (key[0].toUpperCase() + key.substring(1)) : 'Muscle';
       if (key == 'chest' || key == 'triceps' || key == 'deltoids' || key == 'shoulders') {
         return MuscleRecoveryData(
           id: key,
-          name: key[0].toUpperCase() + key.substring(1),
+          name: displayName,
           recoveryPercent: 0.22,
           hoursSinceLastTrained: 2.5,
           lastTrainedDate: DateTime.now().subtract(const Duration(hours: 2, minutes: 30)),
@@ -142,7 +143,7 @@ class _RealisticBodyHeatmapState extends State<RealisticBodyHeatmap>
       if (key == 'core' || key == 'biceps' || key == 'back' || key == 'traps' || key == 'lats') {
         return MuscleRecoveryData(
           id: key,
-          name: key[0].toUpperCase() + key.substring(1),
+          name: displayName,
           recoveryPercent: 0.58,
           hoursSinceLastTrained: 26.0,
           lastTrainedDate: DateTime.now().subtract(const Duration(hours: 26)),
@@ -153,7 +154,7 @@ class _RealisticBodyHeatmapState extends State<RealisticBodyHeatmap>
       }
       return MuscleRecoveryData(
         id: key,
-        name: key[0].toUpperCase() + key.substring(1),
+        name: displayName,
         recoveryPercent: 0.95,
         hoursSinceLastTrained: 72.0,
         lastTrainedDate: DateTime.now().subtract(const Duration(days: 3)),
@@ -172,16 +173,20 @@ class _RealisticBodyHeatmapState extends State<RealisticBodyHeatmap>
     if (key == 'lats' || key == 'lower_back') {
       return widget.recoveryData['back'] ?? _fallback(muscleId);
     }
-    if (key == 'quads' || key == 'hamstrings') {
+    if (key == 'quads' || key == 'hamstrings' || key == 'calves' || key == 'glutes') {
       return widget.recoveryData['legs'] ?? _fallback(muscleId);
     }
-    return widget.recoveryData['chest'] ?? _fallback(muscleId);
+    if (key == 'biceps' || key == 'triceps' || key == 'forearms') {
+      return widget.recoveryData['arms'] ?? _fallback(muscleId);
+    }
+    return _fallback(muscleId);
   }
 
   MuscleRecoveryData _fallback(String id) {
+    final name = id.isNotEmpty ? (id[0].toUpperCase() + id.substring(1)) : 'Unknown';
     return MuscleRecoveryData(
       id: id,
-      name: id[0].toUpperCase() + id.substring(1),
+      name: name,
       recoveryPercent: 1.0,
       hoursSinceLastTrained: null,
       lastTrainedDate: null,
