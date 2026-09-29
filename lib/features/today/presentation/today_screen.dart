@@ -717,6 +717,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           final start = _workout!.startedAt ??
               end.subtract(_elapsedDuration > Duration.zero ? _elapsedDuration : const Duration(minutes: 45));
 
+          ref.read(restTimerProvider).stop();
           _elapsedTimer?.cancel();
           _elapsedTimer = null;
           setState(() {
@@ -809,6 +810,30 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final targetItem = _workout?.exercises.where((e) => e.id == input.workoutExerciseId).firstOrNull;
     if (targetItem == null) return;
 
+    if (input.effectiveReps <= 0) {
+      AppHaptics.warning();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter at least 1 rep.')),
+        );
+      }
+      return;
+    }
+
+    if (targetItem.exercise.equipment != EquipmentType.bodyweight &&
+        targetItem.exercise.loadMode != LoadMode.bodyweight &&
+        targetItem.exercise.customTrackingType != ExerciseTrackingType.repsOnly &&
+        targetItem.exercise.loadMode != LoadMode.assisted &&
+        input.effectiveWeight <= 0) {
+      AppHaptics.warning();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a weight greater than 0.')),
+        );
+      }
+      return;
+    }
+
     final newSetId = await repo.logSet(
       workoutExerciseId: input.workoutExerciseId,
       exerciseId: input.exerciseId,
@@ -879,6 +904,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
   Future<void> _handleNumpadUpdateSet(ActiveWorkoutInput input) async {
     if (input.existingSetId == null) return;
+    if (input.effectiveReps <= 0) {
+      AppHaptics.warning();
+      return;
+    }
     final repo = ref.read(workoutRepositoryProvider);
     await repo.updateSet(
       setId: input.existingSetId!,
@@ -1807,6 +1836,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     if (_workout != null) {
                       final repo = ref.read(workoutRepositoryProvider);
                       await repo.discardWorkout(_workout!.id);
+                      ref.read(restTimerProvider).stop();
                       _elapsedTimer?.cancel();
                       _elapsedDuration = Duration.zero;
                       setState(() {

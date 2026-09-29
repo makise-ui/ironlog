@@ -530,6 +530,30 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
     }
   }
 
+  Future<void> retryLastMessage() async {
+    if (state.messages.isEmpty) return;
+
+    final lastMsg = state.messages.last;
+    final int errorIdx = lastMsg.isError
+        ? state.messages.length - 1
+        : state.messages.lastIndexWhere((m) => m.isError);
+
+    if (errorIdx == -1) return;
+
+    final lastUserMsg = state.messages
+        .sublist(0, errorIdx)
+        .reversed
+        .where((m) => m.role == 'user')
+        .firstOrNull;
+
+    if (lastUserMsg == null) return;
+
+    final updatedMessages = List<AiChatMessage>.from(state.messages)..removeAt(errorIdx);
+    state = state.copyWith(messages: updatedMessages);
+
+    await sendMessage(lastUserMsg.content, imagePath: lastUserMsg.imageAttachmentPath);
+  }
+
   static String _extractSnippet(String text) {
     if (text.trim().isEmpty) return '';
     // Strip markdown formatting, headers, bullets, asterisks

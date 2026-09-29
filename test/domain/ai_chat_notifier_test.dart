@@ -79,5 +79,46 @@ void main() {
       expect(cleared.activeThought, isNull);
       expect(cleared.latestAssistantSnippet, isNull);
     });
+
+    test('retryLastMessage removes error message and re-sends user prompt', () async {
+      final db = AppDatabase.memory();
+      final container = ProviderContainer(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+        ],
+      );
+      addTearDown(() async {
+        container.dispose();
+        await db.close();
+      });
+
+      final notifier = container.read(aiChatNotifierProvider.notifier);
+
+      final userMsg = AiChatMessage(
+        id: 'u1',
+        role: 'user',
+        content: 'Give me bench press tips',
+        timestamp: DateTime.now(),
+      );
+      final errorMsg = AiChatMessage(
+        id: 'e1',
+        role: 'assistant',
+        content: 'Issue encountered: timeout',
+        timestamp: DateTime.now(),
+        isError: true,
+      );
+
+      notifier.state = notifier.state.copyWith(
+        messages: [userMsg, errorMsg],
+      );
+
+      expect(notifier.state.messages.length, 2);
+      expect(notifier.state.messages.last.isError, true);
+
+      await notifier.retryLastMessage();
+
+      // The error message must be removed
+      expect(notifier.state.messages.any((m) => m.id == 'e1'), false);
+    });
   });
 }

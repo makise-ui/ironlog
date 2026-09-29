@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -700,6 +701,45 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
     ];
   }
 
+  Future<http.Response> _postWithRetry(
+    Uri endpoint, {
+    required Map<String, String> headers,
+    required Object body,
+    Duration timeout = const Duration(seconds: 45),
+    int maxRetries = 3,
+    void Function(int attempt, Duration delay, dynamic error)? onRetry,
+  }) async {
+    int attempt = 0;
+    while (true) {
+      attempt++;
+      try {
+        final response = await http.post(
+          endpoint,
+          headers: headers,
+          body: body is String ? body : jsonEncode(body),
+        ).timeout(timeout);
+
+        // Retry on server errors or rate limiting (429, 500, 502, 503, 504)
+        if ((response.statusCode == 429 || (response.statusCode >= 500 && response.statusCode <= 504)) &&
+            attempt <= maxRetries) {
+          final delay = Duration(milliseconds: 1000 * (1 << (attempt - 1))); // 1s, 2s, 4s
+          onRetry?.call(attempt, delay, 'HTTP ${response.statusCode}');
+          await Future.delayed(delay);
+          continue;
+        }
+        return response;
+      } catch (e) {
+        if (attempt <= maxRetries) {
+          final delay = Duration(milliseconds: 1000 * (1 << (attempt - 1)));
+          onRetry?.call(attempt, delay, e);
+          await Future.delayed(delay);
+          continue;
+        }
+        rethrow;
+      }
+    }
+  }
+
   /// Universal / OpenAI-compatible endpoint with function calling, context window handling, and live streaming
   Stream<AiAssistantEvent> _sendOpenAiCompatibleMessageStream(
     AiConfigModel config,
@@ -760,12 +800,19 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         requestHeaders['Authorization'] = 'Bearer ${config.apiKey.trim()}';
       }
 
-      // 45s timeout for AI responses
-      var response = await http.post(
+      // 45s timeout for AI responses with automatic retry
+      final retryController = StreamController<AiAssistantEvent>();
+      final responseFuture = _postWithRetry(
         endpoint,
         headers: requestHeaders,
         body: jsonEncode(requestBody),
-      ).timeout(const Duration(seconds: 45));
+        timeout: const Duration(seconds: 45),
+        onRetry: (attempt, delay, error) {
+          retryController.add(AiThinkingEvent('Network issue detected. Retrying attempt $attempt of 3...'));
+        },
+      ).whenComplete(() => retryController.close());
+      yield* retryController.stream;
+      var response = await responseFuture;
 
       // Automatic Context Window Recovery if exceeded
       if (response.statusCode != 200) {
@@ -777,11 +824,18 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
           yield const AiThinkingEvent('Retrying...');
           final nudgedMessages = List<Map<String, dynamic>>.from(messages)
             ..add({'role': 'user', 'content': 'Please respond now.'});
-          response = await http.post(
+          final nudgedRetryController = StreamController<AiAssistantEvent>();
+          final nudgedResponseFuture = _postWithRetry(
             endpoint,
             headers: requestHeaders,
             body: jsonEncode({...requestBody, 'messages': nudgedMessages}),
-          ).timeout(const Duration(seconds: 45));
+            timeout: const Duration(seconds: 45),
+            onRetry: (attempt, delay, error) {
+              nudgedRetryController.add(AiThinkingEvent('Network issue detected. Retrying attempt $attempt of 3...'));
+            },
+          ).whenComplete(() => nudgedRetryController.close());
+          yield* nudgedRetryController.stream;
+          response = await nudgedResponseFuture;
         } else if ((errBody.contains('context') ||
                 errBody.contains('token') ||
                 errBody.contains('too long') ||
@@ -794,14 +848,21 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
           messages.clear();
           messages.addAll([sys, lastUser]);
 
-          response = await http.post(
+          final compactRetryController = StreamController<AiAssistantEvent>();
+          final compactResponseFuture = _postWithRetry(
             endpoint,
             headers: requestHeaders,
             body: jsonEncode({
               ...requestBody,
               'messages': messages,
             }),
-          ).timeout(const Duration(seconds: 45));
+            timeout: const Duration(seconds: 45),
+            onRetry: (attempt, delay, error) {
+              compactRetryController.add(AiThinkingEvent('Network issue detected. Retrying attempt $attempt of 3...'));
+            },
+          ).whenComplete(() => compactRetryController.close());
+          yield* compactRetryController.stream;
+          response = await compactResponseFuture;
         }
 
         if (response.statusCode != 200) {
@@ -961,7 +1022,7 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         '${todayWorkoutContext.isNotEmpty ? '\n\n$todayWorkoutContext' : ''}'
         '\n\n=== ATHLETE PERSISTENT MEMORY (ACROSS SESSIONS) ===\n$userMemoriesPrompt';
 
-    final resp = await http.post(
+    final resp = await _postWithRetry(
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -974,7 +1035,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
           ]
         },
       }),
-    ).timeout(const Duration(seconds: 25));
+      timeout: const Duration(seconds: 25),
+    );
 
     if (resp.statusCode != 200) {
       throw Exception('Gemini error (${resp.statusCode}): ${resp.body}');
@@ -1017,7 +1079,7 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         '${todayWorkoutContext.isNotEmpty ? '\n\n$todayWorkoutContext' : ''}'
         '\n\n=== ATHLETE PERSISTENT MEMORY (ACROSS SESSIONS) ===\n$userMemoriesPrompt';
 
-    final resp = await http.post(
+    final resp = await _postWithRetry(
       url,
       headers: {
         'x-api-key': config.apiKey.trim(),
@@ -1030,7 +1092,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         'system': systemPrompt,
         'messages': messages,
       }),
-    ).timeout(const Duration(seconds: 25));
+      timeout: const Duration(seconds: 25),
+    );
 
     if (resp.statusCode != 200) {
       throw Exception('Anthropic error (${resp.statusCode}): ${resp.body}');

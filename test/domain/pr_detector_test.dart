@@ -172,5 +172,72 @@ void main() {
       expect(result.currentValue, equals(11.0));
       expect(result.previousRecord, equals(8.0));
     });
+
+    test('0-rep or negative-rep set never qualifies as a PR', () {
+      final zeroRepSet = SetModel(
+        id: 's1',
+        workoutExerciseId: 'we1',
+        exerciseId: 'bench',
+        muscleGroupId: 'chest',
+        date: DateTime.now(),
+        setIndex: 1,
+        weight: 120.0,
+        reps: 0,
+        setType: SetType.working,
+        completedAt: DateTime.now(),
+      );
+
+      final result1 = PrDetector.checkSetPr(
+        newSet: zeroRepSet,
+        historicalSets: [],
+      );
+      expect(result1.isPr, isFalse);
+
+      final negRepSet = zeroRepSet.copyWith(reps: -2);
+      final result2 = PrDetector.checkSetPr(
+        newSet: negRepSet,
+        historicalSets: [],
+      );
+      expect(result2.isPr, isFalse);
+    });
+
+    test('Historical sets with 0 reps are ignored when evaluating PRs', () {
+      final incompleteHist = SetModel(
+        id: 'h0',
+        workoutExerciseId: 'we0',
+        exerciseId: 'bench',
+        muscleGroupId: 'chest',
+        date: DateTime.now().subtract(const Duration(days: 7)),
+        setIndex: 1,
+        weight: 150.0, // Failed 150kg with 0 reps
+        reps: 0,
+        setType: SetType.working,
+        completedAt: DateTime.now().subtract(const Duration(days: 7)),
+      );
+
+      final newSet = SetModel(
+        id: 's1',
+        workoutExerciseId: 'we1',
+        exerciseId: 'bench',
+        muscleGroupId: 'chest',
+        date: DateTime.now(),
+        setIndex: 1,
+        weight: 100.0,
+        reps: 5,
+        setType: SetType.working,
+        completedAt: DateTime.now(),
+      );
+
+      // Even though historical set has 150kg, it has 0 reps so validHistory should ignore it.
+      // Thus, newSet is treated as first baseline (isPr = true, maxWeight).
+      final result = PrDetector.checkSetPr(
+        newSet: newSet,
+        historicalSets: [incompleteHist],
+      );
+
+      expect(result.isPr, isTrue);
+      expect(result.prType, equals(PrType.maxWeight));
+      expect(result.currentValue, equals(100.0));
+    });
   });
 }

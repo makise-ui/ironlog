@@ -167,9 +167,17 @@ class ExerciseRepository {
   }
 
   Future<void> archiveExercise(String id, bool archive) async {
-    await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
-      ExercisesCompanion(archived: Value(archive)),
-    );
+    await _db.transaction(() async {
+      await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
+        ExercisesCompanion(archived: Value(archive)),
+      );
+      await (_db.update(_db.sets)..where((t) => t.exerciseId.equals(id))).write(
+        SetsCompanion(archived: Value(archive)),
+      );
+      if (archive) {
+        await (_db.delete(_db.prs)..where((t) => t.exerciseId.equals(id))).go();
+      }
+    });
     BackupService.scheduleAutoBackup(_db);
   }
 

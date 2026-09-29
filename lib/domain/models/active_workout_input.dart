@@ -43,8 +43,8 @@ class ActiveWorkoutInput {
     this.targetReps,
   });
 
-  double get effectiveWeight => double.tryParse(weightInput) ?? 0.0;
-  int get effectiveReps => int.tryParse(repsInput) ?? 0;
+  double get effectiveWeight => double.tryParse(weightInput.replaceAll(',', '.').trim()) ?? 0.0;
+  int get effectiveReps => int.tryParse(repsInput.trim()) ?? 0;
 
   /// Formatted breakdown of plates per side for barbell / plate loaded exercises
   String? get plateBreakdownSummary {

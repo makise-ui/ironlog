@@ -1734,10 +1734,50 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
         ),
-        child: _buildFormattedMarkdown(
-          msg.content,
-          isUser: false,
-          isStreaming: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildFormattedMarkdown(
+              msg.content,
+              isUser: false,
+              isStreaming: false,
+            ),
+            const SizedBox(height: 10),
+            ScaleTap(
+              onPressed: () {
+                ref.read(aiChatNotifierProvider.notifier).retryLastMessage();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.refresh_rounded,
+                      size: 15,
+                      color: AppColors.error,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Retry Response',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }

@@ -12,6 +12,7 @@ import '../../domain/models/analytics_model.dart';
 import '../../core/utils/fuzzy_matcher.dart';
 import '../../core/utils/date_utils.dart';
 import '../../domain/services/backup_service.dart';
+import '../../domain/services/e1rm_calculator.dart';
 import '../../domain/models/workout_debrief_model.dart';
 
 class WorkoutRepository {
@@ -266,29 +267,31 @@ class WorkoutRepository {
 
   /// Discards / abandons a workout session (soft deletes workout, exercises, and sets)
   Future<void> discardWorkout(String workoutId) async {
-    await (_db.update(_db.workouts)..where((t) => t.id.equals(workoutId))).write(
-      const WorkoutsCompanion(archived: Value(true)),
-    );
-    try {
-      await _db.customStatement('''
-        UPDATE workout_exercises SET archived = 1 WHERE workout_id = ?;
-      ''', [workoutId]);
-      await _db.customStatement('''
-        UPDATE sets SET archived = 1 
-        WHERE workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id = ?);
-      ''', [workoutId]);
-    } catch (_) {
-      final weRows = await (_db.select(_db.workoutExercises)..where((t) => t.workoutId.equals(workoutId))).get();
-      for (final we in weRows) {
-        await (_db.update(_db.workoutExercises)..where((t) => t.id.equals(we.id))).write(
-          const WorkoutExercisesCompanion(archived: Value(true)),
-        );
-        await (_db.update(_db.sets)..where((t) => t.workoutExerciseId.equals(we.id))).write(
-          const SetsCompanion(archived: Value(true)),
-        );
+    await _db.transaction(() async {
+      await (_db.update(_db.workouts)..where((t) => t.id.equals(workoutId))).write(
+        const WorkoutsCompanion(archived: Value(true)),
+      );
+      try {
+        await _db.customStatement('''
+          UPDATE workout_exercises SET archived = 1 WHERE workout_id = ?;
+        ''', [workoutId]);
+        await _db.customStatement('''
+          UPDATE sets SET archived = 1 
+          WHERE workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id = ?);
+        ''', [workoutId]);
+      } catch (_) {
+        final weRows = await (_db.select(_db.workoutExercises)..where((t) => t.workoutId.equals(workoutId))).get();
+        for (final we in weRows) {
+          await (_db.update(_db.workoutExercises)..where((t) => t.id.equals(we.id))).write(
+            const WorkoutExercisesCompanion(archived: Value(true)),
+          );
+          await (_db.update(_db.sets)..where((t) => t.workoutExerciseId.equals(we.id))).write(
+            const SetsCompanion(archived: Value(true)),
+          );
+        }
       }
-    }
-    await _cleanupArchivedWorkoutRelations();
+      await _cleanupArchivedWorkoutRelations();
+    });
   }
 
   /// Restores a soft deleted workout exercise (undo)
@@ -364,17 +367,25 @@ class WorkoutRepository {
 
   /// Soft deletes a set (undoable)
   Future<void> deleteSet(String setId) async {
+    final existing = await (_db.select(_db.sets)..where((t) => t.id.equals(setId))).getSingleOrNull();
     await (_db.update(_db.sets)..where((t) => t.id.equals(setId))).write(
       const SetsCompanion(archived: Value(true)),
     );
+    if (existing != null) {
+      await recalculatePrsForExercise(existing.exerciseId);
+    }
     BackupService.scheduleAutoBackup(_db);
   }
 
   /// Restores a soft-deleted set
   Future<void> restoreSet(String setId) async {
+    final existing = await (_db.select(_db.sets)..where((t) => t.id.equals(setId))).getSingleOrNull();
     await (_db.update(_db.sets)..where((t) => t.id.equals(setId))).write(
       const SetsCompanion(archived: Value(false)),
     );
+    if (existing != null) {
+      await recalculatePrsForExercise(existing.exerciseId);
+    }
     BackupService.scheduleAutoBackup(_db);
   }
 
@@ -386,6 +397,7 @@ class WorkoutRepository {
     required SetType setType,
     double? rpe,
   }) async {
+    final existing = await (_db.select(_db.sets)..where((t) => t.id.equals(setId))).getSingleOrNull();
     await (_db.update(_db.sets)..where((t) => t.id.equals(setId))).write(
       SetsCompanion(
         weight: Value(weight),
@@ -394,7 +406,127 @@ class WorkoutRepository {
         rpe: Value(rpe),
       ),
     );
+    if (existing != null) {
+      await recalculatePrsForExercise(existing.exerciseId);
+    }
     BackupService.scheduleAutoBackup(_db);
+  }
+
+  /// Recalculates all PRs for an exercise from active, non-warmup sets with reps > 0 and weight > 0.
+  Future<void> recalculatePrsForExercise(String exerciseId) async {
+    final sets = await (_db.select(_db.sets)
+          ..where((t) =>
+              t.exerciseId.equals(exerciseId) &
+              t.archived.equals(false) &
+              t.setType.equals('warmup').not() &
+              t.reps.isBiggerThanValue(0) &
+              t.weight.isBiggerThanValue(0)))
+        .get();
+
+    await _db.transaction(() async {
+      await (_db.delete(_db.prs)..where((t) => t.exerciseId.equals(exerciseId))).go();
+
+      if (sets.isNotEmpty) {
+        // 1) Find max weight set. If > 0, insert 'heaviest' PR.
+        GymSetData? maxWeightSet;
+        for (final s in sets) {
+          if (maxWeightSet == null || s.weight > maxWeightSet.weight) {
+            maxWeightSet = s;
+          }
+        }
+        final maxWeight = maxWeightSet?.weight ?? 0.0;
+        if (maxWeightSet != null && maxWeight > 0) {
+          await _db.into(_db.prs).insert(
+                PrsCompanion.insert(
+                  id: _uuid.v4(),
+                  exerciseId: exerciseId,
+                  kind: 'heaviest',
+                  value: maxWeight,
+                  setId: Value(maxWeightSet.id),
+                  achievedAt: maxWeightSet.completedAt,
+                ),
+              );
+        }
+
+        // 2) Calculate e1RM for each set via E1rmCalculator.calculate(s.weight, s.reps).
+        // Find max e1rm. If max e1rm > max weight * 1.05, insert 'e1rm' PR.
+        GymSetData? maxE1rmSet;
+        double maxE1rm = 0.0;
+        for (final s in sets) {
+          final e1rm = E1rmCalculator.calculate(s.weight, s.reps);
+          if (e1rm > maxE1rm) {
+            maxE1rm = e1rm;
+            maxE1rmSet = s;
+          }
+        }
+        if (maxE1rmSet != null && maxE1rm > (maxWeight * 1.05)) {
+          await _db.into(_db.prs).insert(
+                PrsCompanion.insert(
+                  id: _uuid.v4(),
+                  exerciseId: exerciseId,
+                  kind: 'e1rm',
+                  value: maxE1rm,
+                  setId: Value(maxE1rmSet.id),
+                  achievedAt: maxE1rmSet.completedAt,
+                ),
+              );
+        }
+
+        // 3) For each unique weight (rounded to 1 decimal place), find max reps.
+        // If max reps > 0, insert 'reps_at_weight' PR for that weight.
+        final Map<double, GymSetData> maxRepSetsByWeight = {};
+        for (final s in sets) {
+          final roundedWeight = double.parse(s.weight.toStringAsFixed(1));
+          final existing = maxRepSetsByWeight[roundedWeight];
+          if (existing == null || s.reps > existing.reps) {
+            maxRepSetsByWeight[roundedWeight] = s;
+          }
+        }
+        for (final entry in maxRepSetsByWeight.entries) {
+          final bestSet = entry.value;
+          if (bestSet.reps > 0) {
+            await _db.into(_db.prs).insert(
+                  PrsCompanion.insert(
+                    id: _uuid.v4(),
+                    exerciseId: exerciseId,
+                    kind: 'reps_at_weight',
+                    value: bestSet.reps.toDouble(),
+                    setId: Value(bestSet.id),
+                    achievedAt: bestSet.completedAt,
+                  ),
+                );
+          }
+        }
+
+        // 4) Group by workoutExerciseId, sum volume (s.weight * s.reps).
+        // If max volume > 0, insert 'session_volume' PR.
+        final Map<String, List<GymSetData>> setsByWorkoutEx = {};
+        for (final s in sets) {
+          setsByWorkoutEx.putIfAbsent(s.workoutExerciseId, () => []).add(s);
+        }
+        double maxVolume = 0.0;
+        GymSetData? maxVolumeFirstSet;
+        for (final group in setsByWorkoutEx.values) {
+          final vol = group.fold(0.0, (sum, s) => sum + (s.weight * s.reps));
+          if (vol > maxVolume) {
+            maxVolume = vol;
+            maxVolumeFirstSet = group.first;
+          }
+        }
+        if (maxVolumeFirstSet != null && maxVolume > 0) {
+          await _db.into(_db.prs).insert(
+                PrsCompanion.insert(
+                  id: _uuid.v4(),
+                  exerciseId: exerciseId,
+                  kind: 'session_volume',
+                  value: maxVolume,
+                  setId: Value(maxVolumeFirstSet.id),
+                  achievedAt: maxVolumeFirstSet.completedAt,
+                ),
+              );
+        }
+      }
+    });
   }
 
   /// Updates workout metadata (note, feel, title, endedAt)
@@ -971,21 +1103,24 @@ class WorkoutRepository {
           ..limit(limit))
         .get();
 
-    final exRows = await _db.select(_db.exercises).get();
+    final exRows = await (_db.select(_db.exercises)..where((t) => t.archived.equals(false))).get();
     final exMap = {for (final e in exRows) e.id: e};
 
-    return prRows.map((pr) {
-      final ex = exMap[pr.exerciseId];
-      return PrItemData(
-        id: pr.id,
-        exerciseId: pr.exerciseId,
-        exerciseName: ex?.name ?? 'Exercise',
-        muscleGroupId: ex?.muscleGroupId ?? 'General',
-        kind: pr.kind,
-        value: pr.value,
-        achievedAt: pr.achievedAt,
-      );
-    }).toList();
+    return prRows
+        .where((pr) => exMap.containsKey(pr.exerciseId))
+        .map((pr) {
+          final ex = exMap[pr.exerciseId]!;
+          return PrItemData(
+            id: pr.id,
+            exerciseId: pr.exerciseId,
+            exerciseName: ex.name,
+            muscleGroupId: ex.muscleGroupId,
+            kind: pr.kind,
+            value: pr.value,
+            achievedAt: pr.achievedAt,
+          );
+        })
+        .toList();
   }
 
   /// Generates a comprehensive AI post-workout debrief comparing against historical volume baseline,
@@ -1057,7 +1192,9 @@ class WorkoutRepository {
     final currentWorkoutExIds = workout.exercises.map((e) => e.id).toSet();
 
     for (final exItem in workout.exercises.where((e) => !e.archived)) {
-      final workingSets = exItem.sets.where((s) => !s.archived && !s.isWarmup).toList();
+      final workingSets = exItem.sets
+          .where((s) => !s.archived && !s.isWarmup && s.reps > 0 && s.weight > 0)
+          .toList();
       if (workingSets.isEmpty) continue;
 
       final sessionMaxWeight = workingSets.map((s) => s.weight).reduce(math.max);
@@ -1068,7 +1205,11 @@ class WorkoutRepository {
 
       // Filter out sets belonging to the current workout and warmups
       final priorSets = histSetsRows
-          .where((s) => !currentWorkoutExIds.contains(s.workoutExerciseId) && !s.isWarmup)
+          .where((s) =>
+              !currentWorkoutExIds.contains(s.workoutExerciseId) &&
+              !s.isWarmup &&
+              s.reps > 0 &&
+              s.weight > 0)
           .toList();
 
       if (priorSets.isNotEmpty) {
@@ -1121,6 +1262,85 @@ class WorkoutRepository {
                   achievedAt: workout.date,
                 ),
               );
+        }
+
+        // Reps at weight PRs
+        final recordedWeights = <double>{};
+        for (final s in workingSets) {
+          final matchingPriorSets = priorSets
+              .where((p) => (p.weight - s.weight).abs() < 0.05)
+              .toList();
+          if (matchingPriorSets.isNotEmpty) {
+            final priorMaxReps = matchingPriorSets.map((p) => p.reps).reduce(math.max);
+            if (s.reps > priorMaxReps) {
+              final roundedWeight = (s.weight * 10).round() / 10.0;
+              if (recordedWeights.contains(roundedWeight)) continue;
+              recordedWeights.add(roundedWeight);
+
+              final sameWeightSets = workingSets.where((w) => (w.weight - s.weight).abs() < 0.05);
+              final bestReps = sameWeightSets.map((w) => w.reps).reduce(math.max);
+
+              final prId = _uuid.v4();
+              final pr = PrItemData(
+                id: prId,
+                exerciseId: exItem.exercise.id,
+                exerciseName: exItem.exercise.name,
+                muscleGroupId: exItem.exercise.muscleGroupId,
+                kind: 'reps_at_weight',
+                value: bestReps.toDouble(),
+                achievedAt: workout.date,
+              );
+              brokenPrs.add(pr);
+
+              await _db.into(_db.prs).insertOnConflictUpdate(
+                    PrsCompanion.insert(
+                      id: prId,
+                      exerciseId: exItem.exercise.id,
+                      kind: 'reps_at_weight',
+                      value: bestReps.toDouble(),
+                      achievedAt: workout.date,
+                    ),
+                  );
+            }
+          }
+        }
+
+        // Session Volume PR
+        final sessionVolume = workingSets.fold(0.0, (sum, s) => sum + (s.weight * s.reps));
+        final Map<String, List<SetModel>> priorSetsByWorkoutEx = {};
+        for (final p in priorSets) {
+          priorSetsByWorkoutEx.putIfAbsent(p.workoutExerciseId, () => []).add(p);
+        }
+        final sessionVolumes = priorSetsByWorkoutEx.values
+            .map((group) => group.fold(0.0, (sum, s) => sum + (s.weight * s.reps)))
+            .where((v) => v > 0)
+            .toList();
+
+        if (sessionVolumes.isNotEmpty) {
+          final priorMaxVolume = sessionVolumes.reduce(math.max);
+          if (sessionVolume > priorMaxVolume && sessionVolume > 0) {
+            final prId = _uuid.v4();
+            final pr = PrItemData(
+              id: prId,
+              exerciseId: exItem.exercise.id,
+              exerciseName: exItem.exercise.name,
+              muscleGroupId: exItem.exercise.muscleGroupId,
+              kind: 'session_volume',
+              value: sessionVolume,
+              achievedAt: workout.date,
+            );
+            brokenPrs.add(pr);
+
+            await _db.into(_db.prs).insertOnConflictUpdate(
+                  PrsCompanion.insert(
+                    id: prId,
+                    exerciseId: exItem.exercise.id,
+                    kind: 'session_volume',
+                    value: sessionVolume,
+                    achievedAt: workout.date,
+                  ),
+                );
+          }
         }
       } else if (sessionMaxWeight > 0) {
         final prId = _uuid.v4();

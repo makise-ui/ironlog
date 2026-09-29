@@ -38,7 +38,9 @@ enum ExerciseTrackingType {
   weightAndReps,
   bodyweightReps,
   duration,     // Isometric holds (Plank, Wall Sit, Dead Hang, L-Sit) - measured in seconds
-  cardioTime,   // Sports & Cardio (Football, Basketball, Running, Boxing) - measured in minutes
+  cardioTime;   // Sports & Cardio (Football, Basketball, Running, Boxing) - measured in minutes
+
+  static const ExerciseTrackingType repsOnly = ExerciseTrackingType.bodyweightReps;
 }
 
 class ExerciseModel {

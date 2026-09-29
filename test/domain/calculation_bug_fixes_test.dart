@@ -1,3 +1,6 @@
+@Timeout(Duration(seconds: 120))
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ironlog/data/database/database.dart';
 import 'package:ironlog/domain/services/csv_import_service.dart';
@@ -5,7 +8,12 @@ import 'package:ironlog/domain/services/e1rm_calculator.dart';
 import 'package:ironlog/domain/services/plan_share_service.dart';
 import 'package:ironlog/domain/services/plate_calculator.dart';
 import 'package:ironlog/domain/services/strength_decay_service.dart';
+import 'package:ironlog/core/utils/unit_converter.dart';
+import 'package:ironlog/domain/models/active_workout_input.dart';
+import 'package:ironlog/domain/models/exercise_model.dart';
+import 'package:ironlog/domain/models/set_model.dart';
 import 'package:ironlog/domain/services/warmup_generator.dart';
+import 'package:ironlog/domain/services/weight_step_learner.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -126,6 +134,25 @@ void main() {
       expect(ex.weightStep, 5.0);
 
       await db.close();
+    });
+
+    test('6. ActiveWorkoutInput correctly parses European comma decimal and trims inputs', () {
+      const input = ActiveWorkoutInput(
+        workoutExerciseId: 'we1',
+        exerciseId: 'ex1',
+        exerciseName: 'Bench Press',
+        equipment: EquipmentType.barbell,
+        setIndex: 1,
+        setType: SetType.working,
+        activeField: WorkoutInputField.weight,
+        weightInput: ' 82,5 ',
+        repsInput: ' 10 ',
+        unit: WeightUnit.kg,
+        isCompleted: false,
+      );
+
+      expect(input.effectiveWeight, 82.5);
+      expect(input.effectiveReps, 10);
     });
   });
 }

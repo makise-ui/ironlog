@@ -316,6 +316,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     required int reps,
     required SetType setType,
   }) async {
+    if (reps <= 0) return;
     widget.onExerciseFocused?.call();
     AppHaptics.tap();
     final repo = ref.read(workoutRepositoryProvider);

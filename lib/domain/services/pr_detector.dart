@@ -72,13 +72,15 @@ class PrDetector {
     required List<SetModel> historicalSets,
     String weightUnit = 'kg',
   }) {
+    if (newSet.reps <= 0) return PrResult.notPr;
+
     // Only working, drop, or failure sets qualify for PRs (warmups excluded per spec)
     if (newSet.setType == SetType.warmup) {
       return PrResult.notPr;
     }
 
     final validHistory = historicalSets
-        .where((s) => s.id != newSet.id && !s.archived && s.setType != SetType.warmup)
+        .where((s) => s.id != newSet.id && !s.archived && s.setType != SetType.warmup && s.reps > 0)
         .toList();
 
     if (validHistory.isEmpty) {
