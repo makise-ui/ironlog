@@ -86,24 +86,35 @@ class WorkoutRepository {
   /// Fetches or creates workout for a specific date (defaults to today)
   Future<WorkoutModel> getOrCreateWorkoutForDate(DateTime date, {String? routineTitle}) async {
     final normDate = AppDateUtils.normalizeDate(date);
-    final existing = await getWorkoutForDate(normDate);
-    if (existing != null) {
-      return existing;
-    }
+    final workoutId = await _db.transaction(() async {
+      final existingList = await (_db.select(_db.workouts)
+            ..where((t) => t.date.equals(normDate) & t.archived.equals(false))
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.endedAt.isNull(), mode: OrderingMode.desc),
+              (t) => OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc),
+              (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+            ]))
+          .get();
+      final existing = existingList.firstOrNull;
+      if (existing != null) {
+        return existing.id;
+      }
 
-    final newId = _uuid.v4();
-    final title = routineTitle ?? 'Workout - ${AppDateUtils.formatShortDate(normDate)}';
-    await _db.into(_db.workouts).insert(
-      WorkoutsCompanion.insert(
-        id: newId,
-        date: normDate,
-        startedAt: const Value(null),
-        title: title,
-        archived: const Value(false),
-      ),
-    );
+      final newId = _uuid.v4();
+      final title = routineTitle ?? 'Workout - ${AppDateUtils.formatShortDate(normDate)}';
+      await _db.into(_db.workouts).insert(
+        WorkoutsCompanion.insert(
+          id: newId,
+          date: normDate,
+          startedAt: const Value(null),
+          title: title,
+          archived: const Value(false),
+        ),
+      );
+      return newId;
+    });
 
-    return getWorkoutById(newId);
+    return getWorkoutById(workoutId);
   }
 
   /// Fetches or creates today's workout
@@ -244,12 +255,18 @@ class WorkoutRepository {
 
   /// Soft deletes a workout exercise (with sets)
   Future<void> removeExerciseFromWorkout(String workoutExerciseId) async {
-    await (_db.update(_db.workoutExercises)..where((t) => t.id.equals(workoutExerciseId))).write(
-      const WorkoutExercisesCompanion(archived: Value(true)),
-    );
-    await (_db.update(_db.sets)..where((t) => t.workoutExerciseId.equals(workoutExerciseId))).write(
-      const SetsCompanion(archived: Value(true)),
-    );
+    final we = await (_db.select(_db.workoutExercises)..where((t) => t.id.equals(workoutExerciseId))).getSingleOrNull();
+    await _db.transaction(() async {
+      await (_db.update(_db.workoutExercises)..where((t) => t.id.equals(workoutExerciseId))).write(
+        const WorkoutExercisesCompanion(archived: Value(true)),
+      );
+      await (_db.update(_db.sets)..where((t) => t.workoutExerciseId.equals(workoutExerciseId))).write(
+        const SetsCompanion(archived: Value(true)),
+      );
+    });
+    if (we != null) {
+      await recalculatePrsForExercise(we.exerciseId);
+    }
     BackupService.scheduleAutoBackup(_db);
   }
 
@@ -261,7 +278,7 @@ class WorkoutRepository {
         WHERE workout_id IN (SELECT id FROM workouts WHERE archived = 1);
       ''');
       await _db.customStatement('''
-        UPDATE sets SET archived = 1
+        UPDATE sets SET archived = 1 
         WHERE workout_exercise_id IN (
           SELECT id FROM workout_exercises WHERE archived = 1
         );
@@ -271,6 +288,9 @@ class WorkoutRepository {
 
   /// Discards / abandons a workout session (soft deletes workout, exercises, and sets)
   Future<void> discardWorkout(String workoutId) async {
+    final weRows = await (_db.select(_db.workoutExercises)..where((t) => t.workoutId.equals(workoutId))).get();
+    final exerciseIds = weRows.map((we) => we.exerciseId).toSet();
+
     await _db.transaction(() async {
       await (_db.update(_db.workouts)..where((t) => t.id.equals(workoutId))).write(
         const WorkoutsCompanion(archived: Value(true)),
@@ -284,7 +304,6 @@ class WorkoutRepository {
           WHERE workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id = ?);
         ''', [workoutId]);
       } catch (_) {
-        final weRows = await (_db.select(_db.workoutExercises)..where((t) => t.workoutId.equals(workoutId))).get();
         for (final we in weRows) {
           await (_db.update(_db.workoutExercises)..where((t) => t.id.equals(we.id))).write(
             const WorkoutExercisesCompanion(archived: Value(true)),
@@ -296,16 +315,26 @@ class WorkoutRepository {
       }
       await _cleanupArchivedWorkoutRelations();
     });
+
+    for (final exId in exerciseIds) {
+      await recalculatePrsForExercise(exId);
+    }
   }
 
   /// Restores a soft deleted workout exercise (undo)
   Future<void> restoreWorkoutExercise(String workoutExerciseId) async {
-    await (_db.update(_db.workoutExercises)..where((t) => t.id.equals(workoutExerciseId))).write(
-      const WorkoutExercisesCompanion(archived: Value(false)),
-    );
-    await (_db.update(_db.sets)..where((t) => t.workoutExerciseId.equals(workoutExerciseId))).write(
-      const SetsCompanion(archived: Value(false)),
-    );
+    final we = await (_db.select(_db.workoutExercises)..where((t) => t.id.equals(workoutExerciseId))).getSingleOrNull();
+    await _db.transaction(() async {
+      await (_db.update(_db.workoutExercises)..where((t) => t.id.equals(workoutExerciseId))).write(
+        const WorkoutExercisesCompanion(archived: Value(false)),
+      );
+      await (_db.update(_db.sets)..where((t) => t.workoutExerciseId.equals(workoutExerciseId))).write(
+        const SetsCompanion(archived: Value(false)),
+      );
+    });
+    if (we != null) {
+      await recalculatePrsForExercise(we.exerciseId);
+    }
   }
 
   /// Records a new set
@@ -416,7 +445,7 @@ class WorkoutRepository {
     BackupService.scheduleAutoBackup(_db);
   }
 
-  /// Recalculates all PRs for an exercise from active, non-warmup sets with reps > 0 and weight > 0.
+  /// Recalculates all PRs for an exercise from active, non-warmup sets with reps > 0 and weight >= 0.
   Future<void> recalculatePrsForExercise(String exerciseId) async {
     final sets = await (_db.select(_db.sets)
           ..where((t) =>
@@ -424,7 +453,7 @@ class WorkoutRepository {
               t.archived.equals(false) &
               t.setType.equals('warmup').not() &
               t.reps.isBiggerThanValue(0) &
-              t.weight.isBiggerThanValue(0)))
+              t.weight.isBiggerOrEqualValue(0)))
         .get();
 
     await _db.transaction(() async {
@@ -447,33 +476,36 @@ class WorkoutRepository {
                   kind: 'heaviest',
                   value: maxWeight,
                   setId: Value(maxWeightSet.id),
-                  achievedAt: maxWeightSet.completedAt,
+                  achievedAt: maxWeightSet.date,
                 ),
               );
         }
 
         // 2) Calculate e1RM for each set via E1rmCalculator.calculate(s.weight, s.reps).
         // Find max e1rm. If max e1rm > max weight * 1.05, insert 'e1rm' PR.
-        GymSetData? maxE1rmSet;
-        double maxE1rm = 0.0;
-        for (final s in sets) {
-          final e1rm = E1rmCalculator.calculate(s.weight, s.reps);
-          if (e1rm > maxE1rm) {
-            maxE1rm = e1rm;
-            maxE1rmSet = s;
+        if (maxWeight > 0) {
+          GymSetData? maxE1rmSet;
+          double maxE1rm = 0.0;
+          for (final s in sets) {
+            if (s.weight <= 0) continue;
+            final e1rm = E1rmCalculator.calculate(s.weight, s.reps);
+            if (e1rm > maxE1rm) {
+              maxE1rm = e1rm;
+              maxE1rmSet = s;
+            }
           }
-        }
-        if (maxE1rmSet != null && maxE1rm > (maxWeight * 1.05)) {
-          await _db.into(_db.prs).insert(
-                PrsCompanion.insert(
-                  id: _uuid.v4(),
-                  exerciseId: exerciseId,
-                  kind: 'e1rm',
-                  value: maxE1rm,
-                  setId: Value(maxE1rmSet.id),
-                  achievedAt: maxE1rmSet.completedAt,
-                ),
-              );
+          if (maxE1rmSet != null && maxE1rm > (maxWeight * 1.05)) {
+            await _db.into(_db.prs).insert(
+                  PrsCompanion.insert(
+                    id: _uuid.v4(),
+                    exerciseId: exerciseId,
+                    kind: 'e1rm',
+                    value: maxE1rm,
+                    setId: Value(maxE1rmSet.id),
+                    achievedAt: maxE1rmSet.date,
+                  ),
+                );
+          }
         }
 
         // 3) For each unique weight (rounded to 1 decimal place), find max reps.
@@ -496,7 +528,7 @@ class WorkoutRepository {
                     kind: 'reps_at_weight',
                     value: bestSet.reps.toDouble(),
                     setId: Value(bestSet.id),
-                    achievedAt: bestSet.completedAt,
+                    achievedAt: bestSet.date,
                   ),
                 );
           }
@@ -577,6 +609,7 @@ class WorkoutRepository {
 
   /// Copies last session of this workout title / routine
   Future<void> copyLastSession(String targetWorkoutId, String previousWorkoutId) async {
+    final targetWorkout = await getWorkoutById(targetWorkoutId);
     final prevWorkout = await getWorkoutById(previousWorkoutId);
     await _db.transaction(() async {
       for (final prevEx in prevWorkout.exercises) {
@@ -594,7 +627,7 @@ class WorkoutRepository {
             workoutExerciseId: weId,
             exerciseId: prevEx.exercise.id,
             muscleGroupId: s.muscleGroupId,
-            date: DateTime.now(),
+            date: targetWorkout.date,
             weight: s.weight,
             reps: s.reps,
             setType: s.setType,
@@ -618,18 +651,17 @@ class WorkoutRepository {
     final workoutId = _uuid.v4();
     final workoutTitle = title ?? 'Imported Workout - ${AppDateUtils.formatShortDate(normalizedDate)}';
 
-    await _db.into(_db.workouts).insert(
-      WorkoutsCompanion.insert(
-        id: workoutId,
-        date: normalizedDate,
-        startedAt: Value(normalizedDate.add(const Duration(hours: 10))),
-        endedAt: Value(normalizedDate.add(const Duration(hours: 11, minutes: 15))),
-        title: workoutTitle,
-        archived: const Value(false),
-      ),
-    );
-
     await _db.transaction(() async {
+      await _db.into(_db.workouts).insert(
+        WorkoutsCompanion.insert(
+          id: workoutId,
+          date: normalizedDate,
+          startedAt: Value(normalizedDate.add(const Duration(hours: 10))),
+          endedAt: Value(normalizedDate.add(const Duration(hours: 11, minutes: 15))),
+          title: workoutTitle,
+          archived: const Value(false),
+        ),
+      );
       for (final block in blocks) {
         // Fuzzy-match exercise name
         final match = FuzzyMatcher.bestMatch<ExerciseData>(
@@ -1446,8 +1478,8 @@ class WorkoutRepository {
 
     final completedWeekdays = <int>{};
     for (final w in weekWorkouts) {
-      final isRest = w.title.toLowerCase().contains('rest');
       final hasLifted = workoutIdsWithCompletedSets.contains(w.id);
+      final isRest = (w.title.toLowerCase().trim() == 'rest' || w.title.toLowerCase().trim() == 'rest day') && !hasLifted;
       if (isRest || hasLifted) {
         completedWeekdays.add(w.date.weekday);
       }
@@ -1458,7 +1490,7 @@ class WorkoutRepository {
         .get();
 
     final activeOrRestDates = allNonArchived
-        .where((w) => workoutIdsWithCompletedSets.contains(w.id) || w.title.toLowerCase().contains('rest'))
+        .where((w) => workoutIdsWithCompletedSets.contains(w.id) || w.title.toLowerCase().trim() == 'rest' || w.title.toLowerCase().trim() == 'rest day')
         .map((w) => DateTime(w.date.year, w.date.month, w.date.day))
         .toSet();
 
@@ -1473,7 +1505,7 @@ class WorkoutRepository {
     }
 
     final nonRestCount = weekWorkouts
-        .where((w) => workoutIdsWithCompletedSets.contains(w.id) && !w.title.toLowerCase().contains('rest'))
+        .where((w) => workoutIdsWithCompletedSets.contains(w.id))
         .length;
 
     return StreakAndWeekData(

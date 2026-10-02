@@ -145,7 +145,35 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 '${existing.exercises.length} movements • ${existing.totalSetsCount} sets',
                 style: TextStyle(fontSize: 12, color: context.textSecondary),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  AppHaptics.save();
+                  final today = AppDateUtils.normalizeDate(DateTime.now());
+                  final repo = ref.read(workoutRepositoryProvider);
+                  final todayWorkout = await repo.getOrCreateTodayWorkout();
+                  await repo.copyLastSession(todayWorkout.id, existing.id);
+                  ref.read(selectedWorkoutDateProvider.notifier).state = today;
+                  if (mounted) {
+                    context.go('/today');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Copied "${existing.title}" to today\'s workout!'),
+                        backgroundColor: const Color(0xFF10B981),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.today_rounded, size: 16),
+                label: const Text('Repeat in Today\'s Workout'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.accent,
+                  foregroundColor: context.onAccent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -165,7 +193,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: ElevatedButton.icon(
+                    child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
                         ref.read(selectedWorkoutDateProvider.notifier).state =
@@ -173,10 +201,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         context.go('/today');
                       },
                       icon: const Icon(Icons.edit_note_rounded, size: 16),
-                      label: const Text('Edit / Add Sets'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: context.accent,
-                        foregroundColor: context.onAccent,
+                      label: const Text('Edit Sets'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: context.textPrimary,
+                        side: BorderSide(color: context.chipBorder),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),

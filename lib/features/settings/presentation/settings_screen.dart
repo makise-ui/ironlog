@@ -19,6 +19,8 @@ import 'csv_import_sheet.dart';
 import '../../intro/presentation/onboarding_sheet.dart';
 import '../../today/presentation/widgets/ai_assistant_sheet.dart';
 import 'ai_settings_screen.dart';
+import '../../../domain/services/app_update_service.dart';
+import 'whats_new_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -44,6 +46,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _aiNotificationsEnabled = true;
   bool _aiSuggestionsEnabled = true;
   bool _restTimerNotifsEnabled = true;
+  bool _autoCheckUpdates = true;
+  bool _isCheckingUpdates = false;
 
   AiConfigModel _aiConfig = const AiConfigModel();
 
@@ -79,6 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final aiNotifs = await settingsRepo.getAiNotificationsEnabled();
     final aiSuggestions = await settingsRepo.getAiSuggestionsEnabled();
     final restTimerNotifs = await settingsRepo.getRestTimerNotificationsEnabled();
+    final autoCheck = await settingsRepo.getAutoCheckUpdates();
 
     if (mounted) {
       setState(() {
@@ -94,6 +99,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _aiNotificationsEnabled = aiNotifs;
         _aiSuggestionsEnabled = aiSuggestions;
         _restTimerNotifsEnabled = restTimerNotifs;
+        _autoCheckUpdates = autoCheck;
       });
     }
   }
@@ -1067,19 +1073,127 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           const SizedBox(height: AppSpacing.lg),
-          const Text('ABOUT IRONLOG', style: AppTypography.labelSmall),
+          const Text('ABOUT IRONLOG & UPDATES', style: AppTypography.labelSmall),
           const SizedBox(height: AppSpacing.xs),
           GlassTile(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('IronLog v1.0.0', style: AppTypography.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  '100% Offline-first gym tracker built with Flutter, Drift (SQLite), and glassmorphic UI. Zero internet permission requested for core tracking.',
-                  style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text('IronLog ${AppUpdateService.currentVersion}', style: AppTypography.titleMedium),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: context.accent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Latest',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.onAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '100% Offline-first gym tracker built with Flutter, Drift (SQLite), and glassmorphic UI.',
+                            style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GlassButton(
+                        text: 'What\'s New',
+                        icon: Icons.auto_awesome_rounded,
+                        style: GlassButtonStyle.primary,
+                        onPressed: () {
+                          AppHaptics.tap();
+                          WhatsNewSheet.show(context);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GlassButton(
+                        text: 'Check Update',
+                        icon: Icons.refresh_rounded,
+                        style: GlassButtonStyle.secondary,
+                        isLoading: _isCheckingUpdates,
+                        onPressed: () async {
+                          setState(() => _isCheckingUpdates = true);
+                          AppHaptics.tap();
+                          try {
+                            final res = await ref.read(appUpdateServiceProvider).checkForUpdates(isManual: true);
+                            if (mounted && context.mounted) {
+                              if (res.isUpdateAvailable) {
+                                WhatsNewSheet.show(context);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('IronLog is up to date (${AppUpdateService.currentVersion})!'),
+                                    backgroundColor: const Color(0xFF10B981),
+                                  ),
+                                );
+                              }
+                            }
+                          } finally {
+                            if (mounted) setState(() => _isCheckingUpdates = false);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Auto-Check Updates',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            'Notify when new features and performance patches land',
+                            style: TextStyle(fontSize: 11, color: context.textTertiary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _autoCheckUpdates,
+                      activeThumbColor: context.accent,
+                      onChanged: (val) async {
+                        AppHaptics.selection();
+                        setState(() => _autoCheckUpdates = val);
+                        await ref.read(settingsRepositoryProvider).setAutoCheckUpdates(val);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
                 GlassButton(
                   text: 'Replay Onboarding Guide',
                   icon: Icons.school_outlined,

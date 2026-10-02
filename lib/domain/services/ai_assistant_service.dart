@@ -12,6 +12,7 @@ import '../models/ai_chat_message.dart';
 import '../models/chibi_avatar_model.dart';
 import 'ai_tool_service.dart';
 import 'ai_memory_service.dart';
+import 'app_notification_service.dart';
 
 final aiAssistantServiceProvider = Provider<AiAssistantService>((ref) {
   return AiAssistantService(ref);
@@ -577,8 +578,7 @@ TODAY'S WORKOUT LOG ($dateFormatted):
       }
     } catch (e) {
       debugPrint('AI Stream error: $e');
-      yield AiThinkingEvent('Connection issue encountered. Switching to offline engine...');
-      yield* _handleOfflineHeuristicStream(userPrompt, fallbackError: e.toString(), imagePath: imagePath);
+      yield AiErrorEvent('Network connection was interrupted while processing: $e');
     }
   }
 
@@ -706,7 +706,7 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
     required Map<String, String> headers,
     required Object body,
     Duration timeout = const Duration(seconds: 45),
-    int maxRetries = 3,
+    int maxRetries = 4,
     void Function(int attempt, Duration delay, dynamic error)? onRetry,
   }) async {
     int attempt = 0;
@@ -722,7 +722,7 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         // Retry on server errors or rate limiting (429, 500, 502, 503, 504)
         if ((response.statusCode == 429 || (response.statusCode >= 500 && response.statusCode <= 504)) &&
             attempt <= maxRetries) {
-          final delay = Duration(milliseconds: 1000 * (1 << (attempt - 1))); // 1s, 2s, 4s
+          final delay = Duration(milliseconds: 1000 * (1 << (attempt - 1))); // 1s, 2s, 4s, 8s
           onRetry?.call(attempt, delay, 'HTTP ${response.statusCode}');
           await Future.delayed(delay);
           continue;
@@ -730,7 +730,9 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         return response;
       } catch (e) {
         if (attempt <= maxRetries) {
-          final delay = Duration(milliseconds: 1000 * (1 << (attempt - 1)));
+          final isBg = AppNotificationService.instance.isAppInBackground;
+          final factor = isBg ? 2 : 1;
+          final delay = Duration(milliseconds: factor * 1000 * (1 << (attempt - 1)));
           onRetry?.call(attempt, delay, e);
           await Future.delayed(delay);
           continue;
@@ -870,8 +872,15 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         }
       }
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final choice = (data['choices'] as List).firstOrNull as Map<String, dynamic>?;
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Invalid JSON response from AI provider: ${response.body}');
+      }
+      final data = decoded;
+      final choicesRaw = data['choices'];
+      final choice = (choicesRaw is List && choicesRaw.isNotEmpty)
+          ? choicesRaw.first as Map<String, dynamic>?
+          : null;
       final message = choice?['message'] as Map<String, dynamic>?;
 
       // Handle completely empty model output — treat as done with no content

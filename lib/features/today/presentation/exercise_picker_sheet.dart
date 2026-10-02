@@ -10,6 +10,7 @@ import '../../../domain/models/exercise_model.dart';
 import '../../../domain/services/weight_step_learner.dart';
 import '../../../data/providers.dart';
 import 'custom_exercise_dialog.dart';
+import 'edit_exercise_dialog.dart';
 import 'widgets/exercise_visual_thumbnail.dart';
 import 'widgets/exercise_guide_sheet.dart';
 import 'widgets/exercise_image_picker_sheet.dart';
@@ -548,7 +549,24 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                                   ),
                                 ),
 
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 4),
+
+                                // Customize Specs / Tracking Button
+                                IconButton(
+                                  icon: Icon(Icons.tune_rounded, size: 19, color: context.textTertiary),
+                                  tooltip: 'Customize Tracking & Specs',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () async {
+                                    AppHaptics.tap();
+                                    final updated = await EditExerciseDialog.show(
+                                      context,
+                                      exercise: ex,
+                                    );
+                                    if (updated != null && mounted) {
+                                      await _loadExercises();
+                                    }
+                                  },
+                                ),
 
                                 // Info Button
                                 IconButton(

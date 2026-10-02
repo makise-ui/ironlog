@@ -42,6 +42,7 @@ import 'widgets/this_week_progress_bar.dart';
 import 'widgets/routine_card.dart';
 import '../../routines/presentation/create_preset_sheet.dart';
 import '../../intro/presentation/onboarding_sheet.dart';
+import '../../settings/presentation/whats_new_sheet.dart';
 import 'widgets/routine_qr_share_dialog.dart';
 import 'widgets/routine_preview_sheet.dart';
 import '../../../domain/services/exercise_auto_image_service.dart';
@@ -115,7 +116,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkAndPromptBackupRestore();
       if (mounted) {
-        OnboardingSheet.showIfNeeded(context, ref);
+        await OnboardingSheet.showIfNeeded(context, ref);
+      }
+      if (mounted) {
+        await WhatsNewSheet.showIfNeeded(context, ref);
       }
     });
   }
@@ -367,14 +371,17 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   }
 
   void _resumeWorkout() {
-    if (_workout != null && _workout!.startedAt != null) {
+    final isToday = AppDateUtils.isSameDay(_selectedDate, DateTime.now());
+    if (isToday && _workout != null && _workout!.startedAt != null) {
       // Adjust startedAt forward by the duration paused so elapsed time does not jump
       final adjustedStart = DateTime.now().subtract(_elapsedDuration);
       _workout = _workout!.copyWith(startedAt: adjustedStart);
       ref.read(workoutRepositoryProvider).startWorkout(_workout!.id, startedAt: adjustedStart);
     }
     setState(() => _sessionLeft = false);
-    _startElapsedTimer();
+    if (isToday) {
+      _startElapsedTimer();
+    }
   }
 
   Future<void> _loadWorkoutForDate(DateTime date) async {
@@ -401,7 +408,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         _suggestions = suggestions;
         _isLoading = false;
         _elapsedDuration = _calculateElapsedDuration(w);
+        if (!isToday) {
+          _sessionLeft = false;
+        }
       });
+      if (isToday && w != null && w.startedAt != null && w.endedAt == null && _elapsedTimer == null && !_sessionLeft) {
+        _startElapsedTimer();
+      }
       if (w != null && w.exercises.isNotEmpty) {
         ExerciseAutoImageService.prefetchBatch(
           w.exercises.where((e) => !e.archived).map((e) => (name: e.exercise.name, id: e.exercise.id)).toList(),
@@ -426,11 +439,15 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     );
 
     if (mounted) {
+      final isToday = AppDateUtils.isSameDay(_selectedDate, DateTime.now());
       setState(() {
         _workout = w;
         _suggestions = suggestions;
         _elapsedDuration = _calculateElapsedDuration(w);
       });
+      if (isToday && w.startedAt != null && w.endedAt == null && _elapsedTimer == null && !_sessionLeft) {
+        _startElapsedTimer();
+      }
       if (w.exercises.isNotEmpty) {
         ExerciseAutoImageService.prefetchBatch(
           w.exercises.where((e) => !e.archived).map((e) => (name: e.exercise.name, id: e.exercise.id)).toList(),
@@ -568,6 +585,22 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         workoutId: _workout!.id,
         onRoutineApplied: _refreshWorkout,
       ),
+    );
+  }
+
+  void _saveWorkoutAsPreset() {
+    final activeExercises = _workout?.exercises.where((e) => !e.archived).toList() ?? [];
+    if (activeExercises.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least one movement before saving as a preset routine.')),
+      );
+      return;
+    }
+    AppHaptics.tap();
+    CreatePresetSheet.show(
+      context,
+      initialName: _workout?.title,
+      initialExercises: activeExercises.map((e) => e.exercise).toList(),
     );
   }
 
@@ -722,10 +755,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         onFinish: (feel, note) async {
           final repo = ref.read(workoutRepositoryProvider);
           final end = DateTime.now();
+          final hadNoStartedAt = _workout!.startedAt == null;
           final start = _workout!.startedAt ??
               end.subtract(_elapsedDuration > Duration.zero ? _elapsedDuration : const Duration(minutes: 45));
 
           ref.read(restTimerProvider).stop();
+          ref.read(activeWorkoutInputProvider.notifier).close();
+          _activeWorkoutExerciseId = null;
           _elapsedTimer?.cancel();
           _elapsedTimer = null;
           setState(() {
@@ -745,7 +781,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             feel: feel,
             note: note,
           );
-          if (_workout!.startedAt == null) {
+          if (hadNoStartedAt) {
             await repo.startWorkout(_workout!.id, startedAt: start);
           }
           await _refreshWorkout();
@@ -818,21 +854,29 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final targetItem = _workout?.exercises.where((e) => e.id == input.workoutExerciseId).firstOrNull;
     if (targetItem == null) return;
 
+    final trackingType = targetItem.exercise.trackingType;
+    final isHold = trackingType == ExerciseTrackingType.duration;
+    final isCardio = trackingType == ExerciseTrackingType.cardioTime;
+
     if (input.effectiveReps <= 0) {
       AppHaptics.warning();
       if (mounted) {
+        final errorMsg = isHold
+            ? 'Please enter duration in seconds.'
+            : (isCardio ? 'Please enter duration in minutes.' : 'Please enter at least 1 rep.');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter at least 1 rep.')),
+          SnackBar(content: Text(errorMsg)),
         );
       }
       return;
     }
 
-    if (targetItem.exercise.equipment != EquipmentType.bodyweight &&
+    final isWeightRequired = trackingType == ExerciseTrackingType.weightAndReps &&
+        targetItem.exercise.equipment != EquipmentType.bodyweight &&
         targetItem.exercise.loadMode != LoadMode.bodyweight &&
-        targetItem.exercise.customTrackingType != ExerciseTrackingType.repsOnly &&
-        targetItem.exercise.loadMode != LoadMode.assisted &&
-        input.effectiveWeight <= 0) {
+        targetItem.exercise.loadMode != LoadMode.assisted;
+
+    if (isWeightRequired && input.effectiveWeight <= 0) {
       AppHaptics.warning();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -899,10 +943,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         if (currentExIdx >= 0) {
           final nextExIdx = (currentExIdx + 1) % supersetExercises.length;
           final nextExercise = supersetExercises[nextExIdx];
-          final isCyclingBack = nextExIdx == 0;
-          final nextSetIdx = isCyclingBack ? input.setIndex + 1 : input.setIndex;
-
           final nextCompletedSets = nextExercise.sets.where((s) => !s.archived).toList();
+          final nextSetIdx = nextCompletedSets.length + 1;
           final nextWeightKg = nextCompletedSets.isNotEmpty
               ? nextCompletedSets.last.weight
               : (nextExercise.exercise.equipment == EquipmentType.barbell ? 20.0 : 0.0);
@@ -1893,6 +1935,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       final repo = ref.read(workoutRepositoryProvider);
                       await repo.discardWorkout(_workout!.id);
                       ref.read(restTimerProvider).stop();
+                      ref.read(activeWorkoutInputProvider.notifier).close();
+                      _activeWorkoutExerciseId = null;
+                      ref.read(isWorkoutActiveProvider.notifier).state = false;
                       _elapsedTimer?.cancel();
                       _elapsedDuration = Duration.zero;
                       setState(() {
@@ -1938,6 +1983,10 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
   void _removeExercise(WorkoutExerciseItem item) async {
     final repo = ref.read(workoutRepositoryProvider);
+    if (_activeWorkoutExerciseId == item.id) {
+      _activeWorkoutExerciseId = null;
+      ref.read(activeWorkoutInputProvider.notifier).close();
+    }
     await repo.removeExerciseFromWorkout(item.id);
     _refreshWorkout();
 
@@ -2712,20 +2761,32 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
               children: [
                 _buildQuietPill(
                   icon: Icons.add_circle_outline_rounded,
-                  label: 'Add Exercise',
+                  label: 'Add Movement',
                   onTap: _openExercisePicker,
+                ),
+                const SizedBox(width: S.sm),
+                _buildQuietPill(
+                  icon: Icons.fitness_center_rounded,
+                  label: 'Presets',
+                  onTap: _openRoutines,
+                ),
+                const SizedBox(width: S.sm),
+                _buildQuietPill(
+                  icon: Icons.bookmark_add_rounded,
+                  label: 'Save Preset',
+                  onTap: _saveWorkoutAsPreset,
+                ),
+                const SizedBox(width: S.sm),
+                _buildQuietPill(
+                  icon: Icons.copy_all_rounded,
+                  label: 'Copy Past Session',
+                  onTap: _openCopySession,
                 ),
                 const SizedBox(width: S.sm),
                 _buildQuietPill(
                   icon: Icons.content_paste_rounded,
                   label: 'Paste Import',
                   onTap: _openPasteImporter,
-                ),
-                const SizedBox(width: S.sm),
-                _buildQuietPill(
-                  icon: Icons.copy_all_rounded,
-                  label: 'Copy Last',
-                  onTap: _openCopySession,
                 ),
                 const SizedBox(width: S.sm),
                 _buildQuietPill(
@@ -2966,6 +3027,64 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       size: 18,
                     ),
                   ),
+                ),
+                const SizedBox(width: 6),
+                PopupMenuButton<String>(
+                  icon: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: C.surfaceHi,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: C.hairline),
+                    ),
+                    child: Icon(Icons.more_vert_rounded, color: C.text2, size: 18),
+                  ),
+                  color: context.cardBg,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: context.cardBorder),
+                  ),
+                  onSelected: (val) {
+                    if (val == 'save_preset') {
+                      _saveWorkoutAsPreset();
+                    } else if (val == 'copy_past') {
+                      _openCopySession();
+                    } else if (val == 'discard') {
+                      _discardWorkout();
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'save_preset',
+                      child: Row(
+                        children: [
+                          Icon(Icons.bookmark_add_rounded, color: context.accent, size: 17),
+                          const SizedBox(width: 10),
+                          Text('Save as Preset', style: TextStyle(color: context.textPrimary, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'copy_past',
+                      child: Row(
+                        children: [
+                          Icon(Icons.copy_all_rounded, color: context.accent, size: 17),
+                          const SizedBox(width: 10),
+                          Text('Copy Past Workout...', style: TextStyle(color: context.textPrimary, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'discard',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 17),
+                          SizedBox(width: 10),
+                          Text('Discard Workout', style: TextStyle(color: AppColors.error, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

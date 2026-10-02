@@ -11,6 +11,7 @@ import '../../../../core/widgets/bouncy_pressable.dart';
 import '../../../../data/database/database.dart';
 import '../../../../domain/models/routine_model.dart';
 import '../../../../domain/services/plan_share_service.dart';
+import '../../../routines/presentation/multi_routine_import_sheet.dart';
 import 'routine_preview_sheet.dart';
 
 class RoutineQrShareDialog extends StatefulWidget {
@@ -91,6 +92,24 @@ class _RoutineQrShareDialogState extends State<RoutineQrShareDialog> with Single
     if (clean.isEmpty) return;
 
     try {
+      if (PlanShareService.isBundlePayload(clean)) {
+        final bundle = PlanShareService.parseBundlePreview(clean);
+        _isScanningHandled = true;
+        AppHaptics.success();
+        Navigator.pop(context);
+        MultiRoutineImportSheet.show(
+          context,
+          bundle: bundle,
+          db: widget.db,
+          onImported: (importedList) {
+            if (importedList.isNotEmpty) {
+              widget.onRoutineImported?.call(importedList.first);
+            }
+          },
+        );
+        return;
+      }
+
       final preview = PlanShareService.parsePreview(clean);
       _isScanningHandled = true;
       AppHaptics.success();
@@ -125,6 +144,23 @@ class _RoutineQrShareDialogState extends State<RoutineQrShareDialog> with Single
     setState(() => _importError = null);
 
     try {
+      if (PlanShareService.isBundlePayload(text)) {
+        final bundle = PlanShareService.parseBundlePreview(text);
+        AppHaptics.success();
+        Navigator.pop(context);
+        MultiRoutineImportSheet.show(
+          context,
+          bundle: bundle,
+          db: widget.db,
+          onImported: (importedList) {
+            if (importedList.isNotEmpty) {
+              widget.onRoutineImported?.call(importedList.first);
+            }
+          },
+        );
+        return;
+      }
+
       final preview = PlanShareService.parsePreview(text);
       AppHaptics.success();
 

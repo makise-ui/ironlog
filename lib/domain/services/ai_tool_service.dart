@@ -1299,12 +1299,17 @@ class AiToolService {
       }
     }
 
+    final userUnit = _ref.read(weightUnitNotifierProvider);
+    final weightInKg = (userUnit == WeightUnit.lb && weight > 0)
+        ? UnitConverter.toKg(weight, WeightUnit.lb)
+        : weight;
+
     await workoutRepo.logSet(
       workoutExerciseId: weId,
       exerciseId: matchedEx.id,
       muscleGroupId: matchedEx.muscleGroupId,
       date: targetDate,
-      weight: weight,
+      weight: weightInKg,
       reps: finalReps,
       setType: setType,
     );
@@ -1327,7 +1332,7 @@ class AiToolService {
         muscleGroupId: matchedEx.muscleGroupId,
         date: targetDate,
         setIndex: (weItem?.sets.length ?? 0) + 1,
-        weight: weight,
+        weight: weightInKg,
         reps: finalReps,
         setType: setType,
         completedAt: targetDate,
@@ -1341,17 +1346,18 @@ class AiToolService {
         : ' on ${AppDateUtils.formatShortDate(targetDate)}';
     final customNotice = matchedEx.isCustom ? ' (custom exercise created)' : '';
 
+    final unitLabel = userUnit == WeightUnit.lb ? 'lb' : 'kg';
     final tracking = matchedEx.trackingType;
     String performanceSummary;
     if (tracking == ExerciseTrackingType.duration) {
       final dur = SetModel.formatDuration(finalReps);
-      performanceSummary = weight > 0 ? '$dur (+${weight}kg)' : dur;
+      performanceSummary = weight > 0 ? '$dur (+$weight$unitLabel)' : dur;
     } else if (tracking == ExerciseTrackingType.cardioTime) {
       performanceSummary = '$finalReps min session';
     } else if (tracking == ExerciseTrackingType.bodyweightReps) {
-      performanceSummary = weight > 0 ? '$finalReps reps (+${weight}kg)' : '$finalReps reps';
+      performanceSummary = weight > 0 ? '$finalReps reps (+$weight$unitLabel)' : '$finalReps reps';
     } else {
-      performanceSummary = '${weight}kg × $finalReps';
+      performanceSummary = '$weight$unitLabel × $finalReps';
     }
 
     return AiToolExecutionResult(
@@ -1362,6 +1368,8 @@ class AiToolService {
         'exercise': matchedEx.name,
         'trackingType': tracking.name,
         'weight': weight,
+        'weightInKg': weightInKg,
+        'unit': userUnit.name,
         'reps': finalReps,
         'setType': setType.name,
         'date': targetDate.toIso8601String(),
@@ -1411,6 +1419,10 @@ class AiToolService {
     final targetDate = _resolveDateString(dateStr);
 
     final workout = await workoutRepo.getOrCreateWorkoutForDate(targetDate, routineTitle: title);
+    if (workout.startedAt == null && AppDateUtils.isSameDay(targetDate, DateTime.now())) {
+      await workoutRepo.startWorkout(workout.id);
+      _ref.read(isWorkoutActiveProvider.notifier).state = true;
+    }
     int addedCount = 0;
     for (final name in exerciseNames) {
       final matched = await _ensureExercise(name);
@@ -1440,13 +1452,19 @@ class AiToolService {
     final workoutRepo = _ref.read(workoutRepositoryProvider);
     final workout = await workoutRepo.getOrCreateTodayWorkout();
 
+    final end = DateTime.now();
+    if (workout.startedAt == null) {
+      final start = end.subtract(const Duration(minutes: 45));
+      await workoutRepo.startWorkout(workout.id, startedAt: start);
+    }
+
     final note = (workout.note != null && workout.note!.isNotEmpty)
         ? '${workout.note}\nFinished via AI Assistant'
         : 'Finished via AI Assistant';
 
     await workoutRepo.updateWorkoutMeta(
       workoutId: workout.id,
-      endedAt: DateTime.now(),
+      endedAt: end,
       feel: workout.feel ?? 3,
       note: note,
     );
@@ -1967,7 +1985,15 @@ class AiToolService {
       if (s.contains('work')) setType = SetType.working;
     }
 
-    final newWeight = weight ?? targetSet.weight;
+    final userUnit = _ref.read(weightUnitNotifierProvider);
+    final double newWeight;
+    if (weight != null) {
+      newWeight = (userUnit == WeightUnit.lb && weight > 0)
+          ? UnitConverter.toKg(weight, WeightUnit.lb)
+          : weight;
+    } else {
+      newWeight = targetSet.weight;
+    }
     final newReps = reps ?? targetSet.reps;
     final newRpe = rpe ?? targetSet.rpe;
 
@@ -1979,10 +2005,13 @@ class AiToolService {
       rpe: newRpe,
     );
 
+    final unitLabel = userUnit == WeightUnit.lb ? 'lb' : 'kg';
+    final displayWeight = UnitConverter.formatWeight(newWeight, unit: userUnit, includeUnit: false);
+
     return AiToolExecutionResult(
       toolName: 'edit_set',
       success: true,
-      summary: 'Updated ${weItem.exercise.name} set #${targetSet.setIndex} to ${newWeight}kg × $newReps (${setType.name})',
+      summary: 'Updated ${weItem.exercise.name} set #${targetSet.setIndex} to $displayWeight$unitLabel × $newReps (${setType.name})',
       data: {
         'exercise': weItem.exercise.name,
         'setIndex': targetSet.setIndex,

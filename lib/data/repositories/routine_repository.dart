@@ -23,6 +23,13 @@ class RoutineRepository {
       equip = EquipmentType.values.byName(data.equipment.toLowerCase());
     } catch (_) {}
 
+    ExerciseTrackingType? tracking;
+    if (data.trackingType != null && data.trackingType!.isNotEmpty) {
+      try {
+        tracking = ExerciseTrackingType.values.byName(data.trackingType!);
+      } catch (_) {}
+    }
+
     return ExerciseModel(
       id: data.id,
       name: data.name,
@@ -37,6 +44,8 @@ class RoutineRepository {
       restSeconds: data.restSeconds,
       isCustom: data.isCustom,
       archived: data.archived,
+      imagePath: data.imagePath,
+      customTrackingType: tracking,
     );
   }
 
@@ -87,25 +96,27 @@ class RoutineRepository {
     required List<String> exerciseIds,
   }) async {
     final routineId = _uuid.v4();
-    await _db.into(_db.routines).insert(
-      RoutinesCompanion.insert(
-        id: routineId,
-        name: name,
-        description: Value(description),
-        archived: const Value(false),
-      ),
-    );
-
-    for (int i = 0; i < exerciseIds.length; i++) {
-      await _db.into(_db.routineItems).insert(
-        RoutineItemsCompanion.insert(
-          id: '${routineId}_item_$i',
-          routineId: routineId,
-          exerciseId: exerciseIds[i],
-          position: i,
+    await _db.transaction(() async {
+      await _db.into(_db.routines).insert(
+        RoutinesCompanion.insert(
+          id: routineId,
+          name: name,
+          description: Value(description),
+          archived: const Value(false),
         ),
       );
-    }
+
+      for (int i = 0; i < exerciseIds.length; i++) {
+        await _db.into(_db.routineItems).insert(
+          RoutineItemsCompanion.insert(
+            id: '${routineId}_item_$i',
+            routineId: routineId,
+            exerciseId: exerciseIds[i],
+            position: i,
+          ),
+        );
+      }
+    });
 
     BackupService.scheduleAutoBackup(_db);
     return routineId;

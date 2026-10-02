@@ -1,10 +1,12 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ai_chat_message.dart';
 import 'ai_assistant_service.dart';
 import 'app_notification_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../data/providers.dart';
+import 'wakelock_service.dart';
 
 class AiChatState {
   final List<AiChatMessage> messages;
@@ -62,10 +64,37 @@ final aiChatNotifierProvider = StateNotifierProvider<AiChatNotifier, AiChatState
   return notifier;
 });
 
-class AiChatNotifier extends StateNotifier<AiChatState> {
+class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObserver {
   final Ref _ref;
 
-  AiChatNotifier(this._ref) : super(const AiChatState());
+  AiChatNotifier(this._ref) : super(const AiChatState()) {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _handleAppResumed();
+    }
+  }
+
+  void _handleAppResumed() {
+    if (state.isLoading) return;
+    if (state.messages.isEmpty) return;
+    final lastMsg = state.messages.last;
+    if (lastMsg.isError &&
+        (lastMsg.content.contains('Generation paused because app went into background') ||
+         lastMsg.content.contains('Connection was interrupted when the app went into the background'))) {
+      debugPrint('[AiChatNotifier] App resumed from background with an interrupted AI response. Auto-resuming...');
+      retryLastMessage();
+    }
+  }
 
   Future<void> init() async {
     if (state.isInitialized) return;
@@ -364,6 +393,9 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
     );
 
     try {
+      try {
+        await WakelockPlus.enable();
+      } catch (_) {}
       AppNotificationService.instance.showAiRunningNotification(prompt: promptText);
       final aiService = _ref.read(aiAssistantServiceProvider);
       final stream = aiService.sendMessageStream(
@@ -479,26 +511,42 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
           final idx = state.messages.indexWhere((m) => m.id == assistantMsgId);
           final msgs = List<AiChatMessage>.from(state.messages);
           if (idx != -1) {
-            msgs[idx] = AiChatMessage(
-              id: assistantMsgId,
-              role: 'assistant',
-              content: 'Issue encountered: ${event.error}',
-              timestamp: DateTime.now(),
+            final existingContent = msgs[idx].content.trim();
+            final errLower = event.error.toLowerCase();
+            final isBackgroundDisconnect = errLower.contains('connection closed') ||
+                errLower.contains('socket') ||
+                errLower.contains('reset by peer') ||
+                errLower.contains('clientexception') ||
+                errLower.contains('broken pipe') ||
+                errLower.contains('handshake');
+
+            final explanation = isBackgroundDisconnect
+                ? (existingContent.isNotEmpty
+                    ? '$existingContent\n\n*(Generation paused because app went into background or network was interrupted)*'
+                    : 'Connection was interrupted when the app went into the background. Tap Retry Response below to continue.')
+                : (existingContent.isNotEmpty
+                    ? '$existingContent\n\n*(Issue encountered: ${event.error})*'
+                    : 'Issue encountered: ${event.error}');
+
+            msgs[idx] = msgs[idx].copyWith(
+              content: explanation,
               isError: true,
               isStreaming: false,
+              liveThinking: null,
+              liveToolStatus: null,
             );
           }
           state = state.copyWith(
             messages: msgs,
             isLoading: false,
             clearActiveThought: true,
-            latestAssistantSnippet: 'Issue encountered. Tap to view.',
+            latestAssistantSnippet: 'Generation paused or interrupted. Tap to resume.',
             showFloatingCloud: true,
           );
           await aiService.saveSession(state.currentSessionId ?? 'session_default', msgs);
           AppNotificationService.instance.showAiCompletedNotification(
             prompt: promptText,
-            snippet: 'Issue encountered: ${event.error}',
+            snippet: 'Generation paused. Tap to resume.',
           );
         }
       }
@@ -506,27 +554,52 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
       final idx = state.messages.indexWhere((m) => m.id == assistantMsgId);
       final msgs = List<AiChatMessage>.from(state.messages);
       if (idx != -1) {
-        msgs[idx] = AiChatMessage(
-          id: assistantMsgId,
-          role: 'assistant',
-          content: 'Sorry, I encountered an issue: $e',
-          timestamp: DateTime.now(),
+        final existingContent = msgs[idx].content.trim();
+        final errLower = e.toString().toLowerCase();
+        final isBackgroundDisconnect = errLower.contains('connection closed') ||
+            errLower.contains('socket') ||
+            errLower.contains('reset by peer') ||
+            errLower.contains('clientexception') ||
+            errLower.contains('broken pipe') ||
+            errLower.contains('handshake');
+
+        final explanation = isBackgroundDisconnect
+            ? (existingContent.isNotEmpty
+                ? '$existingContent\n\n*(Generation paused because app went into background or network was interrupted)*'
+                : 'Connection was interrupted when the app went into the background. Tap Retry Response below to continue.')
+            : (existingContent.isNotEmpty
+                ? '$existingContent\n\n*(Interrupted: $e)*'
+                : 'Sorry, I encountered an issue: $e');
+
+        msgs[idx] = msgs[idx].copyWith(
+          content: explanation,
           isError: true,
           isStreaming: false,
+          liveThinking: null,
+          liveToolStatus: null,
         );
       }
       state = state.copyWith(
         messages: msgs,
         isLoading: false,
         clearActiveThought: true,
-        latestAssistantSnippet: 'Issue encountered. Tap to view.',
+        latestAssistantSnippet: 'Generation paused or interrupted. Tap to resume.',
         showFloatingCloud: true,
       );
       await _ref.read(aiAssistantServiceProvider).saveSession(state.currentSessionId ?? 'session_default', msgs);
       AppNotificationService.instance.showAiCompletedNotification(
         prompt: promptText,
-        snippet: 'Issue encountered: $e',
+        snippet: 'Generation paused. Tap to resume.',
       );
+    } finally {
+      try {
+        final isWorkoutActive = _ref.read(isWorkoutActiveProvider);
+        final keepAwake = _ref.read(keepScreenAwakeProvider);
+        if (!isWorkoutActive || !keepAwake) {
+          await WakelockPlus.disable();
+          await WakelockService.disable();
+        }
+      } catch (_) {}
     }
   }
 
@@ -548,10 +621,27 @@ class AiChatNotifier extends StateNotifier<AiChatState> {
 
     if (lastUserMsg == null) return;
 
+    final partialAssistantMsg = state.messages[errorIdx];
+    final cleanPartial = partialAssistantMsg.content
+        .replaceAll(RegExp(r'\n*\*\(Generation paused.*?\)\*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\n*\*\(Issue encountered.*?\)\*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\n*\*\(Interrupted.*?\)\*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'Connection was interrupted.*?\.', caseSensitive: false), '')
+        .trim();
+
     final updatedMessages = List<AiChatMessage>.from(state.messages)..removeAt(errorIdx);
     state = state.copyWith(messages: updatedMessages);
 
-    await sendMessage(lastUserMsg.content, imagePath: lastUserMsg.imageAttachmentPath);
+    if (cleanPartial.isNotEmpty && cleanPartial.length > 50) {
+      final snippetLast = cleanPartial.length > 150
+          ? cleanPartial.substring(cleanPartial.length - 150)
+          : cleanPartial;
+      final continuationPrompt =
+          '${lastUserMsg.content}\n\n[System Note: Your previous response was interrupted after: "...$snippetLast". Please continue seamlessly and complete the response.]';
+      await sendMessage(continuationPrompt, imagePath: lastUserMsg.imageAttachmentPath);
+    } else {
+      await sendMessage(lastUserMsg.content, imagePath: lastUserMsg.imageAttachmentPath);
+    }
   }
 
   static String _extractSnippet(String text) {

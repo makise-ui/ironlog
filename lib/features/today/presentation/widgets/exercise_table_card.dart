@@ -16,6 +16,7 @@ import '../../../../domain/models/workout_model.dart';
 import '../../../../domain/models/suggestion_model.dart';
 import '../../../../domain/services/pr_detector.dart';
 import '../rename_exercise_dialog.dart';
+import '../edit_exercise_dialog.dart';
 import '../warmup_calculator_sheet.dart';
 import '../suggestion_explain_sheet.dart';
 import '../set_entry_sheet.dart';
@@ -780,6 +781,12 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                           },
                         ),
                       );
+                    } else if (val == 'customize_specs') {
+                      EditExerciseDialog.show(
+                        context,
+                        exercise: ex,
+                        onUpdated: (_) => widget.onRefresh(),
+                      );
                     } else if (val == 'superset') {
                       _handleSupersetToggle();
                     } else if (val == 'delete') {
@@ -829,6 +836,16 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                           const Icon(Icons.fitness_center_rounded, color: AppColors.warmupSet, size: 16),
                           const SizedBox(width: 10),
                           Text('Auto Warmup Sets', style: TextStyle(color: context.textPrimary, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'customize_specs',
+                      child: Row(
+                        children: [
+                          Icon(Icons.tune_rounded, color: context.accent, size: 16),
+                          const SizedBox(width: 10),
+                          Text('Customize Tracking & Specs', style: TextStyle(color: context.textPrimary, fontSize: 13)),
                         ],
                       ),
                     ),

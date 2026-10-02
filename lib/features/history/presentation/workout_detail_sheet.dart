@@ -14,6 +14,7 @@ import '../../../domain/models/set_model.dart';
 import '../../../data/providers.dart';
 import '../../today/presentation/widgets/exercise_visual_thumbnail.dart';
 import '../../today/presentation/widgets/shareable_workout_card.dart';
+import '../../routines/presentation/create_preset_sheet.dart';
 
 class WorkoutDetailSheet extends ConsumerWidget {
   final WorkoutModel workout;
@@ -79,6 +80,18 @@ class WorkoutDetailSheet extends ConsumerWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.bookmark_add_rounded, color: context.accent),
+                  tooltip: 'Save as Preset Routine',
+                  onPressed: () {
+                    AppHaptics.tap();
+                    CreatePresetSheet.show(
+                      context,
+                      initialName: workout.title,
+                      initialExercises: activeExercises.map((e) => e.exercise).toList(),
+                    );
+                  },
                 ),
                 IconButton(
                   icon: Icon(Icons.share_rounded, color: context.accent),
@@ -258,45 +271,74 @@ class WorkoutDetailSheet extends ConsumerWidget {
             ),
           ),
 
-          // Actions: Edit / Log Sets & Delete
+          // Actions: Repeat Today, Edit / Log Sets & Delete
           Padding(
             padding: EdgeInsets.only(
               left: AppSpacing.md,
               right: AppSpacing.md,
               bottom: MediaQuery.of(context).padding.bottom + AppSpacing.md,
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  flex: 3,
-                  child: GlassButton(
-                    text: 'Edit / Log Sets',
-                    icon: Icons.edit_note_rounded,
-                    style: GlassButtonStyle.primary,
-                    onPressed: () {
-                      AppHaptics.tap();
-                      ref.read(selectedWorkoutDateProvider.notifier).state =
-                          AppDateUtils.normalizeDate(workout.date);
+                GlassButton(
+                  text: 'Copy to Today\'s Workout',
+                  icon: Icons.today_rounded,
+                  style: GlassButtonStyle.primary,
+                  onPressed: () async {
+                    AppHaptics.save();
+                    final today = AppDateUtils.normalizeDate(DateTime.now());
+                    final repo = ref.read(workoutRepositoryProvider);
+                    final todayWorkout = await repo.getOrCreateTodayWorkout();
+                    await repo.copyLastSession(todayWorkout.id, workout.id);
+                    ref.read(selectedWorkoutDateProvider.notifier).state = today;
+                    if (context.mounted) {
                       Navigator.of(context).pop();
                       context.go('/today');
-                    },
-                  ),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Copied "${workout.title}" to today\'s active workout!'),
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
+                      );
+                    }
+                  },
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  flex: 2,
-                  child: GlassButton(
-                    text: 'Delete',
-                    icon: Icons.delete_outline_rounded,
-                    style: GlassButtonStyle.danger,
-                    onPressed: () async {
-                      AppHaptics.warning();
-                      final repo = ref.read(workoutRepositoryProvider);
-                      await repo.deleteWorkout(workout.id);
-                      onWorkoutModified();
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
-                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: GlassButton(
+                        text: 'Edit / Log Sets',
+                        icon: Icons.edit_note_rounded,
+                        style: GlassButtonStyle.secondary,
+                        onPressed: () {
+                          AppHaptics.tap();
+                          ref.read(selectedWorkoutDateProvider.notifier).state =
+                              AppDateUtils.normalizeDate(workout.date);
+                          Navigator.of(context).pop();
+                          context.go('/today');
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      flex: 2,
+                      child: GlassButton(
+                        text: 'Delete',
+                        icon: Icons.delete_outline_rounded,
+                        style: GlassButtonStyle.danger,
+                        onPressed: () async {
+                          AppHaptics.warning();
+                          final repo = ref.read(workoutRepositoryProvider);
+                          await repo.deleteWorkout(workout.id);
+                          onWorkoutModified();
+                          if (context.mounted) Navigator.of(context).pop();
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

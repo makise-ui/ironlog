@@ -1,0 +1,220 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import '../../data/repositories/settings_repository.dart';
+import '../../data/providers.dart';
+
+class ReleaseNoteItem {
+  final String title;
+  final String description;
+  final IconData icon;
+  final String? tag; // e.g. 'NEW', 'IMPROVED', 'FIX'
+
+  const ReleaseNoteItem({
+    required this.title,
+    required this.description,
+    required this.icon,
+    this.tag,
+  });
+}
+
+class AppReleaseInfo {
+  final String version;
+  final int buildNumber;
+  final String releaseDate;
+  final String title;
+  final String summary;
+  final List<ReleaseNoteItem> highlights;
+  final String? downloadUrl;
+
+  const AppReleaseInfo({
+    required this.version,
+    required this.buildNumber,
+    required this.releaseDate,
+    required this.title,
+    required this.summary,
+    required this.highlights,
+    this.downloadUrl,
+  });
+}
+
+class UpdateCheckResult {
+  final bool isUpdateAvailable;
+  final String currentVersion;
+  final String latestVersion;
+  final AppReleaseInfo releaseInfo;
+  final String? downloadUrl;
+
+  const UpdateCheckResult({
+    required this.isUpdateAvailable,
+    required this.currentVersion,
+    required this.latestVersion,
+    required this.releaseInfo,
+    this.downloadUrl,
+  });
+}
+
+final appUpdateServiceProvider = Provider<AppUpdateService>((ref) {
+  return AppUpdateService(ref.read(settingsRepositoryProvider));
+});
+
+class AppUpdateService {
+  final SettingsRepository _settingsRepo;
+
+  static const String currentVersion = 'v1.4.0';
+  static const int currentBuildNumber = 6;
+
+  AppUpdateService(this._settingsRepo);
+
+  /// Current and historical release notes
+  static const List<AppReleaseInfo> releases = [
+    AppReleaseInfo(
+      version: 'v1.4.0',
+      buildNumber: 6,
+      releaseDate: 'October 2026',
+      title: 'Catalog Customization & Routine Packs',
+      summary: 'Full exercise catalog customization, multi-preset bundle sharing, past workout copying, and robust background AI resilience.',
+      highlights: [
+        ReleaseNoteItem(
+          title: 'Exercise Catalog Customization',
+          description: 'Edit any exercise in the catalog: toggle between Weight & Reps, Bodyweight, Timed Hold (sec), and Cardio (min), plus custom equipment, rep ranges, rest timers, and custom images.',
+          icon: Icons.tune_rounded,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: 'Bodyweight & Timed Hold Logging',
+          description: 'Log bodyweight reps, isometric holds (planks, dead hangs), and sports/cardio sessions with 0.0 weight without blocking input validation.',
+          icon: Icons.timer_outlined,
+          tag: 'FIX',
+        ),
+        ReleaseNoteItem(
+          title: 'Multi-Preset Bundle Packs',
+          description: 'Share and import entire routine splits (Push/Pull/Legs, Upper/Lower) in a single unified QR code or text payload with interactive checkbox selection.',
+          icon: Icons.folder_zip_outlined,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: 'Copy Past Workout to Today',
+          description: 'Clone any previous completed workout directly into today\'s active session with a single tap from history or workout detail sheets.',
+          icon: Icons.content_copy_rounded,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: 'Save Session as Preset Routine',
+          description: 'Convert any active or historical workout session directly into a permanent reusable preset in your routine library.',
+          icon: Icons.bookmark_add_outlined,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: 'AI Background Resilience & Auto-Resume',
+          description: 'The AI assistant preserves partial streamed responses when minimizing the app, uses screen wakelock while thinking, and automatically resumes generating when you switch back.',
+          icon: Icons.psychology_outlined,
+          tag: 'IMPROVED',
+        ),
+        ReleaseNoteItem(
+          title: 'Dynamic PR Engine Recalculation',
+          description: 'Editing or deleting past sets automatically invalidates and recalculates all Heaviest, e1RM, and Volume PR records in SQLite.',
+          icon: Icons.emoji_events_outlined,
+          tag: 'FIX',
+        ),
+      ],
+    ),
+    AppReleaseInfo(
+      version: 'v1.2.0',
+      buildNumber: 4,
+      releaseDate: 'September 2026',
+      title: 'Chibi Avatars & Persistent Athlete Memory',
+      summary: 'Interactive Chibi AI Companions, long-term memory across sessions, and 3D body fatigue heatmaps.',
+      highlights: [
+        ReleaseNoteItem(
+          title: 'Chibi AI Companions',
+          description: 'Choose your anime AI workout companion (Titan, Kitsune, Kensei, Valkyrie) with dynamic reactive expressions.',
+          icon: Icons.face_rounded,
+        ),
+        ReleaseNoteItem(
+          title: 'Long-Term Athlete Memory',
+          description: 'The AI remembers your personal injuries, equipment, and training preferences across conversations.',
+          icon: Icons.memory_rounded,
+        ),
+        ReleaseNoteItem(
+          title: '3D Muscle Fatigue Heatmap',
+          description: 'Interactive anatomical heatmaps showing muscle fatigue and recovery status.',
+          icon: Icons.accessibility_new_rounded,
+        ),
+      ],
+    ),
+  ];
+
+  static AppReleaseInfo get currentRelease => releases.first;
+
+  /// Check whether the app has an available update
+  Future<UpdateCheckResult> checkForUpdates({bool isManual = false}) async {
+    try {
+      // Check GitHub releases endpoint with a fast timeout
+      final uri = Uri.parse('https://api.github.com/repos/ironlog/ironlog/releases/latest');
+      final response = await http.get(uri, headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'IronLog-App',
+      }).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final tagName = data['tag_name'] as String? ?? currentVersion;
+        final htmlUrl = data['html_url'] as String?;
+        final isNewer = _isVersionNewer(tagName, currentVersion);
+
+        return UpdateCheckResult(
+          isUpdateAvailable: isNewer,
+          currentVersion: currentVersion,
+          latestVersion: tagName,
+          releaseInfo: currentRelease,
+          downloadUrl: htmlUrl,
+        );
+      }
+    } catch (_) {
+      // Network unavailable or offline mode — fallback gracefully
+    }
+
+    // Default to current version info
+    return UpdateCheckResult(
+      isUpdateAvailable: false,
+      currentVersion: currentVersion,
+      latestVersion: currentVersion,
+      releaseInfo: currentRelease,
+    );
+  }
+
+  /// Whether a newly installed version should prompt the "What's New" modal
+  Future<bool> shouldShowWhatsNew() async {
+    final autoCheck = await _settingsRepo.getAutoCheckUpdates();
+    if (!autoCheck) return false;
+
+    final lastSeen = await _settingsRepo.getLastSeenVersion();
+    return lastSeen != currentVersion;
+  }
+
+  /// Mark the current version changelog as seen
+  Future<void> markCurrentVersionSeen() async {
+    await _settingsRepo.setLastSeenVersion(currentVersion);
+  }
+
+  /// Compares semantic versions (e.g. v1.3.1 vs v1.3.0)
+  bool _isVersionNewer(String remoteTag, String localTag) {
+    try {
+      final remoteClean = remoteTag.replaceAll(RegExp(r'[^0-9.]'), '');
+      final localClean = localTag.replaceAll(RegExp(r'[^0-9.]'), '');
+
+      final remoteParts = remoteClean.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final localParts = localClean.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+
+      for (int i = 0; i < remoteParts.length && i < localParts.length; i++) {
+        if (remoteParts[i] > localParts[i]) return true;
+        if (remoteParts[i] < localParts[i]) return false;
+      }
+      return remoteParts.length > localParts.length;
+    } catch (_) {
+      return false;
+    }
+  }
+}

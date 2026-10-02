@@ -1,5 +1,6 @@
 import 'exercise_model.dart';
 import 'set_model.dart';
+import '../services/weight_step_learner.dart';
 
 class WorkoutExerciseItem {
   final String id; // workoutExerciseId
@@ -23,9 +24,11 @@ class WorkoutExerciseItem {
   });
 
   double get totalVolume {
+    final isPerHand = exercise.loadMode == LoadMode.perHand || exercise.equipment == EquipmentType.dumbbell;
+    final multiplier = isPerHand ? 2.0 : 1.0;
     return sets
         .where((s) => !s.isWarmup && !s.archived)
-        .fold(0.0, (sum, s) => sum + s.volume);
+        .fold(0.0, (sum, s) => sum + (s.volume * multiplier));
   }
 
   double get maxWeight {
@@ -107,9 +110,16 @@ class WorkoutModel {
     return endedAt!.difference(startedAt!);
   }
 
-  bool get isRestDay =>
-      title.toLowerCase().contains('rest') &&
-      !title.toLowerCase().contains('restart');
+  bool get isRestDay {
+    if (exercises.any((e) => !e.archived && e.sets.any((s) => !s.archived && (s.reps > 0 || s.weight > 0)))) {
+      return false;
+    }
+    final t = title.toLowerCase().trim();
+    return t == 'rest' ||
+        t == 'rest day' ||
+        t.startsWith('rest day') ||
+        (t.contains('rest') && !t.contains('pause') && !t.contains('restart'));
+  }
 
   WorkoutModel copyWith({
     String? id,

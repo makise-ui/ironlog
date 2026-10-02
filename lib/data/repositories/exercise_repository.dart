@@ -172,6 +172,9 @@ class ExerciseRepository {
       await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
         ExercisesCompanion(archived: Value(archive)),
       );
+      await (_db.update(_db.workoutExercises)..where((t) => t.exerciseId.equals(id))).write(
+        WorkoutExercisesCompanion(archived: Value(archive)),
+      );
       await (_db.update(_db.sets)..where((t) => t.exerciseId.equals(id))).write(
         SetsCompanion(archived: Value(archive)),
       );

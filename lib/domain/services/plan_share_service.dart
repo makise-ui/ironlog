@@ -143,8 +143,149 @@ class PlanShareService {
     return allRoutines.firstWhere((r) => r.id == newRoutineId);
   }
 
+  /// Serializes multiple routines into a unified bundle payload for bulk sharing
+  static String exportRoutinesBundleToPayload(
+    List<RoutineModel> routines, {
+    String? bundleTitle,
+    bool isLb = false,
+  }) {
+    final Map<String, dynamic> data = {
+      'ironlog_plan_bundle': currentFormatVersion,
+      'bundle_title': bundleTitle ?? 'Workout Presets (${routines.length})',
+      'unit': isLb ? 'lb' : 'kg',
+      'routines': routines.map((r) {
+        return {
+          'title': r.name,
+          'description': r.description,
+          'exercises': r.items.map((item) {
+            return {
+              'name': item.exercise.name,
+              'muscle': item.exercise.muscleGroupId,
+              'equipment': item.exercise.equipment.name,
+              'sets': item.targetSets,
+              'repMin': item.repMin,
+              'repMax': item.repMax,
+              'rest': item.restSeconds,
+            };
+          }).toList(),
+        };
+      }).toList(),
+    };
+    return jsonEncode(data);
+  }
+
+  /// Checks if a payload is a multi-preset bundle
+  static bool isBundlePayload(String payload) {
+    try {
+      final decoded = jsonDecode(payload.trim());
+      if (decoded is Map<String, dynamic>) {
+        return decoded.containsKey('ironlog_plan_bundle') || decoded.containsKey('routines');
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Parses a multi-preset bundle payload
+  static PlanBundlePreviewModel parseBundlePreview(String payload) {
+    final Map<String, dynamic> data = jsonDecode(payload.trim());
+    if (!data.containsKey('ironlog_plan_bundle') && !data.containsKey('routines')) {
+      throw const FormatException('Invalid bundle format: Missing IronLog plan bundle headers.');
+    }
+    final bundleTitle = data['bundle_title'] as String? ?? 'Workout Presets Bundle';
+    final unit = data['unit'] as String? ?? 'kg';
+    final rawRoutines = data['routines'] as List<dynamic>? ?? [];
+
+    final routinePreviews = <RoutinePreviewModel>[];
+    for (final raw in rawRoutines) {
+      final map = raw as Map<String, dynamic>;
+      final title = map['title'] as String? ?? 'Imported Routine';
+      final description = map['description'] as String? ?? '';
+      final rawExercises = map['exercises'] as List<dynamic>? ?? [];
+
+      final exercises = rawExercises.map((rawEx) {
+        final exMap = rawEx as Map<String, dynamic>;
+        final exName = (exMap['name'] as String? ?? 'Exercise').trim();
+        final muscle = exMap['muscle'] as String? ?? CsvImportService.inferMuscleGroup(exName);
+        final (eq, _, _) = CsvImportService.inferEquipment(exName);
+        final eqName = exMap['equipment'] as String? ?? eq;
+        final sets = (exMap['sets'] as num?)?.toInt() ?? 3;
+        final repMin = (exMap['repMin'] as num?)?.toInt() ?? 8;
+        final repMax = (exMap['repMax'] as num?)?.toInt() ?? 12;
+        final rest = (exMap['rest'] as num?)?.toInt() ?? 90;
+
+        return RoutinePreviewExercise(
+          name: exName,
+          muscle: muscle,
+          equipment: eqName,
+          sets: sets,
+          repMin: repMin,
+          repMax: repMax,
+          rest: rest,
+        );
+      }).toList();
+
+      routinePreviews.add(RoutinePreviewModel(
+        title: title,
+        description: description,
+        unit: unit,
+        exercises: exercises,
+        rawPayload: jsonEncode(map),
+      ));
+    }
+
+    return PlanBundlePreviewModel(
+      title: bundleTitle,
+      unit: unit,
+      routines: routinePreviews,
+      rawPayload: payload,
+    );
+  }
+
+  /// Imports multiple routines from a bundle payload into SQLite
+  static Future<List<RoutineModel>> importRoutinesBundleFromPayload(
+    String payload,
+    AppDatabase db, {
+    List<int>? selectedIndices,
+  }) async {
+    final bundle = parseBundlePreview(payload);
+    final imported = <RoutineModel>[];
+
+    for (int i = 0; i < bundle.routines.length; i++) {
+      if (selectedIndices != null && !selectedIndices.contains(i)) {
+        continue;
+      }
+      final rPreview = bundle.routines[i];
+      final singlePayload = jsonEncode({
+        'ironlog_plan': currentFormatVersion,
+        'title': rPreview.title,
+        'description': rPreview.description,
+        'unit': rPreview.unit,
+        'exercises': rPreview.exercises.map((e) => {
+          'name': e.name,
+          'muscle': e.muscle,
+          'equipment': e.equipment,
+          'sets': e.sets,
+          'repMin': e.repMin,
+          'repMax': e.repMax,
+          'rest': e.rest,
+        }).toList(),
+      });
+      final routine = await importRoutineFromPayload(singlePayload, db);
+      imported.add(routine);
+    }
+
+    return imported;
+  }
+
   /// Parses a QR payload or JSON string into a preview model without modifying the database
   static RoutinePreviewModel parsePreview(String payload) {
+    if (isBundlePayload(payload)) {
+      final bundle = parseBundlePreview(payload);
+      if (bundle.routines.isNotEmpty) {
+        return bundle.routines.first;
+      }
+    }
+
     final Map<String, dynamic> data = jsonDecode(payload.trim());
 
     if (!data.containsKey('ironlog_plan') && !data.containsKey('title')) {
@@ -190,6 +331,20 @@ class PlanShareService {
       rawPayload: payload,
     );
   }
+}
+
+class PlanBundlePreviewModel {
+  final String title;
+  final String unit;
+  final List<RoutinePreviewModel> routines;
+  final String rawPayload;
+
+  const PlanBundlePreviewModel({
+    required this.title,
+    required this.unit,
+    required this.routines,
+    required this.rawPayload,
+  });
 }
 
 class RoutinePreviewExercise {

@@ -8,8 +8,13 @@ import '../../../domain/models/routine_model.dart';
 import '../../../data/providers.dart';
 import '../../today/presentation/widgets/routine_qr_share_dialog.dart';
 import '../../today/presentation/widgets/routine_preview_sheet.dart';
-import '../../today/presentation/widgets/ai_assistant_sheet.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../../core/utils/unit_converter.dart';
+import '../../../core/widgets/glass_button.dart';
+import '../../../domain/services/plan_share_service.dart';
 import 'create_preset_sheet.dart';
+import '../../today/presentation/widgets/ai_assistant_sheet.dart';
 
 class RoutinesSheet extends ConsumerStatefulWidget {
   final String workoutId;
@@ -27,6 +32,131 @@ class RoutinesSheet extends ConsumerStatefulWidget {
 
 class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
   List<RoutineModel> _routines = [];
+  bool _isSelectionMode = false;
+  final Set<String> _selectedRoutineIds = {};
+
+  void _toggleSelectionMode() {
+    AppHaptics.selection();
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      _selectedRoutineIds.clear();
+    });
+  }
+
+  void _toggleSelectRoutine(String id) {
+    AppHaptics.selection();
+    setState(() {
+      if (_selectedRoutineIds.contains(id)) {
+        _selectedRoutineIds.remove(id);
+      } else {
+        _selectedRoutineIds.add(id);
+      }
+    });
+  }
+
+  void _shareSelectedBundle(List<RoutineModel> allRoutines) {
+    final selected = allRoutines.where((r) => _selectedRoutineIds.contains(r.id)).toList();
+    if (selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one preset to share.')),
+      );
+      return;
+    }
+
+    AppHaptics.tap();
+    final isLb = ref.read(weightUnitNotifierProvider) == WeightUnit.lb;
+    final payload = PlanShareService.exportRoutinesBundleToPayload(
+      selected,
+      bundleTitle: '${selected.length} Workout Presets Bundle',
+      isLb: isLb,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
+        decoration: BoxDecoration(
+          color: context.sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          border: Border(top: BorderSide(color: context.sheetBorder, width: 0.8)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.folder_zip_rounded, color: context.accent, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Share ${selected.length} Presets Pack',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamilyDisplay,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Share this multi-routine workout pack via file, clipboard, or instant export.',
+              style: TextStyle(fontSize: 12.5, color: context.textSecondary),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.textPrimary,
+                      side: BorderSide(color: context.cardBorder),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    label: const Text('Copy JSON'),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: payload));
+                      AppHaptics.success();
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Copied preset bundle JSON to clipboard!')),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: context.accent,
+                      foregroundColor: context.onAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.share_rounded, size: 16),
+                    label: const Text('Share File / Text'),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await Share.share(
+                        payload,
+                        subject: 'IronLog Presets Bundle (${selected.length} Routines)',
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -207,38 +337,79 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    'Workout Presets',
+                    _isSelectionMode
+                        ? '${_selectedRoutineIds.length} Selected'
+                        : 'Workout Presets',
                     style: AppTypography.titleLarge.copyWith(color: context.textPrimary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.qr_code_2_rounded, color: context.accent, size: 22),
-                      tooltip: 'Scan or Share QR Routine',
-                      onPressed: () => _shareRoutineQr(null),
-                    ),
-                    TextButton.icon(
-                      onPressed: _openCreatePreset,
-                      icon: Icon(Icons.add_rounded, size: 16, color: context.accent),
-                      label: Text(
-                        'New Preset',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: context.accent,
-                        ),
+                if (_isSelectionMode) ...[
+                  TextButton(
+                    onPressed: () {
+                      AppHaptics.selection();
+                      setState(() {
+                        if (_selectedRoutineIds.length == allRoutines.length) {
+                          _selectedRoutineIds.clear();
+                        } else {
+                          _selectedRoutineIds.addAll(allRoutines.map((r) => r.id));
+                        }
+                      });
+                    },
+                    child: Text(
+                      _selectedRoutineIds.length == allRoutines.length ? 'Deselect All' : 'Select All',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.accent,
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.close_rounded, color: context.textSecondary),
-                      onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  TextButton(
+                    onPressed: _toggleSelectionMode,
+                    child: Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.textSecondary,
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ] else ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.checklist_rounded, color: context.accent, size: 22),
+                        tooltip: 'Select & Share Multiple',
+                        onPressed: _toggleSelectionMode,
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.qr_code_2_rounded, color: context.accent, size: 22),
+                        tooltip: 'Scan or Share QR Routine',
+                        onPressed: () => _shareRoutineQr(null),
+                      ),
+                      TextButton.icon(
+                        onPressed: _openCreatePreset,
+                        icon: Icon(Icons.add_rounded, size: 16, color: context.accent),
+                        label: Text(
+                          'New Preset',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: context.accent,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close_rounded, color: context.textSecondary),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -408,6 +579,21 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
                     ],
                   ),
           ),
+          if (_isSelectionMode)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                8,
+                AppSpacing.md,
+                MediaQuery.of(context).padding.bottom + AppSpacing.md,
+              ),
+              child: GlassButton(
+                text: 'Share Presets Pack (${_selectedRoutineIds.length})',
+                icon: Icons.share_rounded,
+                style: GlassButtonStyle.primary,
+                onPressed: _selectedRoutineIds.isEmpty ? null : () => _shareSelectedBundle(allRoutines),
+              ),
+            ),
         ],
       ),
     );
@@ -430,6 +616,7 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
   Widget _buildRoutineTile(RoutineModel r, {required bool isCustom}) {
     final exNames = r.items.map((i) => i.exercise.name).join(', ');
     final imageAsset = _resolvePresetImage(r.name);
+    final isSelected = _selectedRoutineIds.contains(r.id);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -438,12 +625,20 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
         child: Stack(
           children: [
             GlassTile(
-              onTap: () => _confirmApplyRoutine(r),
+              onTap: _isSelectionMode ? () => _toggleSelectRoutine(r.id) : () => _confirmApplyRoutine(r),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
+                      if (_isSelectionMode) ...[
+                        Checkbox(
+                          value: isSelected,
+                          activeColor: context.accent,
+                          onChanged: (_) => _toggleSelectRoutine(r.id),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -461,48 +656,59 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
                           ),
                         ),
                       ),
-                if (isCustom) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: context.isDark ? const Color(0x20FFFFFF) : const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    ),
-                    child: Text(
-                      'CUSTOM',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: context.textPrimary,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                      if (isCustom) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: context.isDark ? const Color(0x20FFFFFF) : const Color(0xFFE2E8F0),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          ),
+                          child: Text(
+                            'CUSTOM',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: context.textPrimary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      if (_isSelectionMode) ...[
+                        Text(
+                          isSelected ? 'Selected' : 'Tap to select',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? context.accent : context.textTertiary,
+                          ),
+                        ),
+                      ] else ...[
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                          onPressed: () => _confirmDeleteRoutine(r),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Delete preset',
+                        ),
+                        const SizedBox(width: 2),
+                        IconButton(
+                          icon: Icon(Icons.qr_code_2_rounded, size: 20, color: context.textSecondary),
+                          onPressed: () => _shareRoutineQr(r),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Share QR code',
+                        ),
+                        const SizedBox(width: 2),
+                        IconButton(
+                          icon: Icon(Icons.play_circle_fill_rounded, size: 22, color: context.accent),
+                          onPressed: () => _confirmApplyRoutine(r),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Load routine',
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                  onPressed: () => _confirmDeleteRoutine(r),
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Delete preset',
-                ),
-                const SizedBox(width: 2),
-                IconButton(
-                  icon: Icon(Icons.qr_code_2_rounded, size: 20, color: context.textSecondary),
-                  onPressed: () => _shareRoutineQr(r),
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Share QR code',
-                ),
-                const SizedBox(width: 2),
-                IconButton(
-                  icon: Icon(Icons.play_circle_fill_rounded, size: 22, color: context.accent),
-                  onPressed: () => _confirmApplyRoutine(r),
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Load routine',
-                ),
-              ],
-            ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               r.name,

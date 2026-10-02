@@ -46,7 +46,7 @@ void main() {
     expect(find.text('WORKOUT & TRAINING'), findsOneWidget);
     expect(find.text('APPEARANCE & THEME'), findsOneWidget);
     expect(find.text('DATABASE & PERFORMANCE'), findsOneWidget);
-    expect(find.text('ABOUT IRONLOG'), findsOneWidget);
+    expect(find.text('ABOUT IRONLOG & UPDATES'), findsOneWidget);
     BackupService.cancelPendingAutoBackup();
   });
 

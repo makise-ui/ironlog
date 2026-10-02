@@ -13,6 +13,7 @@ import '../../../../domain/services/strength_decay_service.dart';
 import 'exercise_image_picker_sheet.dart';
 import 'exercise_position_slideshow.dart';
 import 'exercise_web_search_sheet.dart';
+import '../edit_exercise_dialog.dart';
 
 class ExerciseGuideSheet extends ConsumerStatefulWidget {
   final ExerciseModel exercise;
@@ -290,6 +291,48 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () async {
+                        AppHaptics.tap();
+                        final updated = await EditExerciseDialog.show(
+                          context,
+                          exercise: _exercise,
+                        );
+                        if (updated != null && mounted) {
+                          setState(() {
+                            _exercise = updated;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF27272A) : const Color(0xFFEAEAEE),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFD4D4D8),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.tune_rounded, size: 14, color: context.accent),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Edit',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     InkWell(
                       borderRadius: BorderRadius.circular(8),
                       onTap: () {

@@ -90,4 +90,21 @@ class SettingsRepository {
   Future<void> setRestTimerNotificationsEnabled(bool value) async {
     await setSetting('rest_timer_notifications_enabled', value.toString());
   }
+
+  Future<bool> getAutoCheckUpdates() async {
+    final val = await getSetting('auto_check_updates');
+    return val != 'false'; // default true
+  }
+
+  Future<void> setAutoCheckUpdates(bool value) async {
+    await setSetting('auto_check_updates', value.toString());
+  }
+
+  Future<String?> getLastSeenVersion() async {
+    return await getSetting('last_seen_version');
+  }
+
+  Future<void> setLastSeenVersion(String version) async {
+    await setSetting('last_seen_version', version);
+  }
 }

@@ -10,17 +10,56 @@ import '../../today/presentation/exercise_picker_sheet.dart';
 import '../../today/presentation/widgets/ai_assistant_sheet.dart';
 
 class CreatePresetSheet extends ConsumerStatefulWidget {
-  const CreatePresetSheet({super.key});
+  final String? initialName;
+  final String? initialDescription;
+  final List<ExerciseModel>? initialExercises;
+
+  const CreatePresetSheet({
+    super.key,
+    this.initialName,
+    this.initialDescription,
+    this.initialExercises,
+  });
+
+  static Future<String?> show(
+    BuildContext context, {
+    String? initialName,
+    String? initialDescription,
+    List<ExerciseModel>? initialExercises,
+  }) {
+    AppHaptics.tap();
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => CreatePresetSheet(
+        initialName: initialName,
+        initialDescription: initialDescription,
+        initialExercises: initialExercises,
+      ),
+    );
+  }
 
   @override
   ConsumerState<CreatePresetSheet> createState() => _CreatePresetSheetState();
 }
 
 class _CreatePresetSheetState extends ConsumerState<CreatePresetSheet> {
-  final _nameController = TextEditingController();
-  final _descController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _descController;
   final List<ExerciseModel> _selectedExercises = [];
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName ?? '');
+    _descController = TextEditingController(text: widget.initialDescription ?? '');
+    if (widget.initialExercises != null) {
+      _selectedExercises.addAll(widget.initialExercises!);
+    }
+  }
 
   @override
   void dispose() {

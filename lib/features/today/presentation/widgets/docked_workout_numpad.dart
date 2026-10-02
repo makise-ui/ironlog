@@ -166,6 +166,7 @@ class DockedWorkoutNumpad extends ConsumerWidget {
                                   unit: inputState.unit,
                                   exerciseName: inputState.exerciseName,
                                   onWeightSelected: (w) {
+                                    final weightInKg = inputState.unit == WeightUnit.lb ? UnitConverter.toKg(w, WeightUnit.lb) : w;
                                     ref.read(activeWorkoutInputProvider.notifier).startEditing(
                                       workoutExerciseId: inputState.workoutExerciseId,
                                       exerciseId: inputState.exerciseId,
@@ -176,7 +177,7 @@ class DockedWorkoutNumpad extends ConsumerWidget {
                                       existingSetId: inputState.existingSetId,
                                       setType: inputState.setType,
                                       field: WorkoutInputField.weight,
-                                      initialWeight: w,
+                                      initialWeight: weightInKg,
                                       initialReps: inputState.effectiveReps,
                                       unit: inputState.unit,
                                       isCompleted: inputState.isCompleted,
