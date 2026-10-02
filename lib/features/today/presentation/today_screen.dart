@@ -43,6 +43,7 @@ import 'widgets/routine_card.dart';
 import '../../routines/presentation/create_preset_sheet.dart';
 import '../../intro/presentation/onboarding_sheet.dart';
 import '../../settings/presentation/whats_new_sheet.dart';
+import '../../settings/presentation/legal_disclaimers_sheet.dart';
 import 'widgets/routine_qr_share_dialog.dart';
 import 'widgets/routine_preview_sheet.dart';
 import '../../../domain/services/exercise_auto_image_service.dart';
@@ -117,6 +118,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       await _checkAndPromptBackupRestore();
       if (mounted) {
         await OnboardingSheet.showIfNeeded(context, ref);
+      }
+      if (mounted) {
+        await LegalDisclaimersSheet.showIfNeeded(context, ref);
       }
       if (mounted) {
         await WhatsNewSheet.showIfNeeded(context, ref);

@@ -107,4 +107,13 @@ class SettingsRepository {
   Future<void> setLastSeenVersion(String version) async {
     await setSetting('last_seen_version', version);
   }
+
+  Future<bool> getHasAgreedToDisclaimers() async {
+    final val = await getSetting('has_agreed_to_disclaimers');
+    return val == 'true';
+  }
+
+  Future<void> setHasAgreedToDisclaimers(bool value) async {
+    await setSetting('has_agreed_to_disclaimers', value.toString());
+  }
 }

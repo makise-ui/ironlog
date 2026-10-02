@@ -21,6 +21,7 @@ import '../../today/presentation/widgets/ai_assistant_sheet.dart';
 import 'ai_settings_screen.dart';
 import '../../../domain/services/app_update_service.dart';
 import 'whats_new_sheet.dart';
+import 'legal_disclaimers_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -1206,6 +1207,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       backgroundColor: Colors.transparent,
                       builder: (ctx) => const OnboardingSheet(),
                     );
+                  },
+                ),
+                const SizedBox(height: 8),
+                GlassButton(
+                  text: 'Legal & Safety Disclaimers',
+                  icon: Icons.gavel_rounded,
+                  style: GlassButtonStyle.secondary,
+                  onPressed: () {
+                    AppHaptics.tap();
+                    LegalDisclaimersSheet.show(context);
                   },
                 ),
               ],

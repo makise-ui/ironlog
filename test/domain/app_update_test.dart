@@ -20,15 +20,15 @@ void main() {
 
   group('AppUpdateService Tests', () {
     test('Current release has valid highlights and metadata', () {
-      expect(AppUpdateService.currentVersion, 'v1.4.0');
-      expect(AppUpdateService.currentBuildNumber, 6);
+      expect(AppUpdateService.currentVersion, 'v1.4.1');
+      expect(AppUpdateService.currentBuildNumber, 7);
 
       final release = AppUpdateService.currentRelease;
-      expect(release.version, 'v1.4.0');
+      expect(release.version, 'v1.4.1');
       expect(release.highlights, isNotEmpty);
-      expect(release.highlights.any((h) => h.title.contains('Catalog Customization')), isTrue);
-      expect(release.highlights.any((h) => h.title.contains('Multi-Preset')), isTrue);
-      expect(release.highlights.any((h) => h.title.contains('Background Resilience')), isTrue);
+      expect(release.highlights.any((h) => h.title.contains('Medical Liability Waiver')), isTrue);
+      expect(release.highlights.any((h) => h.title.contains('AI Workout Coach')), isTrue);
+      expect(release.highlights.any((h) => h.title.contains('Media Attribution')), isTrue);
     });
 
     test('shouldShowWhatsNew returns true on first run and false after seen', () async {
@@ -51,8 +51,8 @@ void main() {
 
     test('checkForUpdates returns valid result offline', () async {
       final result = await updateService.checkForUpdates();
-      expect(result.currentVersion, 'v1.4.0');
-      expect(result.releaseInfo.version, 'v1.4.0');
+      expect(result.currentVersion, 'v1.4.1');
+      expect(result.releaseInfo.version, 'v1.4.1');
       expect(result.isUpdateAvailable, isFalse);
     });
   });
