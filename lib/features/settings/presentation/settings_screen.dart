@@ -1203,6 +1203,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     AppHaptics.tap();
                     showModalBottomSheet(
                       context: context,
+                      useRootNavigator: true,
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
                       builder: (ctx) => const OnboardingSheet(),

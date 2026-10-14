@@ -16,6 +16,7 @@ class WhatsNewSheet extends ConsumerStatefulWidget {
     AppHaptics.tap();
     return showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => const WhatsNewSheet(),
@@ -387,7 +388,12 @@ class _WhatsNewSheetState extends ConsumerState<WhatsNewSheet> {
 
           // Footer action buttons
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              MediaQuery.of(context).padding.bottom + 16,
+            ),
             decoration: BoxDecoration(
               color: context.cardBg,
               border: Border(top: BorderSide(color: context.cardBorder)),
