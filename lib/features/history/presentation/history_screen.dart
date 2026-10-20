@@ -517,10 +517,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Widget _buildCalendarWidget() {
+    final now = DateTime.now();
     final daysInMonth = DateUtils.getDaysInMonth(_selectedMonth.year, _selectedMonth.month);
     final monthWorkouts = _workouts.where((w) => w.date.year == _selectedMonth.year && w.date.month == _selectedMonth.month).toList();
     final workoutDays = monthWorkouts.where((w) => !w.isRestDay).map((w) => w.date.day).toSet();
     final restDays = monthWorkouts.where((w) => w.isRestDay).map((w) => w.date.day).toSet();
+
+    // Monday-first offset (Dart DateTime.weekday: Monday = 1, Sunday = 7)
+    final firstWeekdayOffset = (DateTime(_selectedMonth.year, _selectedMonth.month, 1).weekday - 1) % 7;
+    final totalGridSlots = firstWeekdayOffset + daysInMonth;
+
+    const weekdayHeaders = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
@@ -589,7 +596,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.sm),
+          // Weekday Header Row (MON - SUN)
+          Row(
+            children: weekdayHeaders.map((w) {
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    w,
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: context.textTertiary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 6),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -599,12 +626,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               crossAxisSpacing: 6,
               childAspectRatio: 1.1,
             ),
-            itemCount: daysInMonth,
+            itemCount: totalGridSlots,
             itemBuilder: (context, index) {
-              final day = index + 1;
+              if (index < firstWeekdayOffset) {
+                // Empty slot before month starts
+                return const SizedBox.shrink();
+              }
+
+              final day = index - firstWeekdayOffset + 1;
               final hasWorkout = workoutDays.contains(day);
               final hasRest = restDays.contains(day);
               final existingW = monthWorkouts.where((w) => w.date.day == day).firstOrNull;
+              final isToday = now.year == _selectedMonth.year && now.month == _selectedMonth.month && now.day == day;
 
               Color bg = Colors.transparent;
               Color border = context.isDark ? const Color(0x18FFFFFF) : context.cardBorder;
@@ -614,6 +647,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               } else if (hasRest) {
                 bg = context.isDark ? const Color(0xFF383838) : const Color(0xFFF0F0F1);
                 border = context.isDark ? const Color(0xFF505050) : const Color(0xFFCCCCCC);
+              } else if (isToday) {
+                border = context.accent.withValues(alpha: 0.6);
               }
 
               return GestureDetector(
@@ -624,7 +659,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: border,
-                      width: (hasWorkout || hasRest) ? 1.2 : 0.6,
+                      width: isToday ? 1.5 : ((hasWorkout || hasRest) ? 1.2 : 0.6),
                     ),
                   ),
                   child: Center(
@@ -640,10 +675,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               style: TextStyle(
                                 fontFamily: AppTypography.fontFamily,
                                 fontSize: 12,
-                                fontWeight: (hasWorkout || hasRest) ? FontWeight.w700 : FontWeight.w500,
+                                fontWeight: (hasWorkout || hasRest || isToday) ? FontWeight.w700 : FontWeight.w500,
                                 color: hasWorkout
                                     ? context.accent
-                                    : (hasRest ? context.textPrimary : context.textSecondary),
+                                    : (isToday
+                                        ? context.accent
+                                        : (hasRest ? context.textPrimary : context.textSecondary)),
                               ),
                             ),
                             if (hasRest) ...[
@@ -661,6 +698,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               shape: BoxShape.circle,
                               color: context.accent,
                             ),
+                          )
+                        else if (isToday)
+                          Container(
+                            width: 4,
+                            height: 4,
+                            margin: const EdgeInsets.only(top: 2),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: context.accent.withValues(alpha: 0.6),
+                            ),
                           ),
                       ],
                     ),
@@ -675,6 +722,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Widget _buildWorkoutCard(WorkoutModel w, WeightUnit unit) {
+    final weekday = DateFormat('EEE').format(w.date).toUpperCase();
+    final dayMonth = DateFormat('MMM d').format(w.date);
+    final isToday = AppDateUtils.isSameDay(w.date, DateTime.now());
+    final isYesterday = AppDateUtils.isSameDay(w.date, DateTime.now().subtract(const Duration(days: 1)));
+    final dateBadge = isToday ? 'TODAY • $weekday' : (isYesterday ? 'YESTERDAY • $weekday' : '$weekday, $dayMonth');
+
     if (w.isRestDay) {
       return GlassTile(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -712,9 +765,23 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Text(
-                        AppDateUtils.formatRelativeDate(w.date),
-                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: context.cardBorder, width: 0.6),
+                        ),
+                        child: Text(
+                          dateBadge,
+                          style: TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: context.textSecondary,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -804,13 +871,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Text(
-                      AppDateUtils.formatRelativeDate(w.date),
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 11,
-                        color: C.text3,
-                        fontWeight: FontWeight.w500,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isToday
+                            ? context.accent.withValues(alpha: context.isDark ? 0.20 : 0.12)
+                            : (context.isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9)),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isToday ? context.accent.withValues(alpha: 0.45) : context.cardBorder,
+                          width: 0.6,
+                        ),
+                      ),
+                      child: Text(
+                        dateBadge,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 10,
+                          color: isToday ? context.accent : C.text2,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
                       ),
                     ),
                   ],

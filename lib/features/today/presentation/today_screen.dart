@@ -3179,6 +3179,78 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ),
           ),
 
+        // Compact Mode Quick Exercise Jump Strip
+        if (isCompact && activeExercises.length > 1)
+          SliverToBoxAdapter(
+            child: Container(
+              height: 38,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: S.xl),
+                itemCount: activeExercises.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  final exItem = activeExercises[idx];
+                  final isFocused = _activeWorkoutExerciseId == exItem.id || (_activeWorkoutExerciseId == null && idx == 0);
+                  final setsLogged = exItem.sets.where((s) => !s.archived).length;
+                  return ScaleTap(
+                    onPressed: () {
+                      AppHaptics.selection();
+                      setState(() => _activeWorkoutExerciseId = exItem.id);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isFocused
+                            ? context.accent.withValues(alpha: context.isDark ? 0.22 : 0.14)
+                            : (context.isDark ? const Color(0xFF161922) : const Color(0xFFF1F5F9)),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isFocused ? context.accent : (context.isDark ? const Color(0xFF262A38) : const Color(0xFFE2E8F0)),
+                          width: isFocused ? 1.4 : 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${idx + 1}. ${exItem.exercise.name}',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: isFocused ? FontWeight.w700 : FontWeight.w500,
+                              color: isFocused ? context.accent : context.textPrimary,
+                            ),
+                          ),
+                          if (setsLogged > 0) ...[
+                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: isFocused ? context.accent.withValues(alpha: 0.2) : context.chipBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '$setsLogged',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isFocused ? context.accent : context.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
         // 2. Active Exercises List
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: S.xl),
@@ -3196,6 +3268,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     unit: unit,
                     workoutDate: _selectedDate,
                     suggestion: exSug,
+                    isHeroFocused: !isCompact || (_activeWorkoutExerciseId == item.id || (_activeWorkoutExerciseId == null && index == 0)),
                     onRefresh: _refreshWorkout,
                     onPrAchieved: (pr) {
                       setState(() => _activePr = pr);

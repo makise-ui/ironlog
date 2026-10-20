@@ -257,6 +257,46 @@ class AiToolService {
         {
           'type': 'function',
           'function': {
+            'name': 'preview_preset',
+            'description': 'Show an interactive visual preview card of a proposed routine or preset to the user. Use this whenever the user asks for a workout split, routine recommendation, preset creation, or asks to adjust/modify a routine. The interactive preview lets the user inspect the routine, tap to import it to their library, start the session immediately, or ask for changes.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'title': {
+                  'type': 'string',
+                  'description': 'Title of the routine (e.g. "Chest & Triceps Hypertrophy", "3-Day Full Body").',
+                },
+                'description': {
+                  'type': 'string',
+                  'description': 'Short description of goals, target muscles, and recommendations.',
+                },
+                'category': {
+                  'type': 'string',
+                  'description': 'Category of the routine (e.g., Push, Pull, Legs, Upper, Lower, Full Body).',
+                },
+                'exercises': {
+                  'type': 'array',
+                  'description': 'List of exercises in the routine.',
+                  'items': {
+                    'type': 'object',
+                    'properties': {
+                      'name': {'type': 'string', 'description': 'Exercise name.'},
+                      'targetSets': {'type': 'integer', 'description': 'Target number of sets (e.g., 3 or 4).'},
+                      'targetReps': {'type': 'string', 'description': 'Target rep range (e.g., "8-10", "10-12").'},
+                      'restSeconds': {'type': 'integer', 'description': 'Rest period in seconds (e.g. 90, 120).'},
+                      'notes': {'type': 'string', 'description': 'Form cue, superset tip, or intensity technique.'},
+                    },
+                    'required': ['name'],
+                  },
+                },
+              },
+              'required': ['title', 'exercises'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
             'name': 'start_rest_timer',
             'description': 'Start the countdown rest timer for the user between sets.',
             'parameters': {
@@ -844,6 +884,22 @@ class AiToolService {
             name: call.arguments['name']?.toString() ?? 'Custom Routine',
             category: call.arguments['category']?.toString() ?? 'Custom',
             exerciseNames: exerciseNames,
+          );
+        case 'preview_preset':
+          final rawExercises = call.arguments['exercises'];
+          final exercisesList = <Map<String, dynamic>>[];
+          if (rawExercises is List) {
+            for (final item in rawExercises) {
+              if (item is Map) {
+                exercisesList.add(Map<String, dynamic>.from(item));
+              }
+            }
+          }
+          return await _executePreviewPreset(
+            title: call.arguments['title']?.toString() ?? 'Workout Preset',
+            description: call.arguments['description']?.toString(),
+            category: call.arguments['category']?.toString(),
+            exercises: exercisesList,
           );
         case 'edit_routine':
           final addRaw = call.arguments['addExercises'];
@@ -1580,6 +1636,45 @@ class AiToolService {
         'category': category,
         'exerciseCount': matchedIds.length,
         'exercises': addedExerciseNames,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executePreviewPreset({
+    required String title,
+    String? description,
+    String? category,
+    required List<Map<String, dynamic>> exercises,
+  }) async {
+    final cleanTitle = title.trim().isEmpty ? 'Workout Preset' : title.trim();
+    final cleanCategory = category?.trim().isNotEmpty == true ? category!.trim() : 'Custom';
+    final cleanDesc = description?.trim().isNotEmpty == true
+        ? description!.trim()
+        : 'Targeted workout routine engineered for strength and hypertrophy.';
+
+    final parsedExercises = <Map<String, dynamic>>[];
+    for (final ex in exercises) {
+      final name = ex['name']?.toString().trim() ?? '';
+      if (name.isEmpty) continue;
+      parsedExercises.add({
+        'name': name,
+        'targetSets': _asInt(ex['targetSets']) ?? 3,
+        'targetReps': ex['targetReps']?.toString().trim() ?? '8-12',
+        'restSeconds': _asInt(ex['restSeconds']) ?? 90,
+        if (ex['notes'] != null && ex['notes'].toString().trim().isNotEmpty)
+          'notes': ex['notes'].toString().trim(),
+      });
+    }
+
+    return AiToolExecutionResult(
+      toolName: 'preview_preset',
+      success: true,
+      summary: 'Generated interactive preview for "$cleanTitle" with ${parsedExercises.length} movements.',
+      data: {
+        'title': cleanTitle,
+        'category': cleanCategory,
+        'description': cleanDesc,
+        'exercises': parsedExercises,
       },
     );
   }

@@ -766,6 +766,8 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
           return routineName != null && routineName.isNotEmpty
               ? 'Routine "$routineName" saved'
               : 'Routine saved';
+        case 'preview_preset':
+          return 'Routine preset preview ready';
         case 'edit_routine':
           return routineName != null && routineName.isNotEmpty
               ? 'Routine "$routineName" updated'

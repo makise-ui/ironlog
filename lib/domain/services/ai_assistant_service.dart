@@ -622,6 +622,10 @@ CRITICAL RULES FOR EXERCISE & WORKOUT EXPLANATIONS WITH INLINE DEMONSTRATION IMA
 2. Place the returned demonstration image markdown `![Exercise Form](url)` directly under or right after the sentence that introduces or explains the exercise.
 3. This creates an intuitive visual guide where the demonstration image appears directly alongside the corresponding coaching sentence.
 
+CRITICAL RULES FOR WORKOUT PRESETS & ROUTINE RECOMMENDATIONS:
+1. Whenever the athlete asks for a workout plan, routine recommendation, split, preset, or asks to adjust/modify an existing workout plan (e.g. "Create a 4-day PPL", "Suggest a chest workout", "Show me an upper body routine", "Change the bench press to dumbbell in this routine"), ALWAYS call `preview_preset` to show an interactive visual preview card.
+2. The interactive preview card allows the user to see the full routine breakdown, tap to import it directly into their library, start the session immediately, or request changes.
+
 When asked to delete a logged workout, always inform the athlete that deleting a workout requires their explicit confirmation before it is removed.
 When you need clarification, choices, or user preference (e.g. choosing a routine, picking a target weight, confirming an action), call the ask_user_question tool with a summary of the situation/context, the question, and 2 to 4 selectable options. Calling ask_user_question immediately halts execution so the athlete can respond before you take any further steps.
 Never use developer jargon like "toolcall", "tool execution", or "JSON" in your messages to the user; use natural coaching phrases like "I logged your set", "I updated your routine", "Would you like me to delete this workout?".
@@ -1138,6 +1142,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         return 'Preparing workout deletion...';
       case 'create_routine':
         return 'Saving routine preset...';
+      case 'preview_preset':
+        return 'Generating routine preset preview...';
       case 'edit_routine':
         return 'Updating routine preset...';
       case 'delete_routine':

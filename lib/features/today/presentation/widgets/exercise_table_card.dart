@@ -24,6 +24,7 @@ import '../../../../core/widgets/bouncy_pressable.dart';
 import 'exercise_visual_thumbnail.dart';
 import 'exercise_guide_sheet.dart';
 import 'plate_calculator_sheet.dart';
+import 'ai_assistant_sheet.dart';
 import '../../../../domain/services/e1rm_calculator.dart';
 
 class ExerciseTableCard extends ConsumerStatefulWidget {
@@ -35,6 +36,7 @@ class ExerciseTableCard extends ConsumerStatefulWidget {
   final Function(PrResult pr) onPrAchieved;
   final VoidCallback onRemoveExercise;
   final VoidCallback? onExerciseFocused;
+  final bool isHeroFocused;
 
   const ExerciseTableCard({
     super.key,
@@ -46,6 +48,7 @@ class ExerciseTableCard extends ConsumerStatefulWidget {
     required this.onPrAchieved,
     required this.onRemoveExercise,
     this.onExerciseFocused,
+    this.isHeroFocused = true,
   });
 
   static void setExerciseExpanded(String id, bool expanded) {
@@ -473,6 +476,135 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     );
   }
 
+  void _openAskAiAboutExercise(ExerciseModel ex) {
+    AppHaptics.tap();
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).padding.bottom + 20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF13151B) : const Color(0xFFF8FAFC),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: isDark ? const Color(0xFF2E3342) : const Color(0xFFE2E8F0))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black26,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: ctx.accent.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.auto_awesome_rounded, color: ctx.accent, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ask AI: ${ex.name}',
+                          style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Form cues, technique, progressions & tips',
+                          style: TextStyle(fontSize: 11, color: ctx.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildAiQuestionTile(
+                ctx,
+                icon: Icons.fitness_center_rounded,
+                title: 'Form & Execution Cues',
+                prompt: 'How do I perform ${ex.name} with optimal hypertrophy form? What are key cues to remember?',
+              ),
+              _buildAiQuestionTile(
+                ctx,
+                icon: Icons.sync_alt_rounded,
+                title: 'Best Equipment Alternatives',
+                prompt: 'What are the best alternative exercises for ${ex.name} if machines or weights are taken?',
+              ),
+              _buildAiQuestionTile(
+                ctx,
+                icon: Icons.trending_up_rounded,
+                title: 'Weight & Rep Progression',
+                prompt: 'What rep range and progression strategy is best for building muscle with ${ex.name}?',
+              ),
+              _buildAiQuestionTile(
+                ctx,
+                icon: Icons.shield_outlined,
+                title: 'Joint Safety & Common Mistakes',
+                prompt: 'What are common form mistakes and safety tips when doing ${ex.name} to protect joints?',
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    AiAssistantSheet.show(
+                      context,
+                      initialPrompt: 'Regarding ${ex.name}: ',
+                    );
+                  },
+                  icon: Icon(Icons.chat_bubble_outline_rounded, size: 16, color: ctx.accent),
+                  label: Text('Ask Custom Question...', style: TextStyle(color: ctx.accent, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAiQuestionTile(BuildContext ctx, {required IconData icon, required String title, required String prompt}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: ctx.cardElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ctx.cardBorder, width: 0.8),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: ctx.accent, size: 20),
+        title: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ctx.textPrimary)),
+        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: ctx.textTertiary),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        dense: true,
+        onTap: () {
+          Navigator.pop(ctx);
+          AiAssistantSheet.show(context, initialPrompt: prompt);
+        },
+      ),
+    );
+  }
+
   Color _getSetTypeColor(SetType type) {
     switch (type) {
       case SetType.warmup:
@@ -514,34 +646,155 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         : null;
     final bestE1rm = bestSet != null ? E1rmCalculator.calculateEpley(bestSet.weight, bestSet.reps) : 0.0;
     final isCompact = ref.watch(compactWorkoutModeProvider);
+    final isHero = widget.isHeroFocused;
+
+    // In Compact Focus mode: Fold non-hero exercises into sleek one-line summary strips
+    if (isCompact && !isHero) {
+      final isComplete = activeSets.isNotEmpty && (_customPlannedCount == null || activeSets.length >= _customPlannedCount!);
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () {
+          AppHaptics.selection();
+          widget.onExerciseFocused?.call();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOutCubic,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isComplete
+                  ? AppColors.workingSet.withValues(alpha: 0.35)
+                  : context.cardBorder,
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            children: [
+              ExerciseVisualThumbnail(
+                exerciseId: ex.id,
+                exerciseName: ex.name,
+                imagePath: ex.imagePath,
+                muscleGroupId: ex.muscleGroupId,
+                equipment: ex.equipment.name,
+                size: 34,
+                onTap: () {
+                  AppHaptics.selection();
+                  widget.onExerciseFocused?.call();
+                },
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      ex.name,
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamilyDisplay,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${ex.equipment.name.toUpperCase()} • ${activeSets.length} sets logged${bestSet != null ? ' • Best: ${UnitConverter.formatWeight(bestSet.weight, unit: widget.unit)} × ${bestSet.reps}' : ''}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.textTertiary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isComplete
+                      ? AppColors.workingSet.withValues(alpha: 0.15)
+                      : context.accent.withValues(alpha: context.isDark ? 0.15 : 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isComplete
+                        ? AppColors.workingSet.withValues(alpha: 0.4)
+                        : context.accent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isComplete)
+                      const Icon(Icons.check_circle_rounded, size: 12, color: AppColors.workingSet)
+                    else
+                      Icon(Icons.fitness_center_rounded, size: 12, color: context.accent),
+                    const SizedBox(width: 4),
+                    Text(
+                      isComplete ? 'Complete' : '${activeSets.length} sets',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isComplete ? AppColors.workingSet : context.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.unfold_more_rounded, size: 16, color: context.textTertiary),
+            ],
+          ),
+        ),
+      );
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTapDown: (_) => widget.onExerciseFocused?.call(),
-      child: Container(
-        margin: EdgeInsets.only(bottom: isCompact ? 8 : 14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOutCubic,
+        margin: EdgeInsets.only(bottom: (isCompact && isHero) ? 12 : (isCompact ? 8 : 14)),
       decoration: BoxDecoration(
         color: context.cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: context.cardBorder,
-          width: 1.0,
+          color: (isCompact && isHero) ? context.accent : context.cardBorder,
+          width: (isCompact && isHero) ? 1.6 : 1.0,
         ),
-        boxShadow: context.isDark
+        boxShadow: (isCompact && isHero)
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 12,
+                  color: context.accent.withValues(alpha: context.isDark ? 0.28 : 0.16),
+                  blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
               ]
-            : [
-                const BoxShadow(
-                  color: Color(0x06000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
+            : (context.isDark
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [
+                    const BoxShadow(
+                      color: Color(0x06000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,6 +957,21 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     child: Icon(Icons.calculate_outlined, color: context.accent, size: 18),
                   ),
                 ),
+                // Ask AI about this exercise button
+                BouncyPressable(
+                  onTap: () => _openAskAiAboutExercise(ex),
+                  scaleDown: 0.88,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    margin: const EdgeInsets.only(right: 2),
+                    decoration: BoxDecoration(
+                      color: context.accent.withValues(alpha: context.isDark ? 0.16 : 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: context.accent.withValues(alpha: 0.35)),
+                    ),
+                    child: Icon(Icons.auto_awesome_rounded, color: context.accent, size: 18),
+                  ),
+                ),
                 // Expand / Collapse Toggle button
                 BouncyPressable(
                   onTap: () {
@@ -789,11 +1057,23 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                       );
                     } else if (val == 'superset') {
                       _handleSupersetToggle();
+                    } else if (val == 'ask_ai') {
+                      _openAskAiAboutExercise(ex);
                     } else if (val == 'delete') {
                       widget.onRemoveExercise();
                     }
                   },
                   itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'ask_ai',
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_awesome_rounded, color: context.accent, size: 16),
+                          const SizedBox(width: 10),
+                          Text('Ask AI about ${ex.name}', style: TextStyle(color: context.textPrimary, fontSize: 13)),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'superset',
                       child: Row(
