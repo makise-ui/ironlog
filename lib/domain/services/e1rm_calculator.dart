@@ -12,6 +12,15 @@ class E1rmCalculator {
 
   static double calculate(double weight, int reps) => calculateEpley(weight, reps);
 
+  /// Calculates estimated 1 Rep Max using the Brzycki formula: weight * (36 / (37 - reps))
+  /// If reps >= 37, falls back to Epley to avoid division by zero or negative results.
+  static double calculateBrzycki(double weight, int reps) {
+    if (weight <= 0 || reps <= 0) return 0.0;
+    if (reps == 1) return weight;
+    if (reps >= 37) return calculateEpley(weight, reps);
+    return weight * (36.0 / (37.0 - reps));
+  }
+
   /// Calculates session volume = sum(effectiveWeight * reps)
   /// If [isPerHand] is true, multiplies load x 2.
   /// If [isAssisted] or weight < 0, calculates net moved load if [userBodyweight] is provided,

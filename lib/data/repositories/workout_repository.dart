@@ -32,6 +32,13 @@ class WorkoutRepository {
       equip = EquipmentType.values.byName(data.equipment.toLowerCase());
     } catch (_) {}
 
+    ExerciseTrackingType? tracking;
+    if (data.trackingType != null && data.trackingType!.isNotEmpty) {
+      try {
+        tracking = ExerciseTrackingType.values.byName(data.trackingType!);
+      } catch (_) {}
+    }
+
     return ExerciseModel(
       id: data.id,
       name: data.name,
@@ -46,6 +53,8 @@ class WorkoutRepository {
       restSeconds: data.restSeconds,
       isCustom: data.isCustom,
       archived: data.archived,
+      imagePath: data.imagePath,
+      customTrackingType: tracking,
     );
   }
 
@@ -1625,7 +1634,7 @@ class WorkoutRepository {
       if (s.weight <= 0 || s.reps <= 0) continue;
       final exId = weMap[s.workoutExerciseId] ?? '';
       final name = exMap[exId] ?? 'Unknown';
-      final e1rm = s.weight * (1 + s.reps / 30.0);
+      final e1rm = E1rmCalculator.calculate(s.weight, s.reps);
       if (!best.containsKey(name) || e1rm > best[name]!.e1rm) {
         best[name] = SetData(weight: s.weight, reps: s.reps, e1rm: e1rm, date: s.date);
       }

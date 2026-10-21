@@ -105,6 +105,11 @@ class AppNotificationService with WidgetsBindingObserver {
   }
 
   /// Shows a notification when the AI has finished its response or tool executions
+  Future<void> dismissAiRunningNotification() async {
+    await cancelNotification(_aiTaskNotificationId);
+  }
+
+  /// Shows a notification when the AI has finished its response or tool executions
   Future<void> showAiCompletedNotification({
     required String prompt,
     required String snippet,

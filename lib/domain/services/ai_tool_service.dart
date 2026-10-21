@@ -16,6 +16,7 @@ import '../models/ai_chat_message.dart';
 import 'ai_memory_service.dart';
 import 'exercise_image_search_service.dart';
 import 'plate_calculator.dart';
+import 'warmup_generator.dart';
 import '../../features/nutrition/data/nutrition_service.dart';
 
 class AiToolService {
@@ -2826,83 +2827,39 @@ class AiToolService {
       );
     }
 
-    // Plate calculation helper per side
-    List<double> availablePlates = (unit == 'lbs')
-        ? [45.0, 35.0, 25.0, 10.0, 5.0, 2.5]
-        : [25.0, 20.0, 15.0, 10.0, 5.0, 2.5, 1.25];
+    final proposals = WarmupGenerator.generate(
+      targetWeight: targetWeight,
+      barWeight: bar,
+      isBarbell: true,
+    );
 
-    Map<double, int> calculatePlatesPerSide(double totalWeight) {
-      double perSide = (totalWeight - bar) / 2.0;
-      if (perSide <= 0) return {};
-      final map = <double, int>{};
-      for (final p in availablePlates) {
-        if (perSide >= p) {
-          int count = (perSide / p).floor();
-          map[p] = count;
-          perSide -= count * p;
-        }
-      }
-      return map;
+    String formatPlates(PlateCalculationResult pr) {
+      if (pr.platesPerSide.isEmpty) return 'Empty Bar';
+      return pr.platesPerSide.map((p) => '${p.count}x${p.spec.weight}$unit').join(' + ');
     }
-
-    String formatPlates(Map<double, int> plates) {
-      if (plates.isEmpty) return 'Empty Bar';
-      return plates.entries.map((e) => '${e.value}x${e.key}$unit').join(' + ');
-    }
-
-    // Standard scientific ramp-up scheme:
-    // Set 1: Bar x 10
-    // Set 2: 50% target x 5
-    // Set 3: 70% target x 3
-    // Set 4: 85% target x 1-2
-    final step2Weight = (targetWeight * 0.50 / 2.5).round() * 2.5;
-    final step3Weight = (targetWeight * 0.70 / 2.5).round() * 2.5;
-    final step4Weight = (targetWeight * 0.85 / 2.5).round() * 2.5;
 
     final warmupSteps = <Map<String, dynamic>>[];
-
-    warmupSteps.add({
-      'set': 1,
-      'weight': bar,
-      'reps': 10,
-      'purpose': 'Barbell groove & joint warmup',
-      'platesPerSide': 'Empty Bar',
-    });
-
-    if (step2Weight > bar) {
-      final p2 = calculatePlatesPerSide(step2Weight);
+    for (final p in proposals) {
+      final plateRes = PlateCalculator.calculate(
+        targetWeight: p.weight,
+        barWeight: bar,
+        isLb: unit == 'lbs',
+      );
       warmupSteps.add({
-        'set': 2,
-        'weight': step2Weight,
-        'reps': 5,
-        'purpose': '50% target - pattern acceleration',
-        'platesPerSide': formatPlates(p2),
+        'set': p.setIndex,
+        'weight': p.weight,
+        'reps': p.reps,
+        'purpose': p.label,
+        'platesPerSide': formatPlates(plateRes),
       });
     }
 
-    if (step3Weight > step2Weight && step3Weight < targetWeight) {
-      final p3 = calculatePlatesPerSide(step3Weight);
-      warmupSteps.add({
-        'set': 3,
-        'weight': step3Weight,
-        'reps': 3,
-        'purpose': '70% target - moderate load velocity',
-        'platesPerSide': formatPlates(p3),
-      });
-    }
-
-    if (step4Weight > step3Weight && step4Weight < targetWeight) {
-      final p4 = calculatePlatesPerSide(step4Weight);
-      warmupSteps.add({
-        'set': 4,
-        'weight': step4Weight,
-        'reps': 1,
-        'purpose': '85% target - CNS potentiation (zero fatigue)',
-        'platesPerSide': formatPlates(p4),
-      });
-    }
-
-    final targetPlates = calculatePlatesPerSide(targetWeight);
+    final targetPlateRes = PlateCalculator.calculate(
+      targetWeight: targetWeight,
+      barWeight: bar,
+      isLb: unit == 'lbs',
+    );
+    final targetPlatesStr = formatPlates(targetPlateRes);
 
     if (addToWorkout) {
       for (final step in warmupSteps) {
@@ -2920,7 +2877,7 @@ class AiToolService {
     for (final s in warmupSteps) {
       summaryBuf.writeln('• Set ${s['set']}: ${s['weight']} $unit x ${s['reps']} reps [Plates/side: ${s['platesPerSide']}] - ${s['purpose']}');
     }
-    summaryBuf.writeln('Working Set: $targetWeight $unit [Plates/side: ${formatPlates(targetPlates)}]');
+    summaryBuf.writeln('Working Set: $targetWeight $unit [Plates/side: $targetPlatesStr]');
     if (addToWorkout) {
       summaryBuf.writeln('Automatically added ${warmupSteps.length} warmup sets to today\'s session.');
     }
@@ -2932,7 +2889,7 @@ class AiToolService {
       data: {
         'exerciseName': exerciseName,
         'targetWeight': targetWeight,
-        'targetPlatesPerSide': formatPlates(targetPlates),
+        'targetPlatesPerSide': targetPlatesStr,
         'unit': unit,
         'warmupSteps': warmupSteps,
         'addedToWorkout': addToWorkout,
@@ -3323,7 +3280,7 @@ class AiToolService {
     }
 
     final epley1rm = E1rmCalculator.calculateEpley(weight, reps);
-    final brzycki1rm = reps < 37 ? weight * (36.0 / (37.0 - reps)) : epley1rm;
+    final brzycki1rm = E1rmCalculator.calculateBrzycki(weight, reps);
     final estimated1rm = double.parse(((epley1rm + brzycki1rm) / 2.0).toStringAsFixed(1));
 
     final percentages = {

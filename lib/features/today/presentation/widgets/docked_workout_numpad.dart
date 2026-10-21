@@ -427,6 +427,11 @@ class DockedWorkoutNumpad extends ConsumerWidget {
 
                 Divider(height: 1, color: isDark ? const Color(0xFF23283A) : const Color(0xFFE8EAF2)),
 
+                // 2.5 1-Tap Inline RPE / RIR Strip
+                _buildRpeStrip(context, ref, inputState),
+
+                Divider(height: 1, color: isDark ? const Color(0xFF23283A) : const Color(0xFFE8EAF2)),
+
               // 3. Keypad & Actions Layout
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -701,6 +706,113 @@ class DockedWorkoutNumpad extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRpeStrip(BuildContext context, WidgetRef ref, ActiveWorkoutInput inputState) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final rpeOptions = const [
+      (value: 7.0, label: '7', sub: '3 RIR', color: Color(0xFF06B6D4)),
+      (value: 8.0, label: '8', sub: '2 RIR', color: Color(0xFF3B82F6)),
+      (value: 9.0, label: '9', sub: '1 RIR', color: Color(0xFFF59E0B)),
+      (value: 10.0, label: '10', sub: 'Max', color: Color(0xFFEF4444)),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      color: isDark ? const Color(0xFF0E111B) : const Color(0xFFF3F4F8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1B1F2E) : const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Text(
+              'RPE',
+              style: TextStyle(
+                fontFamily: AppTypography.fontFamily,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                color: inputState.rpe != null ? context.accent : context.textSecondary,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              children: [
+                for (final opt in rpeOptions) ...[
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                      child: BouncyPressable(
+                        onTap: () {
+                          AppHaptics.selection();
+                          ref.read(activeWorkoutInputProvider.notifier).setRpe(opt.value);
+                        },
+                        scaleDown: 0.92,
+                        child: Builder(
+                          builder: (context) {
+                            final isSelected = inputState.rpe != null &&
+                                (inputState.rpe! - opt.value).abs() < 0.1;
+                            return Container(
+                              height: 27,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? opt.color.withValues(alpha: isDark ? 0.30 : 0.18)
+                                    : (isDark ? const Color(0xFF181C2A) : Colors.white),
+                                borderRadius: BorderRadius.circular(7),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? opt.color
+                                      : (isDark ? const Color(0xFF282E40) : const Color(0xFFCBD5E1)),
+                                  width: isSelected ? 1.4 : 1.0,
+                                ),
+                              ),
+                              child: RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '${opt.label} ',
+                                      style: TextStyle(
+                                        fontFamily: AppTypography.fontFamily,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: isSelected
+                                            ? opt.color
+                                            : context.textPrimary,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: '[${opt.sub}]',
+                                      style: TextStyle(
+                                        fontFamily: AppTypography.fontFamily,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSelected
+                                            ? opt.color
+                                            : context.textTertiary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

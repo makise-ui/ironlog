@@ -1765,6 +1765,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     initialReps: set.reps,
                     unit: widget.unit,
                     isCompleted: true,
+                    initialRpe: set.rpe,
                   );
                 }
               },
@@ -1848,6 +1849,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     initialReps: set.reps,
                     unit: widget.unit,
                     isCompleted: true,
+                    initialRpe: set.rpe,
                   );
                 }
               },
@@ -1902,6 +1904,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     initialReps: set.reps,
                     unit: widget.unit,
                     isCompleted: true,
+                    initialRpe: set.rpe,
                   );
                 }
               },
@@ -1961,6 +1964,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     initialReps: set.reps,
                     unit: widget.unit,
                     isCompleted: true,
+                    initialRpe: set.rpe,
                   );
                 }
               },
@@ -2014,6 +2018,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     initialReps: set.reps,
                     unit: widget.unit,
                     isCompleted: true,
+                    initialRpe: set.rpe,
                   );
                 }
               },
@@ -2068,6 +2073,7 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     initialReps: set.reps,
                     unit: widget.unit,
                     isCompleted: true,
+                    initialRpe: set.rpe,
                   );
                 }
               },

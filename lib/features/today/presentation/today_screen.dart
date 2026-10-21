@@ -899,6 +899,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       weight: input.weightInKg,
       reps: input.effectiveReps,
       setType: input.setType,
+      rpe: input.rpe,
     );
 
     // Rest timer
@@ -919,6 +920,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       weight: input.weightInKg,
       reps: input.effectiveReps,
       setType: input.setType,
+      rpe: input.rpe,
       completedAt: DateTime.now(),
     );
 
@@ -1015,6 +1017,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
       weight: input.weightInKg,
       reps: input.effectiveReps,
       setType: input.setType,
+      rpe: input.rpe,
     );
     await _refreshWorkout();
     ref.read(activeWorkoutInputProvider.notifier).close();
@@ -2798,15 +2801,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   label: isRestDay ? 'Unmark Rest' : 'Rest Day',
                   onTap: () => _markRestDay(isRest: !isRestDay),
                 ),
-                const SizedBox(width: S.sm),
-                _buildQuietPill(
-                  icon: Icons.restaurant_rounded,
-                  label: 'Fuel & Food',
-                  onTap: () {
-                    AppHaptics.tap();
-                    context.push('/nutrition');
-                  },
-                ),
               ],
             ),
           ),
@@ -3496,14 +3490,14 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   ),
           ),
 
-          // Floating Rest Timer Dynamic Capsule (glides above numpad or HUD!)
+          // Floating Rest Timer Dynamic Capsule (glides smoothly above numpad or HUD!)
           if (hasActiveWorkout)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: hasActiveInput ? 280 : (hasActiveWorkout && !isFinished ? 76 : 24),
+              bottom: hasActiveInput ? 312 : (hasActiveWorkout && !isFinished ? 68 : 20),
               child: const RestTimerOverlay(),
             ),
 

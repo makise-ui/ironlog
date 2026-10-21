@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/haptics.dart';
+import '../../../domain/models/chibi_avatar_model.dart';
 import '../../../domain/services/pr_detector.dart';
 
 class SparkParticle {
@@ -44,6 +45,7 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
   late final AnimationController _controller;
   final List<SparkParticle> _particles = [];
   final Random _rand = Random();
+  ChibiAvatar? _companion;
 
   final List<Color> _colors = [
     const Color(0xFF00FFCC), // Electric Cyan
@@ -57,6 +59,9 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
   void initState() {
     super.initState();
     AppHaptics.save();
+    ChibiAvatar.loadCurrent().then((c) {
+      if (mounted) setState(() => _companion = c);
+    });
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2800),
@@ -250,7 +255,31 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  if (_companion != null) ...[
+                                    Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: const Color(0xFFFBBF24), width: 1.5),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFFBBF24).withValues(alpha: 0.35),
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipOval(
+                                        child: Image.asset(
+                                          _companion!.assetPath,
+                                          width: 32,
+                                          height: 32,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
                                   GestureDetector(
                                     onTap: widget.onDismiss,
                                     behavior: HitTestBehavior.opaque,

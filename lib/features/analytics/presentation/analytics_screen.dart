@@ -25,6 +25,7 @@ class AnalyticsScreen extends ConsumerStatefulWidget {
 
 class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   int _selectedDaysWindow = 7; // 7, 30, or 90
+  int _activeAnalyticsTab = 0; // 0: Overview & Recovery, 1: Strength & PRs, 2: Volume & Effort
   bool _isLoading = true;
   bool _showAdvanced = false;
 
@@ -209,688 +210,395 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                 ),
               )
             else ...[
-              // 0. Super-Zoomable Growth Timeline Hero Card
+              // 3-Tab Segment Switcher: [ Overview & Recovery | Strength & PRs | Volume & Effort ]
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm),
-                  child: ScaleTap(
-                    onPressed: () {
-                      AppHaptics.mediumImpact();
-                      context.push('/analytics/timeline');
-                    },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF141724) : const Color(0xFFEFF1F8),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF262C42) : const Color(0xFFDDE1EE),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildTabSegment(0, 'Overview', Icons.dashboard_rounded),
+                        _buildTabSegment(1, 'Strength', Icons.emoji_events_rounded),
+                        _buildTabSegment(2, 'Volume', Icons.bar_chart_rounded),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // === TAB 0: OVERVIEW & RECOVERY ===
+              if (_activeAnalyticsTab == 0) ...[
+                // Super-Zoomable Growth Timeline Hero Card
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
+                    child: ScaleTap(
+                      onPressed: () {
+                        AppHaptics.mediumImpact();
+                        context.push('/analytics/timeline');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDark
+                                ? [
+                                    const Color(0xFF2E1B4E),
+                                    const Color(0xFF161F38),
+                                  ]
+                                : [
+                                    const Color(0xFFF3E8FF),
+                                    const Color(0xFFE0E7FF),
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: AppColors.accentViolet.withValues(alpha: isDark ? 0.4 : 0.6),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.accentViolet.withValues(alpha: isDark ? 0.3 : 0.15),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentViolet.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.accentViolet,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.auto_graph_rounded,
+                                color: AppColors.accentViolet,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'GROWTH TIMELINE',
+                                        style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.6,
+                                          color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accentEmerald.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'ZOOMABLE',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppColors.accentEmerald,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Interactive pinch-to-zoom training journey with PRs, volume curves & inspection.',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 11.5,
+                                      color: isDark ? Colors.white70 : const Color(0xFF4B5563),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: AppColors.accentViolet,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Hero Overview Metrics Grid
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'TOTAL VOLUME',
+                                value: UnitConverter.formatWeight(_overview?.totalVolume ?? 0, unit: unit),
+                                icon: Icons.fitness_center_rounded,
+                                iconColor: context.accent,
+                                context: context,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'WORKOUTS',
+                                value: '${_overview?.totalWorkouts ?? 0}',
+                                icon: Icons.event_available_rounded,
+                                iconColor: AppColors.accentViolet,
+                                context: context,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'TOTAL SETS',
+                                value: '${_overview?.totalSets ?? 0}',
+                                icon: Icons.repeat_rounded,
+                                iconColor: AppColors.accentEmerald,
+                                context: context,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'ACTIVE STREAK',
+                                value: '${_overview?.currentStreakDays ?? 0} Days',
+                                icon: Icons.local_fire_department_rounded,
+                                iconColor: AppColors.warning,
+                                context: context,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 14)),
+
+                // Muscle Recovery & Fatigue Heatmap (Realistic Human Anatomy)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: RealisticBodyHeatmap(
+                      recoveryData: _muscleRecovery,
+                    ),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                // Muscle Group Split Breakdown
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: isDark
-                              ? [
-                                  const Color(0xFF2E1B4E),
-                                  const Color(0xFF161F38),
-                                ]
-                              : [
-                                  const Color(0xFFF3E8FF),
-                                  const Color(0xFFE0E7FF),
-                                ],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: AppColors.accentViolet.withValues(alpha: isDark ? 0.4 : 0.6),
-                          width: 1.5,
-                        ),
+                        color: context.cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.cardBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accentViolet.withValues(alpha: isDark ? 0.3 : 0.15),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
+                            color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x06000000),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
                           ),
                         ],
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.accentViolet.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.accentViolet,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.auto_graph_rounded,
-                              color: AppColors.accentViolet,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'GROWTH TIMELINE',
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.6,
-                                        color: isDark ? Colors.white : const Color(0xFF1E1B4B),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.accentEmerald.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text(
-                                        'ZOOMABLE',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppColors.accentEmerald,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Interactive pinch-to-zoom training journey with PRs, volume curves & inspection.',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 11.5,
-                                    color: isDark ? Colors.white70 : const Color(0xFF4B5563),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 14,
-                            color: AppColors.accentViolet,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // 1. Hero Overview Metrics Grid
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              label: 'TOTAL VOLUME',
-                              value: UnitConverter.formatWeight(_overview?.totalVolume ?? 0, unit: unit),
-                              icon: Icons.fitness_center_rounded,
-                              iconColor: context.accent,
-                              context: context,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              label: 'WORKOUTS',
-                              value: '${_overview?.totalWorkouts ?? 0}',
-                              icon: Icons.event_available_rounded,
-                              iconColor: AppColors.accentViolet,
-                              context: context,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              label: 'TOTAL SETS',
-                              value: '${_overview?.totalSets ?? 0}',
-                              icon: Icons.repeat_rounded,
-                              iconColor: AppColors.accentEmerald,
-                              context: context,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              label: 'ACTIVE STREAK',
-                              value: '${_overview?.currentStreakDays ?? 0} Days',
-                              icon: Icons.local_fire_department_rounded,
-                              iconColor: AppColors.warning,
-                              context: context,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-
-              // 2. Volume Progression Bar Chart
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.cardBorder),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x06000000),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.bar_chart_rounded, color: context.textSecondary, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              'DAILY TRAINING VOLUME',
-                              style: AppTypography.labelSmall.copyWith(
-                                color: context.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              unit.label.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: context.accent,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          height: 180,
-                          child: _buildVolumeBarChart(unit, isDark),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-              // 3. Muscle Recovery & Fatigue Heatmap (Realistic Human Anatomy)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: RealisticBodyHeatmap(
-                    recoveryData: _muscleRecovery,
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-              // 4. Muscle Group Split Breakdown
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.cardBorder),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x06000000),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.pie_chart_rounded, color: context.textSecondary, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              'MUSCLE GROUP SPLIT',
-                              style: AppTypography.labelSmall.copyWith(
-                                color: context.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              'Last $_selectedDaysWindow Days',
-                              style: TextStyle(fontSize: 11, color: context.textTertiary),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        if (_muscleSplit.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Center(
-                              child: Text(
-                                'No sets recorded in this timeframe.',
-                                style: TextStyle(color: context.textTertiary, fontSize: 12),
-                              ),
-                            ),
-                          )
-                        else
-                          ..._buildMuscleSplitBars(context),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-              // Training Effort & Stimulating Reps (RIR / Hypertrophy)
-              if (_recentWorkingSets.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: EffortDistributionCard(sets: _recentWorkingSets),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              ],
-
-              // 4. Personal Records (PR) Hall of Fame
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.cardBorder),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x06000000),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.emoji_events_rounded, color: context.textSecondary, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              'PERSONAL RECORDS',
-                              style: AppTypography.labelSmall.copyWith(
-                                color: context.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              '${_recentPrs.length} Milestones',
-                              style: const TextStyle(fontSize: 11, color: AppColors.prGold, fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (_recentPrs.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Center(
-                              child: Text(
-                                'Keep lifting! New PR achievements will appear here.',
-                                style: TextStyle(color: context.textTertiary, fontSize: 12),
-                              ),
-                            ),
-                          )
-                        else
-                          ..._recentPrs.map((pr) => _buildPrTile(pr, unit, context)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-
-              // 5. ADVANCED ANALYTICS DRILLDOWN SECTION
-              if (_showAdvanced) ...[
-                const SliverToBoxAdapter(child: SizedBox(height: 18)),
-
-                // Section Badge Header
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentViolet.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.3)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
+                          Row(
                             children: [
-                              Icon(Icons.insights_rounded, size: 14, color: AppColors.accentViolet),
-                              SizedBox(width: 6),
+                              Icon(Icons.pie_chart_rounded, color: context.textSecondary, size: 18),
+                              const SizedBox(width: 8),
                               Text(
-                                'ADVANCED DRILLDOWN & REPS',
-                                style: TextStyle(
-                                  fontSize: 10.5,
+                                'MUSCLE GROUP SPLIT',
+                                style: AppTypography.labelSmall.copyWith(
+                                  color: context.textPrimary,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.accentViolet,
-                                  letterSpacing: 0.6,
+                                  letterSpacing: 0.5,
                                 ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Last $_selectedDaysWindow Days',
+                                style: TextStyle(fontSize: 11, color: context.textTertiary),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-                // Quick Advanced Metrics Row: Avg Duration, Active Exercises, Total Reps
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildMetricCard(
-                            label: 'AVG DURATION',
-                            value: _avgWorkoutDuration > 0
-                                ? '${_avgWorkoutDuration.toStringAsFixed(0)} min'
-                                : '--',
-                            icon: Icons.timer_outlined,
-                            iconColor: AppColors.accentViolet,
-                            context: context,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildMetricCard(
-                            label: 'TOTAL REPS',
-                            value: '${_overview?.totalReps ?? 0}',
-                            icon: Icons.repeat_one_rounded,
-                            iconColor: context.accent,
-                            context: context,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildMetricCard(
-                            label: 'EXERCISES',
-                            value: '${_bestSets.length}',
-                            icon: Icons.fitness_center_rounded,
-                            iconColor: AppColors.accentEmerald,
-                            context: context,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // Rep Range Distribution (Strength, Hypertrophy, Endurance)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: _buildSectionCard(
-                      icon: Icons.pie_chart_outline_rounded,
-                      title: 'REP RANGE DISTRIBUTION',
-                      subtitle: 'Last $_selectedDaysWindow Days',
-                      context: context,
-                      child: _repRanges.isEmpty
-                          ? Padding(
+                          const SizedBox(height: 14),
+                          if (_muscleSplit.isEmpty)
+                            Padding(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Center(
                                 child: Text(
-                                  'No set data recorded in this window.',
+                                  'No sets recorded in this timeframe.',
                                   style: TextStyle(color: context.textTertiary, fontSize: 12),
                                 ),
                               ),
                             )
-                          : Column(
-                              children: _repRanges.map((r) => _buildRepRangeBar(r, context, isDark)).toList(),
-                            ),
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // Avg Reps per Muscle Group
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: _buildSectionCard(
-                      icon: Icons.analytics_rounded,
-                      title: 'AVG REPS / MUSCLE GROUP',
-                      subtitle: 'Last $_selectedDaysWindow Days',
-                      context: context,
-                      child: _avgReps.isEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: Text(
-                                  'No rep data available.',
-                                  style: TextStyle(color: context.textTertiary, fontSize: 12),
-                                ),
-                              ),
-                            )
-                          : Column(
-                              children: (_avgReps.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
-                                  .map((e) {
-                                final color = AppColors.muscleGroupColors[e.key] ?? context.accent;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          e.key,
-                                          style: TextStyle(
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: context.textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        '${e.value.toStringAsFixed(1)} reps/set',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: context.textPrimary,
-                                          fontFeatures: const [FontFeature.tabularFigures()],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // Weekly Training Frequency (Last 8 Weeks)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: _buildSectionCard(
-                      icon: Icons.calendar_view_week_rounded,
-                      title: 'WEEKLY TRAINING FREQUENCY',
-                      subtitle: 'Last 8 Weeks',
-                      context: context,
-                      child: SizedBox(
-                        height: 165,
-                        child: _buildWeeklyFrequencyChart(isDark),
+                          else
+                            ..._buildMuscleSplitBars(context),
+                        ],
                       ),
                     ),
                   ),
                 ),
+
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-                // Top Exercises by Volume
+                // Avg Reps per Muscle Group
+                if (_avgReps.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: _buildSectionCard(
+                        icon: Icons.analytics_rounded,
+                        title: 'AVG REPS / MUSCLE GROUP',
+                        subtitle: 'Last $_selectedDaysWindow Days',
+                        context: context,
+                        child: Column(
+                          children: (_avgReps.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
+                              .map((e) {
+                            final color = AppColors.muscleGroupColors[e.key] ?? context.accent;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      e.key,
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${e.value.toStringAsFixed(1)} reps/set',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textPrimary,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+
+              // === TAB 1: STRENGTH & PROGRESSION ===
+              if (_activeAnalyticsTab == 1) ...[
+                // Personal Records (PR) Hall of Fame
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                    child: _buildSectionCard(
-                      icon: Icons.leaderboard_rounded,
-                      title: 'TOP EXERCISES BY VOLUME',
-                      subtitle: 'Last $_selectedDaysWindow Days',
-                      context: context,
-                      child: _topExercises.isEmpty
-                          ? Padding(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: context.cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.cardBorder),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x06000000),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.emoji_events_rounded, color: context.textSecondary, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'PERSONAL RECORDS',
+                                style: AppTypography.labelSmall.copyWith(
+                                  color: context.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${_recentPrs.length} Milestones',
+                                style: const TextStyle(fontSize: 11, color: AppColors.prGold, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (_recentPrs.isEmpty)
+                            Padding(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Center(
-                                child: Text('No exercises recorded',
-                                    style: TextStyle(color: context.textTertiary, fontSize: 12)),
+                                child: Text(
+                                  'Keep lifting! New PR achievements will appear here.',
+                                  style: TextStyle(color: context.textTertiary, fontSize: 12),
+                                ),
                               ),
                             )
-                          : Column(
-                              children: _topExercises.asMap().entries.map((e) {
-                                final rank = e.key + 1;
-                                final ex = e.value;
-                                final maxVol = _topExercises.first.totalVolume;
-                                final pct = maxVol > 0 ? (ex.totalVolume / maxVol) : 0.0;
-                                final colors = [
-                                  context.accent,
-                                  AppColors.accentViolet,
-                                  AppColors.accentEmerald,
-                                  AppColors.warning,
-                                  AppColors.error,
-                                ];
-                                final color = colors[e.key % colors.length];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            width: 20,
-                                            height: 20,
-                                            decoration: BoxDecoration(
-                                              color: color.withValues(alpha: 0.15),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                '#$rank',
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: color,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              ex.exerciseName,
-                                              style: TextStyle(
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.w600,
-                                                color: context.textPrimary,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          Text(
-                                            UnitConverter.formatWeight(ex.totalVolume, unit: unit),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: context.textPrimary,
-                                              fontFeatures: const [FontFeature.tabularFigures()],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            '${ex.setsCount}s',
-                                            style: TextStyle(fontSize: 11, color: context.textTertiary),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 5),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: Stack(
-                                          children: [
-                                            Container(
-                                              height: 5,
-                                              color: isDark ? const Color(0xFF1A2234) : const Color(0xFFE5E5E5),
-                                            ),
-                                            FractionallySizedBox(
-                                              widthFactor: pct.clamp(0.0, 1.0),
-                                              child: Container(
-                                                height: 5,
-                                                decoration: BoxDecoration(
-                                                  color: color,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
+                          else
+                            ..._recentPrs.map((pr) => _buildPrTile(pr, unit, context)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
+
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
                 // Best Sets (Est. 1RM Milestones)
@@ -967,11 +675,336 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                     ),
                   ),
                 ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                // Rep Range Distribution (Strength, Hypertrophy, Endurance)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: _buildSectionCard(
+                      icon: Icons.pie_chart_outline_rounded,
+                      title: 'REP RANGE DISTRIBUTION',
+                      subtitle: 'Last $_selectedDaysWindow Days',
+                      context: context,
+                      child: _repRanges.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: Text(
+                                  'No set data recorded in this window.',
+                                  style: TextStyle(color: context.textTertiary, fontSize: 12),
+                                ),
+                              ),
+                            )
+                          : Column(
+                              children: _repRanges.map((r) => _buildRepRangeBar(r, context, isDark)).toList(),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+
+              // === TAB 2: VOLUME & EFFORT ===
+              if (_activeAnalyticsTab == 2) ...[
+                // Volume Progression Bar Chart
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: context.cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.cardBorder),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark ? Colors.black.withValues(alpha: 0.25) : const Color(0x06000000),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.bar_chart_rounded, color: context.textSecondary, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'DAILY TRAINING VOLUME',
+                                style: AppTypography.labelSmall.copyWith(
+                                  color: context.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                unit.label.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            height: 180,
+                            child: _buildVolumeBarChart(unit, isDark),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                // Weekly Training Frequency (Last 8 Weeks)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: _buildSectionCard(
+                      icon: Icons.calendar_view_week_rounded,
+                      title: 'WEEKLY TRAINING FREQUENCY',
+                      subtitle: 'Last 8 Weeks',
+                      context: context,
+                      child: SizedBox(
+                        height: 165,
+                        child: _buildWeeklyFrequencyChart(isDark),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                // Top Exercises by Volume
+                if (_topExercises.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: _buildSectionCard(
+                        icon: Icons.leaderboard_rounded,
+                        title: 'TOP EXERCISES BY VOLUME',
+                        subtitle: 'Last $_selectedDaysWindow Days',
+                        context: context,
+                        child: Column(
+                          children: _topExercises.asMap().entries.map((e) {
+                            final rank = e.key + 1;
+                            final ex = e.value;
+                            final maxVol = _topExercises.first.totalVolume;
+                            final pct = maxVol > 0 ? (ex.totalVolume / maxVol) : 0.0;
+                            final colors = [
+                              context.accent,
+                              AppColors.accentViolet,
+                              AppColors.accentEmerald,
+                              AppColors.warning,
+                              AppColors.error,
+                            ];
+                            final color = colors[e.key % colors.length];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: color.withValues(alpha: 0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            '#$rank',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: color,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          ex.exerciseName,
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: context.textPrimary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Text(
+                                        UnitConverter.formatWeight(ex.totalVolume, unit: unit),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: context.textPrimary,
+                                          fontFeatures: const [FontFeature.tabularFigures()],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${ex.setsCount}s',
+                                        style: TextStyle(fontSize: 11, color: context.textTertiary),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 5),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Stack(
+                                      children: [
+                                        Container(
+                                          height: 5,
+                                          color: isDark ? const Color(0xFF1A2234) : const Color(0xFFE5E5E5),
+                                        ),
+                                        FractionallySizedBox(
+                                          widthFactor: pct.clamp(0.0, 1.0),
+                                          child: Container(
+                                            height: 5,
+                                            decoration: BoxDecoration(
+                                              color: color,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                // Training Effort & Stimulating Reps (RIR / Hypertrophy)
+                if (_recentWorkingSets.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: EffortDistributionCard(sets: _recentWorkingSets),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                ],
+
+                // Quick Advanced Metrics Row: Avg Duration, Total Reps, Active Exercises
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildMetricCard(
+                            label: 'AVG DURATION',
+                            value: _avgWorkoutDuration > 0
+                                ? '${_avgWorkoutDuration.toStringAsFixed(0)} min'
+                                : '--',
+                            icon: Icons.timer_outlined,
+                            iconColor: AppColors.accentViolet,
+                            context: context,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildMetricCard(
+                            label: 'TOTAL REPS',
+                            value: '${_overview?.totalReps ?? 0}',
+                            icon: Icons.repeat_one_rounded,
+                            iconColor: context.accent,
+                            context: context,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildMetricCard(
+                            label: 'EXERCISES',
+                            value: '${_bestSets.length}',
+                            icon: Icons.fitness_center_rounded,
+                            iconColor: AppColors.accentEmerald,
+                            context: context,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
 
               const SliverToBoxAdapter(child: SizedBox(height: 130)),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabSegment(int index, String label, IconData icon) {
+    final isSelected = _activeAnalyticsTab == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          AppHaptics.selection();
+          setState(() => _activeAnalyticsTab = index);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? (isDark ? const Color(0xFF23283B) : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: isSelected ? context.accent : context.textTertiary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected ? context.textPrimary : context.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

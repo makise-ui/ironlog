@@ -9,6 +9,7 @@ import '../../../core/widgets/glass_button.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/workout_model.dart';
 import '../../../domain/models/workout_debrief_model.dart';
+import '../../../domain/models/chibi_avatar_model.dart';
 import 'widgets/shareable_workout_card.dart';
 
 class WorkoutSummaryDialog extends ConsumerStatefulWidget {
@@ -35,6 +36,7 @@ class _WorkoutSummaryDialogState extends ConsumerState<WorkoutSummaryDialog> {
 
   WorkoutDebriefData? _debrief;
   bool _loadingDebrief = true;
+  ChibiAvatar _companion = ChibiAvatar.aiko;
 
   final List<IconData> _feelIcons = [
     Icons.sentiment_very_dissatisfied_rounded,
@@ -57,10 +59,12 @@ class _WorkoutSummaryDialogState extends ConsumerState<WorkoutSummaryDialog> {
 
   Future<void> _loadDebrief() async {
     try {
+      final companion = await ChibiAvatar.loadCurrent();
       final repo = ref.read(workoutRepositoryProvider);
       final debrief = await repo.getWorkoutDebrief(widget.workout, elapsed: widget.elapsed);
       if (mounted) {
         setState(() {
+          _companion = companion;
           _debrief = debrief;
           _loadingDebrief = false;
         });
@@ -68,6 +72,50 @@ class _WorkoutSummaryDialogState extends ConsumerState<WorkoutSummaryDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _loadingDebrief = false);
+      }
+    }
+  }
+
+  String _getCompanionDebriefQuote(ChibiAvatar companion, bool hasPrs) {
+    if (hasPrs) {
+      switch (companion.id) {
+        case 'shiba':
+          return 'MUCH GAINS! SUCH POWER! WOW PR CRUSHED!';
+        case 'ken':
+          return 'Discipline yields results. Unwavering focus conquered that PR.';
+        case 'kuro':
+          return 'Precision strikes target. Your strength executed flawlessly.';
+        case 'roxy':
+          return 'Overdrive engaged! Systems hitting peak PR velocity!';
+        case 'bao':
+          return 'Solid as mountain bamboo! That weight was feather-light for you!';
+        case 'ren':
+          return 'HELL YEAH! Your fighting spirit shattered that ceiling!';
+        case 'yuki':
+          return 'Pure flow state and serene mastery. A truly beautiful milestone.';
+        case 'aiko':
+        default:
+          return 'Incredible work out there! You totally smashed new personal records today!';
+      }
+    } else {
+      switch (companion.id) {
+        case 'shiba':
+          return 'Great workout buddy! Recovery time means protein shakes!';
+        case 'ken':
+          return 'Another brick in the fortress. Consistent effort compounds.';
+        case 'kuro':
+          return 'Clean execution. Rest and recover for the next mission.';
+        case 'roxy':
+          return 'Workout completed, power levels stabilized! Fuel up and recharge!';
+        case 'bao':
+          return 'Great session! Good form and heavy effort make a strong foundation.';
+        case 'ren':
+          return 'Great sweat! Never let up, we keep advancing every day!';
+        case 'yuki':
+          return 'Calm breath, complete recovery. Honor the hard work your body did.';
+        case 'aiko':
+        default:
+          return 'Super job finishing today\'s session! Consistency is your superpower!';
       }
     }
   }
@@ -399,27 +447,67 @@ class _WorkoutSummaryDialogState extends ConsumerState<WorkoutSummaryDialog> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: context.accent.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  _companion.assetPath,
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: context.accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.auto_awesome_rounded, color: context.accent, size: 14),
+                  ),
                 ),
-                child: Icon(Icons.auto_awesome_rounded, color: context.accent, size: 14),
               ),
               const SizedBox(width: 8),
-              Text(
-                'AI POST-WORKOUT DEBRIEF',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: context.accent,
+              Expanded(
+                child: Text(
+                  '${_companion.name.toUpperCase()}\'S POST-WORKOUT DEBRIEF',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: context.accent,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: context.accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: context.accent.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.chat_bubble_outline_rounded, size: 13, color: context.accent),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '"${_getCompanionDebriefQuote(_companion, debrief.hasPrs)}"',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.w600,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             debrief.headline,
             style: TextStyle(

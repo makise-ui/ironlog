@@ -12,7 +12,9 @@ import '../../../core/widgets/scale_tap.dart';
 import '../../../domain/models/ai_config_model.dart';
 import '../../../domain/models/chibi_avatar_model.dart';
 import '../../../domain/services/ai_assistant_service.dart';
+import '../../../domain/services/ai_model_fetcher_service.dart';
 import '../../today/presentation/widgets/ai_assistant_sheet.dart';
+import 'model_selection_sheet.dart';
 
 class AiSettingsScreen extends ConsumerStatefulWidget {
   const AiSettingsScreen({super.key});
@@ -98,6 +100,62 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
           duration: const Duration(seconds: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
+      );
+    }
+  }
+
+  Future<void> _quickSelectModelForProfile(AiConfigModel profile) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: context.accent)),
+              const SizedBox(width: 10),
+              const Text('Fetching models from endpoint...'),
+            ],
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      final models = await AiModelFetcherService.fetchModels(
+        baseUrl: profile.baseUrl,
+        apiKey: profile.apiKey,
+        provider: profile.provider,
+      );
+
+      messenger.hideCurrentSnackBar();
+
+      if (!mounted) return;
+      if (models.isEmpty) {
+        messenger.showSnackBar(const SnackBar(content: Text('Endpoint returned 0 models.')));
+        return;
+      }
+
+      final selected = await ModelSelectionSheet.show(
+        context: context,
+        models: models,
+        currentModelId: profile.modelName,
+        endpointUrl: profile.baseUrl,
+      );
+
+      if (selected != null && mounted) {
+        final updated = profile.copyWith(modelName: selected.id);
+        await ref.read(aiAssistantServiceProvider).saveConfig(updated);
+        await _loadProfiles();
+        AppHaptics.success();
+        messenger.showSnackBar(
+          SnackBar(content: Text('Switched to ${selected.id}${selected.isFree ? ' (Free)' : ''}')),
+        );
+      }
+    } catch (e) {
+      messenger.hideCurrentSnackBar();
+      if (!mounted) return;
+      AppHaptics.warning();
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not fetch models: ${e.toString().replaceAll('Exception: ', '')}')),
       );
     }
   }
@@ -503,16 +561,32 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Model: ${activeProfile.modelName}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: context.accent,
-                                          fontWeight: FontWeight.w600,
+                                      const SizedBox(height: 3),
+                                      InkWell(
+                                        onTap: () => _quickSelectModelForProfile(activeProfile),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 2),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  'Model: ${activeProfile.modelName}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: context.accent,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Icon(Icons.swap_vert_rounded, size: 14, color: context.accent),
+                                            ],
+                                          ),
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
@@ -809,6 +883,71 @@ class _ProfileEditorSheetState extends ConsumerState<_ProfileEditorSheet> {
   late bool _requireApiKey;
   bool _obscureApiKey = true;
   bool _isTesting = false;
+  bool _isFetchingModels = false;
+
+  Future<void> _fetchAndSelectModel() async {
+    final baseUrl = _baseUrlController.text.trim();
+    if (baseUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an API Base URL first')),
+      );
+      return;
+    }
+
+    AppHaptics.tap();
+    setState(() => _isFetchingModels = true);
+
+    try {
+      final models = await AiModelFetcherService.fetchModels(
+        baseUrl: baseUrl,
+        apiKey: _apiKeyController.text.trim(),
+        provider: _provider,
+      );
+
+      if (!mounted) return;
+      setState(() => _isFetchingModels = false);
+
+      if (models.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Endpoint returned 0 models. You can enter model name manually.')),
+        );
+        return;
+      }
+
+      final selected = await ModelSelectionSheet.show(
+        context: context,
+        models: models,
+        currentModelId: _modelController.text.trim(),
+        endpointUrl: baseUrl,
+      );
+
+      if (selected != null && mounted) {
+        setState(() {
+          _modelController.text = selected.id;
+        });
+        AppHaptics.success();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selected model: ${selected.id}${selected.isFree ? ' (Free)' : ''}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isFetchingModels = false);
+      AppHaptics.warning();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not fetch models: ${e.toString().replaceAll('Exception: ', '')}'),
+          action: SnackBarAction(
+            label: 'OK',
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -1122,11 +1261,62 @@ class _ProfileEditorSheetState extends ConsumerState<_ProfileEditorSheet> {
                   const SizedBox(height: 12),
 
                   // Model Name
-                  _buildInputLabel('MODEL NAME'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildInputLabel('MODEL NAME'),
+                      BouncyPressable(
+                        onTap: _isFetchingModels ? null : _fetchAndSelectModel,
+                        scaleDown: 0.94,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            color: context.accent.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: context.accent.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_isFetchingModels)
+                                SizedBox(
+                                  width: 10,
+                                  height: 10,
+                                  child: CircularProgressIndicator(strokeWidth: 1.5, color: context.accent),
+                                )
+                              else
+                                Icon(Icons.download_rounded, size: 12, color: context.accent),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isFetchingModels ? 'Fetching...' : 'Select from /models',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   TextField(
                     controller: _modelController,
                     style: TextStyle(fontSize: 13.5, color: context.textPrimary),
-                    decoration: _inputDecoration('e.g. kilo-auto/free, gpt-4o-mini, llama3.2'),
+                    decoration: _inputDecoration('e.g. kilo-auto/free, gpt-4o-mini, llama3.2').copyWith(
+                      suffixIcon: IconButton(
+                        icon: _isFetchingModels
+                            ? SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 1.8, color: context.accent),
+                              )
+                            : const Icon(Icons.arrow_drop_down_circle_outlined, size: 19),
+                        tooltip: 'Select from available endpoint models',
+                        onPressed: _isFetchingModels ? null : _fetchAndSelectModel,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 12),
 

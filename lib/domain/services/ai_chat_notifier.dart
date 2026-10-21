@@ -66,6 +66,7 @@ final aiChatNotifierProvider = StateNotifierProvider<AiChatNotifier, AiChatState
 
 class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObserver {
   final Ref _ref;
+  bool _isCancelled = false;
 
   AiChatNotifier(this._ref) : super(const AiChatState()) {
     WidgetsBinding.instance.addObserver(this);
@@ -360,6 +361,7 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
   }
 
   Future<void> sendMessage(String text, {String? imagePath}) async {
+    _isCancelled = false;
     final promptText = text.trim().isEmpty ? 'Analyze this workout / physique photo' : text.trim();
 
     final userMsg = AiChatMessage(
@@ -409,6 +411,9 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
       final currentThoughtSteps = <String>[];
 
       await for (final event in stream) {
+        if (_isCancelled) {
+          break;
+        }
         if (event is AiThinkingEvent) {
           final thought = event.status;
           final idx = state.messages.indexWhere((m) => m.id == assistantMsgId);
@@ -551,6 +556,7 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
         }
       }
     } catch (e) {
+      if (_isCancelled) return;
       final idx = state.messages.indexWhere((m) => m.id == assistantMsgId);
       final msgs = List<AiChatMessage>.from(state.messages);
       if (idx != -1) {
@@ -600,6 +606,46 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
           await WakelockService.disable();
         }
       } catch (_) {}
+    }
+  }
+
+  /// Immediately halts any ongoing AI streaming generation and preserves existing text.
+  Future<void> stopGeneration() async {
+    if (!state.isLoading) return;
+    _isCancelled = true;
+
+    try {
+      final isWorkoutActive = _ref.read(isWorkoutActiveProvider);
+      final keepAwake = _ref.read(keepScreenAwakeProvider);
+      if (!isWorkoutActive || !keepAwake) {
+        await WakelockPlus.disable();
+        await WakelockService.disable();
+      }
+    } catch (_) {}
+    AppNotificationService.instance.dismissAiRunningNotification();
+
+    final msgs = List<AiChatMessage>.from(state.messages);
+    final idx = msgs.indexWhere((m) => m.isStreaming);
+    if (idx != -1) {
+      final current = msgs[idx];
+      final currentContent = current.content.trim();
+      msgs[idx] = current.copyWith(
+        content: currentContent.isEmpty ? 'Response stopped.' : currentContent,
+        isStreaming: false,
+        liveThinking: null,
+        liveToolStatus: null,
+      );
+    }
+
+    state = state.copyWith(
+      messages: msgs,
+      isLoading: false,
+      clearActiveThought: true,
+      clearSnippet: true,
+    );
+
+    if (state.currentSessionId != null) {
+      await _ref.read(aiAssistantServiceProvider).saveSession(state.currentSessionId!, msgs);
     }
   }
 

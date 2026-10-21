@@ -94,7 +94,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
   bool _showHistorySidebar = false;
   bool _userScrolledUp = false;
   String? _dismissedPresetTitle;
-  ChatTextSize _textSize = ChatTextSize.normal;
+  ChatTextSize _textSize = ChatTextSize.small;
   ChatSheetHeight _sheetHeight = ChatSheetHeight.medium;
 
   final List<String> _quickPrompts = [
@@ -549,7 +549,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
         if (savedTextSize != null) {
           _textSize = ChatTextSize.values.firstWhere(
             (e) => e.name.toLowerCase() == savedTextSize.toLowerCase(),
-            orElse: () => ChatTextSize.normal,
+            orElse: () => ChatTextSize.small,
           );
         }
         if (savedHeight != null) {
@@ -1358,172 +1358,237 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
           // Input Bar: round(+) // space // round(input box + audio) // space // round(send button)
           Padding(
             padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset > 0 ? bottomInset + 6 : 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. round(+) button: Camera / Photo options
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: BouncyPressable(
-                    onTap: _showAttachmentMenu,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: _selectedImagePath != null
-                            ? context.accent.withValues(alpha: 0.18)
-                            : context.cardBg,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _selectedImagePath != null
-                              ? context.accent
-                              : context.cardBorder,
-                          width: _selectedImagePath != null ? 1.5 : 1.0,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.add_rounded,
-                        color: _selectedImagePath != null
-                            ? context.accent
-                            : context.textPrimary,
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // 2. round(input box + audio)
-                Expanded(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    decoration: BoxDecoration(
-                      color: context.cardBg,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: _focusNode.hasFocus
-                            ? context.accent.withValues(alpha: 0.55)
-                            : context.cardBorder,
-                        width: _focusNode.hasFocus ? 1.5 : 1.0,
-                      ),
-                      boxShadow: _focusNode.hasFocus
-                          ? [
+                if (isLoading)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Center(
+                      child: BouncyPressable(
+                        onTap: () {
+                          AppHaptics.warning();
+                          ref.read(aiChatNotifierProvider.notifier).stopGeneration();
+                        },
+                        scaleDown: 0.93,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: context.isDark ? const Color(0xF2181C28) : Colors.white.withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
                               BoxShadow(
-                                color: context.accent.withValues(alpha: 0.08),
-                                blurRadius: 12,
+                                color: Colors.black.withValues(alpha: context.isDark ? 0.35 : 0.08),
+                                blurRadius: 10,
                                 offset: const Offset(0, 2),
                               ),
-                            ]
-                          : [],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _textController,
-                            focusNode: _focusNode,
-                            minLines: 1,
-                            maxLines: 5,
-                            keyboardType: TextInputType.multiline,
-                            textInputAction: TextInputAction.newline,
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: _textSize.baseSize + 0.5,
-                              height: 1.4,
-                            ),
-                            onChanged: (_) => setState(() {}),
-                            decoration: InputDecoration(
-                              hintText: _isListening
-                                  ? '🎙 Listening...'
-                                  : 'Message AI coach…',
-                              hintStyle: TextStyle(
-                                color: context.textTertiary,
-                                fontSize: _textSize.baseSize,
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 14,
+                                height: 14,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEF4444),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.stop_rounded, size: 10, color: Colors.white),
                               ),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.fromLTRB(16, 11, 8, 11),
-                            ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Stop Generating',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFEF4444),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        // Mic button inside input pill
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6, bottom: 6),
-                          child: BouncyPressable(
-                            onTap: _toggleListening,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              padding: const EdgeInsets.all(7),
-                              decoration: BoxDecoration(
-                                color: _isListening
-                                    ? AppColors.error.withValues(alpha: 0.15)
-                                    : Colors.transparent,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                                color: _isListening ? AppColors.error : context.textTertiary,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-
-                // 3. round(send button)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Builder(
-                    builder: (context) {
-                      final hasContent = _textController.text.trim().isNotEmpty || _selectedImagePath != null;
-                      return BouncyPressable(
-                        onTap: (isLoading || !hasContent) ? null : _handleSend,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // 1. round(+) button: Camera / Photo options
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: BouncyPressable(
+                        onTap: _showAttachmentMenu,
+                        child: Container(
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: isLoading
-                                ? context.accent.withValues(alpha: 0.45)
-                                : (hasContent
-                                    ? context.accent
-                                    : (context.isDark ? const Color(0xFF1E212D) : const Color(0xFFE2E8F0))),
+                            color: _selectedImagePath != null
+                                ? context.accent.withValues(alpha: 0.18)
+                                : context.cardBg,
                             shape: BoxShape.circle,
-                            boxShadow: hasContent
-                                ? [
-                                    BoxShadow(
-                                      color: context.accent.withValues(alpha: 0.28),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                : [],
+                            border: Border.all(
+                              color: _selectedImagePath != null
+                                  ? context.accent
+                                  : context.cardBorder,
+                              width: _selectedImagePath != null ? 1.5 : 1.0,
+                            ),
                           ),
                           alignment: Alignment.center,
-                          child: isLoading
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.black,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: hasContent ? Colors.black : context.textTertiary,
-                                  size: 20,
-                                ),
+                          child: Icon(
+                            Icons.add_rounded,
+                            color: _selectedImagePath != null
+                                ? context.accent
+                                : context.textPrimary,
+                            size: 22,
+                          ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // 2. round(input box + audio)
+                    Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        decoration: BoxDecoration(
+                          color: context.cardBg,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: _focusNode.hasFocus
+                                ? context.accent.withValues(alpha: 0.55)
+                                : context.cardBorder,
+                            width: _focusNode.hasFocus ? 1.5 : 1.0,
+                          ),
+                          boxShadow: _focusNode.hasFocus
+                              ? [
+                                  BoxShadow(
+                                    color: context.accent.withValues(alpha: 0.08),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _textController,
+                                focusNode: _focusNode,
+                                minLines: 1,
+                                maxLines: 5,
+                                keyboardType: TextInputType.multiline,
+                                textInputAction: TextInputAction.newline,
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: _textSize.baseSize + 0.5,
+                                  height: 1.4,
+                                ),
+                                onChanged: (_) => setState(() {}),
+                                decoration: InputDecoration(
+                                  hintText: _isListening
+                                      ? '🎙 Listening...'
+                                      : 'Message AI coach…',
+                                  hintStyle: TextStyle(
+                                    color: context.textTertiary,
+                                    fontSize: _textSize.baseSize,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.fromLTRB(16, 11, 8, 11),
+                                ),
+                              ),
+                            ),
+                            // Mic button inside input pill
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6, bottom: 6),
+                              child: BouncyPressable(
+                                onTap: _toggleListening,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: _isListening
+                                        ? AppColors.error.withValues(alpha: 0.15)
+                                        : Colors.transparent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                                    color: _isListening ? AppColors.error : context.textTertiary,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // 3. round(send button / stop button)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Builder(
+                        builder: (context) {
+                          final hasContent = _textController.text.trim().isNotEmpty || _selectedImagePath != null;
+                          return BouncyPressable(
+                            onTap: () {
+                              if (isLoading) {
+                                AppHaptics.warning();
+                                ref.read(aiChatNotifierProvider.notifier).stopGeneration();
+                                return;
+                              }
+                              if (!hasContent) return;
+                              _handleSend();
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isLoading
+                                    ? const Color(0xFFEF4444)
+                                    : (hasContent
+                                        ? context.accent
+                                        : (context.isDark ? const Color(0xFF1E212D) : const Color(0xFFE2E8F0))),
+                                shape: BoxShape.circle,
+                                boxShadow: (hasContent || isLoading)
+                                    ? [
+                                        BoxShadow(
+                                          color: (isLoading ? const Color(0xFFEF4444) : context.accent).withValues(alpha: 0.28),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              alignment: Alignment.center,
+                              child: isLoading
+                                  ? const Icon(
+                                      Icons.stop_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                    )
+                                  : Icon(
+                                      Icons.arrow_upward_rounded,
+                                      color: hasContent ? Colors.black : context.textTertiary,
+                                      size: 20,
+                                    ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

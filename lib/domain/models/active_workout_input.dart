@@ -23,6 +23,7 @@ class ActiveWorkoutInput {
   final bool replaceOnNextInput;
   final double? targetWeight;
   final int? targetReps;
+  final double? rpe;
 
   const ActiveWorkoutInput({
     required this.workoutExerciseId,
@@ -41,6 +42,7 @@ class ActiveWorkoutInput {
     this.replaceOnNextInput = true,
     this.targetWeight,
     this.targetReps,
+    this.rpe,
   });
 
   double get effectiveWeight => double.tryParse(weightInput.replaceAll(',', '.').trim()) ?? 0.0;
@@ -142,6 +144,8 @@ class ActiveWorkoutInput {
     bool? replaceOnNextInput,
     double? targetWeight,
     int? targetReps,
+    double? rpe,
+    bool clearRpe = false,
   }) {
     return ActiveWorkoutInput(
       workoutExerciseId: workoutExerciseId ?? this.workoutExerciseId,
@@ -160,6 +164,7 @@ class ActiveWorkoutInput {
       replaceOnNextInput: replaceOnNextInput ?? this.replaceOnNextInput,
       targetWeight: targetWeight ?? this.targetWeight,
       targetReps: targetReps ?? this.targetReps,
+      rpe: clearRpe ? null : (rpe ?? this.rpe),
     );
   }
 }
@@ -183,6 +188,7 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
     required bool isCompleted,
     double? targetWeight,
     int? targetReps,
+    double? initialRpe,
   }) {
     state = ActiveWorkoutInput(
       workoutExerciseId: workoutExerciseId,
@@ -201,6 +207,17 @@ class ActiveWorkoutInputNotifier extends StateNotifier<ActiveWorkoutInput?> {
       replaceOnNextInput: true,
       targetWeight: targetWeight,
       targetReps: targetReps,
+      rpe: initialRpe,
+    );
+  }
+
+  void setRpe(double? rpe) {
+    if (state == null) return;
+    // Tapping the same RPE toggles it off
+    final isSame = state!.rpe != null && rpe != null && (state!.rpe! - rpe).abs() < 0.05;
+    state = state!.copyWith(
+      rpe: isSame ? null : rpe,
+      clearRpe: isSame,
     );
   }
 
