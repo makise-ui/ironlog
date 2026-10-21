@@ -87,6 +87,14 @@ class BackupService {
       if (!dirs.any((d) => d.path == downloadDir.path)) dirs.add(downloadDir);
     } catch (_) {}
 
+    // 4b. Android public Music folder (fallback storage)
+    try {
+      final musicDir = Directory('/storage/emulated/0/Music');
+      if (await musicDir.exists()) {
+        if (!dirs.any((d) => d.path == musicDir.path)) dirs.add(musicDir);
+      }
+    } catch (_) {}
+
     // 5. Android /sdcard symlink fallbacks
     try {
       final sdDoc = Directory('/sdcard/Documents/IronLog');
@@ -368,6 +376,7 @@ class BackupService {
 
       String? primarySavedPath;
       for (final dir in dirs) {
+        // Try writing primary backup
         try {
           final file = File('${dir.path}/$backupFileName');
           await file.writeAsString(jsonStr, flush: true);
@@ -379,7 +388,17 @@ class BackupService {
 
           debugPrint('IronLog auto-backed up to: ${file.path}');
         } catch (e) {
-          debugPrint('Error writing backup to ${dir.path}: $e');
+          debugPrint('Primary backup write failed for ${dir.path}: $e');
+          // If overwriting existing file was blocked by Android Scoped Storage UID ownership,
+          // write to a resilient alternate file name that the current UID can create.
+          try {
+            final fallbackFile = File('${dir.path}/ironlog_backup_v2.json');
+            await fallbackFile.writeAsString(jsonStr, flush: true);
+            primarySavedPath ??= fallbackFile.path;
+            debugPrint('IronLog fallback auto-backed up to: ${fallbackFile.path}');
+          } catch (e2) {
+            debugPrint('Fallback backup write failed for ${dir.path}: $e2');
+          }
         }
       }
       return primarySavedPath;
@@ -393,12 +412,19 @@ class BackupService {
   static Future<BackupFileInfo?> findExistingBackup() async {
     final dirs = await getPersistentDirectories();
     final candidates = <BackupFileInfo>[];
+    const candidateFiles = [
+      backupFileName,
+      autoBackupFileName,
+      'ironlog_backup_v2.json',
+      'ironlog_autobackup_v2.json',
+      'ironlog_pre_restore_safety.json',
+    ];
 
     for (final dir in dirs) {
-      for (final fname in [backupFileName, autoBackupFileName]) {
+      for (final fname in candidateFiles) {
         final file = File('${dir.path}/$fname');
-        if (await file.exists()) {
-          try {
+        try {
+          if (await file.exists()) {
             final content = await file.readAsString();
             if (content.trim().isEmpty) continue;
             final data = jsonDecode(content) as Map<String, dynamic>;
@@ -427,9 +453,9 @@ class BackupService {
               weightUnit: weightUnit?.toString(),
               displayDirectory: dir.path,
             ));
-          } catch (e) {
-            debugPrint('Error parsing found backup at ${file.path}: $e');
           }
+        } catch (e) {
+          debugPrint('Error parsing found backup at ${file.path}: $e');
         }
       }
     }

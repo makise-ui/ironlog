@@ -2838,46 +2838,33 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                 ScaleTap(
                   onPressed: _leaveSession,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: C.surfaceHi,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: C.hairline),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.arrow_back_rounded, size: 16, color: C.text2),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Pause',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            color: C.text2,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: Icon(Icons.arrow_back_rounded, size: 18, color: C.text1),
                   ),
                 ),
-                const SizedBox(width: S.md),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         _workout?.title ?? 'Active Workout',
-                        style: T.title.copyWith(fontSize: 18),
+                        style: T.title.copyWith(fontSize: 17, fontWeight: FontWeight.w700),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: _workout?.startedAt != null
                                   ? C.accent.withValues(alpha: 0.14)
@@ -2889,21 +2876,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                               children: [
                                 Icon(
                                   _workout?.startedAt != null ? Icons.timer_outlined : Icons.play_circle_outline_rounded,
-                                  size: 12,
+                                  size: 11,
                                   color: _workout?.startedAt != null ? C.accent : C.text2,
                                 ),
-                                const SizedBox(width: 4),
-                                FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    _workout?.startedAt != null ? _formatTimer(_elapsedDuration) : 'Ready',
-                                    style: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: _workout?.startedAt != null ? C.accent : C.text2,
-                                      fontFeatures: const [FontFeature.tabularFigures()],
-                                    ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  _workout?.startedAt != null ? _formatTimer(_elapsedDuration) : 'Ready',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: _workout?.startedAt != null ? C.accent : C.text2,
+                                    fontFeatures: const [FontFeature.tabularFigures()],
                                   ),
                                 ),
                               ],
@@ -2915,7 +2899,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                               '${activeExercises.length} ex • ${_workout?.totalSetsCount ?? 0} sets',
                               style: TextStyle(
                                 fontFamily: 'Inter',
-                                fontSize: 11.5,
+                                fontSize: 11,
                                 color: C.text2,
                                 fontFeatures: const [FontFeature.tabularFigures()],
                               ),
@@ -2928,7 +2912,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 if (_workout?.startedAt == null && !isFinished)
                   ScaleTap(
                     onPressed: _startWorkout,
@@ -2953,7 +2937,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.play_arrow_rounded, size: 17, color: Colors.black),
+                          Icon(Icons.play_arrow_rounded, size: 16, color: Colors.black),
                           SizedBox(width: 3),
                           Text(
                             'Start',
@@ -3000,39 +2984,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     ),
                   ),
                 const SizedBox(width: 6),
-                ScaleTap(
-                  onPressed: _openNotesDialog,
-                  child: Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: C.surfaceHi,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: C.hairline),
-                    ),
-                    child: Icon(Icons.edit_note_rounded, color: C.text2, size: 18),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                ScaleTap(
-                  onPressed: () {
-                    AppHaptics.selection();
-                    ref.read(compactWorkoutModeProvider.notifier).state = !isCompact;
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: isCompact ? context.accent.withValues(alpha: 0.2) : C.surfaceHi,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isCompact ? context.accent : C.hairline),
-                    ),
-                    child: Icon(
-                      isCompact ? Icons.density_small_rounded : Icons.density_medium_rounded,
-                      color: isCompact ? context.accent : C.text2,
-                      size: 18,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
                 PopupMenuButton<String>(
                   icon: Container(
                     padding: const EdgeInsets.all(7),
@@ -3049,7 +3000,12 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     side: BorderSide(color: context.cardBorder),
                   ),
                   onSelected: (val) {
-                    if (val == 'save_preset') {
+                    if (val == 'compact') {
+                      AppHaptics.selection();
+                      ref.read(compactWorkoutModeProvider.notifier).state = !isCompact;
+                    } else if (val == 'notes') {
+                      _openNotesDialog();
+                    } else if (val == 'save_preset') {
                       _saveWorkoutAsPreset();
                     } else if (val == 'copy_past') {
                       _openCopySession();
@@ -3058,6 +3014,33 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                     }
                   },
                   itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'compact',
+                      child: Row(
+                        children: [
+                          Icon(
+                            isCompact ? Icons.density_small_rounded : Icons.density_medium_rounded,
+                            color: context.accent,
+                            size: 17,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            isCompact ? 'Standard View' : 'Focus Compact Mode',
+                            style: TextStyle(color: context.textPrimary, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'notes',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_note_rounded, color: context.accent, size: 17),
+                          const SizedBox(width: 10),
+                          Text('Workout Notes', style: TextStyle(color: context.textPrimary, fontSize: 13)),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'save_preset',
                       child: Row(
@@ -3251,19 +3234,39 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             ),
           ),
 
-        // 2. Active Exercises List
+        // 2. Active Exercises List (Hold to drag reordering)
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: S.xl),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final item = activeExercises[index];
-                final exSug = _suggestions.where((s) => s.payload['exerciseId'] == item.exercise.id).firstOrNull;
+          sliver: SliverReorderableList(
+            itemCount: activeExercises.length,
+            onReorder: (oldIndex, newIndex) async {
+              if (oldIndex < newIndex) {
+                newIndex -= 1;
+              }
+              if (oldIndex == newIndex) return;
+              AppHaptics.heavy();
+              final currentList = List<WorkoutExerciseItem>.from(activeExercises);
+              final moved = currentList.removeAt(oldIndex);
+              currentList.insert(newIndex, moved);
 
-                return Padding(
+              final workoutId = _workout?.id;
+              if (workoutId != null) {
+                final ids = currentList.map((e) => e.id).toList();
+                await ref.read(workoutRepositoryProvider).reorderExercises(workoutId, ids);
+                _refreshWorkout();
+              }
+            },
+            itemBuilder: (context, index) {
+              final item = activeExercises[index];
+              final exSug = _suggestions.where((s) => s.payload['exerciseId'] == item.exercise.id).firstOrNull;
+
+              return ReorderableDelayedDragStartListener(
+                key: ValueKey(item.id),
+                index: index,
+                child: Padding(
                   padding: const EdgeInsets.only(bottom: S.md),
                   child: ExerciseTableCard(
-                    key: ValueKey(item.id),
+                    key: ValueKey('card_${item.id}'),
                     item: item,
                     unit: unit,
                     workoutDate: _selectedDate,
@@ -3280,10 +3283,9 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                       }
                     },
                   ),
-                );
-              },
-              childCount: activeExercises.length,
-            ),
+                ),
+              );
+            },
           ),
         ),
 

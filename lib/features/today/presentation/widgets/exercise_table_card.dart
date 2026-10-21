@@ -934,42 +934,33 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                     ],
                   ),
                 ),
-                // 1-Tap Plate Calculator button
-                BouncyPressable(
-                  onTap: () {
-                    PlateCalculatorSheet.show(
-                      context: context,
-                      initialWeight: UnitConverter.fromKg(effectiveTargetWeight, widget.unit),
-                      unit: widget.unit,
-                      exerciseName: ex.name,
-                      onWeightSelected: (w) => setState(() => _customNextWeight = UnitConverter.toKg(w, widget.unit)),
-                    );
-                  },
-                  scaleDown: 0.88,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    margin: const EdgeInsets.only(right: 2),
-                    decoration: BoxDecoration(
-                      color: context.chipBg,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: context.chipBorder),
-                    ),
-                    child: Icon(Icons.calculate_outlined, color: context.accent, size: 18),
-                  ),
-                ),
                 // Ask AI about this exercise button
                 BouncyPressable(
                   onTap: () => _openAskAiAboutExercise(ex),
                   scaleDown: 0.88,
                   child: Container(
-                    padding: const EdgeInsets.all(6),
-                    margin: const EdgeInsets.only(right: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                    margin: const EdgeInsets.only(right: 4),
                     decoration: BoxDecoration(
                       color: context.accent.withValues(alpha: context.isDark ? 0.16 : 0.10),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: context.accent.withValues(alpha: 0.35)),
                     ),
-                    child: Icon(Icons.auto_awesome_rounded, color: context.accent, size: 18),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, color: context.accent, size: 15),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Ask AI',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: context.accent,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Expand / Collapse Toggle button
