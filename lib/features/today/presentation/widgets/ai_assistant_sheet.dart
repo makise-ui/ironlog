@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -70,6 +71,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
   String? _selectedImagePath;
   bool _showHistorySidebar = false;
   bool _userScrolledUp = false;
+  String? _dismissedPresetTitle;
 
   final List<String> _quickPrompts = [
     'What should I eat after today\'s workout?',
@@ -622,6 +624,19 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     final messages = chatState.messages;
     final isLoading = chatState.isLoading;
 
+    Map<String, dynamic>? latestPresetData;
+    for (final msg in messages.reversed) {
+      if (msg.role != 'user' && msg.toolResults != null) {
+        for (final tr in msg.toolResults!) {
+          if (tr.toolName == 'preview_preset' && tr.data != null && tr.data is Map) {
+            latestPresetData = Map<String, dynamic>.from(tr.data as Map);
+            break;
+          }
+        }
+      }
+      if (latestPresetData != null) break;
+    }
+
     ref.listen<AiChatState>(aiChatNotifierProvider, (prev, next) {
       final prevLen = prev?.messages.length ?? 0;
       final nextLen = next.messages.length;
@@ -939,6 +954,10 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
               ],
             ),
           ),
+
+          // Sticky Quick-Action Floating Pill Bar for Proposed Routines/Presets
+          if (latestPresetData != null && _dismissedPresetTitle != latestPresetData['title']?.toString())
+            _buildStickyPresetBar(latestPresetData),
 
           // Quick Prompt Pills
           SizedBox(
@@ -1817,7 +1836,8 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
               if (tr.toolName == 'visualize_pr_history' && tr.data != null && tr.data is Map)
                 _PrHistoryMilestoneCard(
                   data: Map<String, dynamic>.from(tr.data as Map),
-                  onAskBreakPr: (exName) => _handleSend('Give me a dedicated periodized progression strategy to break my PR on $exName.'),
+                  companion: _companion,
+                  onAskBreakPr: (prompt) => _handleSend(prompt),
                 ),
         ],
       ),
@@ -2176,6 +2196,171 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
 
   void _handleAskAboutExercise(String exerciseName) {
     _handleSend('Can you explain proper form cues, muscle targets, and tips for $exerciseName?');
+  }
+
+  Widget _buildStickyPresetBar(Map<String, dynamic> data) {
+    final title = data['title']?.toString() ?? 'Workout Routine';
+    final rawExercises = data['exercises'] as List? ?? [];
+    final exerciseNames = rawExercises
+        .whereType<Map>()
+        .map((e) => e['name']?.toString() ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+    final category = data['category']?.toString() ?? 'Hypertrophy';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xF2161A26) : Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: context.accent.withValues(alpha: 0.45),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: context.accent.withValues(alpha: context.isDark ? 0.22 : 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: context.accent.withValues(alpha: 0.16),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.bolt_rounded, size: 16, color: context.accent),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: context.accent.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${exerciseNames.length} moves',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.accent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'AI coach routine ready • Launch or save',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: context.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Start Button
+          ScaleTap(
+            onPressed: () => _handleStartPresetWorkout(title, exerciseNames),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: context.accent,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: context.accent.withValues(alpha: 0.35),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.play_arrow_rounded, size: 14, color: Colors.white),
+                  SizedBox(width: 2),
+                  Text(
+                    'Start',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Save Button
+          ScaleTap(
+            onPressed: () => _handleImportPreset(title, category, exerciseNames),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: context.chipBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: context.chipBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.bookmark_add_outlined, size: 13, color: context.textPrimary),
+                  const SizedBox(width: 2),
+                  Text(
+                    'Save',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+          // Dismiss
+          ScaleTap(
+            onPressed: () {
+              AppHaptics.tap();
+              setState(() => _dismissedPresetTitle = title);
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.close_rounded, size: 16, color: context.textTertiary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -4196,7 +4381,7 @@ class _ManageMemoriesSheetState extends ConsumerState<_ManageMemoriesSheet> {
 }
 
 // ── Multi-Exercise Visuals Gallery (Interactive In-Chat UI) ─────────────────
-class _MultiExerciseVisualsCard extends StatelessWidget {
+class _MultiExerciseVisualsCard extends StatefulWidget {
   final Map<String, dynamic> data;
   final Function(String exerciseName) onAskExercise;
 
@@ -4206,8 +4391,15 @@ class _MultiExerciseVisualsCard extends StatelessWidget {
   });
 
   @override
+  State<_MultiExerciseVisualsCard> createState() => _MultiExerciseVisualsCardState();
+}
+
+class _MultiExerciseVisualsCardState extends State<_MultiExerciseVisualsCard> {
+  bool _isCollapsed = false;
+
+  @override
   Widget build(BuildContext context) {
-    final rawItems = data['items'] as List?;
+    final rawItems = widget.data['items'] as List?;
     final items = rawItems?.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -4266,11 +4458,60 @@ class _MultiExerciseVisualsCard extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 6),
+              ScaleTap(
+                onPressed: () {
+                  AppHaptics.tap();
+                  setState(() => _isCollapsed = !_isCollapsed);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: context.chipBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: context.chipBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isCollapsed ? 'Show' : 'Hide',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: context.textSecondary),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        _isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                        size: 13,
+                        color: context.textSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 196,
+          if (_isCollapsed) ...[
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () {
+                AppHaptics.tap();
+                setState(() => _isCollapsed = false);
+              },
+              child: Row(
+                children: [
+                  Text(
+                    '${items.length} form guides loaded • Tap to expand visual cards',
+                    style: TextStyle(fontSize: 11, color: context.textSecondary),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.visibility_outlined, size: 14, color: context.accent),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 196,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -4346,7 +4587,7 @@ class _MultiExerciseVisualsCard extends StatelessWidget {
                             BouncyPressable(
                               onTap: () {
                                 AppHaptics.selection();
-                                onAskExercise(name);
+                                widget.onAskExercise(name);
                               },
                               child: Container(
                                 width: double.infinity,
@@ -4377,6 +4618,7 @@ class _MultiExerciseVisualsCard extends StatelessWidget {
               },
             ),
           ),
+          ],
         ],
       ),
     );
@@ -4425,6 +4667,7 @@ class _VisualDiagramCard extends StatefulWidget {
 
 class _VisualDiagramCardState extends State<_VisualDiagramCard> {
   bool _showMermaidCode = false;
+  bool _isCollapsed = false;
 
   Color _getPhaseColor(String phase, BuildContext context) {
     final lower = phase.toLowerCase();
@@ -4525,8 +4768,58 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                   },
                 ),
               ],
+              const SizedBox(width: 4),
+              ScaleTap(
+                onPressed: () {
+                  AppHaptics.tap();
+                  setState(() => _isCollapsed = !_isCollapsed);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: context.chipBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: context.chipBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isCollapsed ? 'Show' : 'Hide',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: context.textSecondary),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        _isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                        size: 13,
+                        color: context.textSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
+
+          if (_isCollapsed) ...[
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () {
+                AppHaptics.tap();
+                setState(() => _isCollapsed = false);
+              },
+              child: Row(
+                children: [
+                  Text(
+                    '${nodes.length} phase workflow ($diagramType) • Tap to expand chart',
+                    style: TextStyle(fontSize: 11, color: context.textSecondary),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.visibility_outlined, size: 14, color: context.accent),
+                ],
+              ),
+            ),
+          ] else ...[
 
           if (summary != null && summary.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -4613,6 +4906,7 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                 ],
               ],
             ),
+          ],
         ],
       ),
     );
@@ -5116,20 +5410,129 @@ class _MermaidDiagramNativeCardState extends State<_MermaidDiagramNativeCard> {
   }
 }
 
+// ── Gold Sparkles Custom Painter for PR Celebrations ────────────────────────
+class _GoldSparklesPainter extends CustomPainter {
+  final Animation<double> animation;
+  _GoldSparklesPainter({required this.animation}) : super(repaint: animation);
+
+  static final List<math.Point<double>> _points = [
+    const math.Point(0.12, 0.28),
+    const math.Point(0.88, 0.22),
+    const math.Point(0.94, 0.76),
+    const math.Point(0.06, 0.78),
+    const math.Point(0.50, 0.05),
+    const math.Point(0.52, 0.95),
+    const math.Point(0.26, 0.88),
+    const math.Point(0.74, 0.45),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final t = animation.value;
+    for (int i = 0; i < _points.length; i++) {
+      final p = _points[i];
+      final phase = (t + (i / _points.length)) % 1.0;
+      final opacity = math.sin(phase * math.pi).clamp(0.0, 1.0);
+      final radius = 1.2 + math.sin(phase * math.pi) * 1.8;
+      final center = Offset(p.x * size.width, p.y * size.height);
+
+      final paint = Paint()
+        ..color = (i % 2 == 0 ? const Color(0xFFFFD700) : const Color(0xFFFFF7C2))
+            .withValues(alpha: opacity * 0.9)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(center, radius, paint);
+
+      if (i % 3 == 0 && opacity > 0.35) {
+        final crossPaint = Paint()
+          ..color = Colors.white.withValues(alpha: opacity * 0.85)
+          ..strokeWidth = 0.8;
+        final arm = radius * 1.6;
+        canvas.drawLine(Offset(center.dx - arm, center.dy), Offset(center.dx + arm, center.dy), crossPaint);
+        canvas.drawLine(Offset(center.dx, center.dy - arm), Offset(center.dx, center.dy + arm), crossPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GoldSparklesPainter oldDelegate) => true;
+}
+
 // ── Personal Record & Strength Milestone Showcase (Interactive In-Chat UI) ───
-class _PrHistoryMilestoneCard extends StatelessWidget {
+class _PrHistoryMilestoneCard extends StatefulWidget {
   final Map<String, dynamic> data;
-  final Function(String exerciseName)? onAskBreakPr;
+  final Function(String prompt)? onAskBreakPr;
+  final ChibiAvatar? companion;
 
   const _PrHistoryMilestoneCard({
     required this.data,
     this.onAskBreakPr,
+    this.companion,
   });
 
   @override
+  State<_PrHistoryMilestoneCard> createState() => _PrHistoryMilestoneCardState();
+}
+
+class _PrHistoryMilestoneCardState extends State<_PrHistoryMilestoneCard> with SingleTickerProviderStateMixin {
+  late final AnimationController _sparkleController;
+  double? _target1rmGoal;
+  ChibiAvatar _companion = ChibiAvatar.aiko;
+
+  @override
+  void initState() {
+    super.initState();
+    _sparkleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat();
+    _initCompanion();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppHaptics.success();
+    });
+  }
+
+  Future<void> _initCompanion() async {
+    if (widget.companion != null) {
+      if (mounted) setState(() => _companion = widget.companion!);
+      return;
+    }
+    final c = await ChibiAvatar.loadCurrent();
+    if (mounted) setState(() => _companion = c);
+  }
+
+  @override
+  void dispose() {
+    _sparkleController.dispose();
+    super.dispose();
+  }
+
+  String _getCompanionCelebrationQuote(ChibiAvatar companion, String? exerciseName) {
+    final ex = exerciseName ?? 'this lift';
+    switch (companion.id) {
+      case 'shiba':
+        return 'WOOF! MUCH STRENGTH! VERY GAINZ! Beast mode on $ex! 🐕🔥';
+      case 'ken':
+        return 'Flawless execution. Consistency and calculated overload triumph again.';
+      case 'roxy':
+        return 'Max wattage detected! Neurological power surge on $ex! ⚡';
+      case 'bao':
+        return 'Tremendous power and solid bracing! Time for a hearty protein feast! 🐼🍚';
+      case 'kuro':
+        return 'Precision in stillness, explosive in execution. True mastery of the iron.';
+      case 'ren':
+        return 'THAT is the fighting spirit! Break your limits and set the gym ablaze! 🔥';
+      case 'aiko':
+      default:
+        return 'Amazing milestone! Your hard work on $ex is truly paying off. Proud of you! ✨';
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isSingle = data['isSingleExercise'] == true;
-    final unit = data['unit']?.toString() ?? 'kg';
+    final isSingle = widget.data['isSingleExercise'] == true;
+    final unit = widget.data['unit']?.toString() ?? 'kg';
+    final exName = widget.data['exerciseName']?.toString() ?? 'Exercise';
 
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 4),
@@ -5139,13 +5542,13 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
         color: context.isDark ? const Color(0xFF161720) : const Color(0xFFFBFBFD),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFFFFD700).withValues(alpha: 0.35),
+          color: const Color(0xFFFFD700).withValues(alpha: 0.38),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFD700).withValues(alpha: context.isDark ? 0.08 : 0.04),
-            blurRadius: 12,
+            color: const Color(0xFFFFD700).withValues(alpha: context.isDark ? 0.09 : 0.05),
+            blurRadius: 14,
             offset: const Offset(0, 3),
           ),
         ],
@@ -5154,57 +5557,67 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
-          Row(
+          // Header with Gold Sparkles
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFFD700).withValues(alpha: 0.4),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.emoji_events_rounded, size: 14, color: Colors.black),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isSingle ? 'PERSONAL RECORD MILESTONE' : 'RECENT PERSONAL RECORDS',
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.7,
-                    color: Color(0xFFFFD700),
-                  ),
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _GoldSparklesPainter(animation: _sparkleController),
                 ),
               ),
-              if (isSingle && data['percentageGain'] != null && data['percentageGain'] != '0')
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(6),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withValues(alpha: 0.45),
+                          blurRadius: 7,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.emoji_events_rounded, size: 14, color: Colors.black),
                   ),
-                  child: Text(
-                    '+${data['percentageGain']}%',
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF10B981),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isSingle ? 'PERSONAL RECORD MILESTONE' : 'RECENT PERSONAL RECORDS',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.7,
+                        color: Color(0xFFFFD700),
+                      ),
                     ),
                   ),
-                ),
+                  if (isSingle && widget.data['percentageGain'] != null && widget.data['percentageGain'] != '0')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '+${widget.data['percentageGain']}%',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
 
@@ -5215,7 +5628,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    data['exerciseName']?.toString() ?? 'Exercise',
+                    exName,
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 15,
@@ -5224,7 +5637,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (data['muscleGroup'] != null)
+                if (widget.data['muscleGroup'] != null)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -5232,7 +5645,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: Text(
-                      data['muscleGroup'].toString().toUpperCase(),
+                      widget.data['muscleGroup'].toString().toUpperCase(),
                       style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 9.5,
@@ -5268,7 +5681,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '${data['maxWeight'] ?? 0} $unit',
+                          '${widget.data['maxWeight'] ?? 0} $unit',
                           style: TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 14.5,
@@ -5277,7 +5690,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'for ${data['maxWeightReps'] ?? 1} reps',
+                          'for ${widget.data['maxWeightReps'] ?? 1} reps',
                           style: TextStyle(fontSize: 10, color: context.textSecondary),
                         ),
                       ],
@@ -5304,7 +5717,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '${((data['peakE1rm'] as num?) ?? 0).toStringAsFixed(1)} $unit',
+                          '${((widget.data['peakE1rm'] as num?) ?? 0).toStringAsFixed(1)} $unit',
                           style: const TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 14.5,
@@ -5323,8 +5736,46 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
               ],
             ),
 
+            // Chibi Companion Reaction Card
+            Container(
+              margin: const EdgeInsets.only(top: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: context.isDark ? const Color(0xFF1A1F2C) : const Color(0xFFF0F4F8),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: context.accent.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Image.asset(
+                    _companion.assetPath,
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_companion.name} celebrating your lift:',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: context.accent),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          _getCompanionCelebrationQuote(_companion, exName),
+                          style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: context.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Rep Ladder
-            if (data['repLadder'] != null && data['repLadder'] is Map) ...[
+            if (widget.data['repLadder'] != null && widget.data['repLadder'] is Map) ...[
               const SizedBox(height: 10),
               const Text(
                 'REP MAX LADDER',
@@ -5341,7 +5792,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 5,
                 children: [
-                  for (final entry in (data['repLadder'] as Map).entries)
+                  for (final entry in (widget.data['repLadder'] as Map).entries)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -5366,13 +5817,13 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
             ],
 
             // Mini Progression Timeline Curve
-            if (data['timeline'] != null && (data['timeline'] as List).length >= 2) ...[
+            if (widget.data['timeline'] != null && (widget.data['timeline'] as List).length >= 2) ...[
               const SizedBox(height: 12),
               SizedBox(
                 height: 110,
                 child: Builder(
                   builder: (context) {
-                    final points = (data['timeline'] as List).whereType<Map>().toList();
+                    final points = (widget.data['timeline'] as List).whereType<Map>().toList();
                     final values = points.map((p) => (p['weight'] as num).toDouble()).toList();
                     final minVal = values.reduce((a, b) => a < b ? a : b);
                     final maxVal = values.reduce((a, b) => a > b ? a : b);
@@ -5436,13 +5887,194 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
               ),
             ],
 
+            // ── Interactive 1RM Goal Slider & Periodization Ramp ───────────────
+            Builder(
+              builder: (context) {
+                final current1rm = ((widget.data['peakE1rm'] as num?) ?? (widget.data['maxWeight'] as num?) ?? 50.0).toDouble();
+                final minGoal = current1rm;
+                final maxGoal = math.max(minGoal + 10.0, ((current1rm * 1.35) / 2.5).ceil() * 2.5);
+                _target1rmGoal ??= (((current1rm * 1.05) / 2.5).round() * 2.5).clamp(minGoal, maxGoal);
+                final goalDelta = _target1rmGoal! - current1rm;
+                final pctDelta = current1rm > 0 ? (goalDelta / current1rm * 100) : 0.0;
+
+                final rep3Needed = (_target1rmGoal! * 0.93 / 2.5).round() * 2.5;
+                final rep5Needed = (_target1rmGoal! * 0.86 / 2.5).round() * 2.5;
+                final rep8Needed = (_target1rmGoal! * 0.79 / 2.5).round() * 2.5;
+
+                final w1 = (_target1rmGoal! * 0.75 / 2.5).round() * 2.5;
+                final w2 = (_target1rmGoal! * 0.80 / 2.5).round() * 2.5;
+                final w3 = (_target1rmGoal! * 0.875 / 2.5).round() * 2.5;
+                final w4 = (_target1rmGoal! / 2.5).round() * 2.5;
+
+                final divisions = ((maxGoal - minGoal) / 2.5).round().clamp(1, 40);
+
+                return Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: context.isDark ? const Color(0xFF191B24) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.25)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.track_changes_rounded, size: 14, color: Color(0xFFFFD700)),
+                              SizedBox(width: 5),
+                              Text(
+                                'TARGET 1RM GOAL CALCULATOR',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  color: Color(0xFFFFD700),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '+${goalDelta.toStringAsFixed(1)} $unit (+${pctDelta.toStringAsFixed(1)}%)',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Text(
+                            'Target: ${_target1rmGoal!.toStringAsFixed(1)} $unit',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'Current: ${current1rm.toStringAsFixed(1)} $unit',
+                            style: TextStyle(fontSize: 10, color: context.textTertiary),
+                          ),
+                        ],
+                      ),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: const Color(0xFFFFD700),
+                          inactiveTrackColor: context.isDark ? const Color(0x33FFFFFF) : const Color(0xFFCBD5E1),
+                          thumbColor: const Color(0xFFFFD700),
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          trackHeight: 3,
+                        ),
+                        child: Slider(
+                          value: _target1rmGoal!.clamp(minGoal, maxGoal),
+                          min: minGoal,
+                          max: maxGoal,
+                          divisions: divisions,
+                          onChanged: (val) {
+                            AppHaptics.step();
+                            setState(() => _target1rmGoal = val);
+                          },
+                        ),
+                      ),
+                      // Rep Equivalent Requirements
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildRepTargetChip('3RM Need', '$rep3Needed $unit', context),
+                          _buildRepTargetChip('5RM Need', '$rep5Needed $unit', context),
+                          _buildRepTargetChip('8RM Need', '$rep8Needed $unit', context),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // 4-Week Wave Periodization
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: context.isDark ? const Color(0xFF111319) : Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '4-WEEK WAVE PERIODIZATION RAMP',
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '• W1 (Base): $w1 $unit × 8 reps\n'
+                              '• W2 (Volume): $w2 $unit × 6 reps\n'
+                              '• W3 (Intensify): $w3 $unit × 4 reps\n'
+                              '• W4 (Peak Test): $w4 $unit × 1-2 reps',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 10.5,
+                                height: 1.35,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ScaleTap(
+                        onPressed: () {
+                          AppHaptics.selection();
+                          final prompt = 'Build me a dedicated 4-week wave periodization plan to take my $exName from ${current1rm.toStringAsFixed(1)} $unit to ${_target1rmGoal!.toStringAsFixed(1)} $unit.';
+                          if (widget.onAskBreakPr != null) {
+                            widget.onAskBreakPr!(prompt);
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD700).withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.4)),
+                          ),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.fitness_center_rounded, size: 12, color: Color(0xFFFFD700)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Ask AI to Build 4-Week Cycle for ${_target1rmGoal!.toStringAsFixed(1)} $unit',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFFFD700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
             const SizedBox(height: 10),
             BouncyPressable(
               onTap: () {
                 AppHaptics.selection();
-                final exName = data['exerciseName']?.toString();
-                if (exName != null && onAskBreakPr != null) {
-                  onAskBreakPr!(exName);
+                if (widget.onAskBreakPr != null) {
+                  widget.onAskBreakPr!('Give me a dedicated periodized progression strategy to break my PR on $exName.');
                 }
               },
               child: Container(
@@ -5474,7 +6106,7 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
           ] else ...[
             // Multi-Exercise Recent PRs
             const SizedBox(height: 8),
-            for (final pr in (data['records'] as List? ?? []))
+            for (final pr in (widget.data['records'] as List? ?? []))
               Container(
                 margin: const EdgeInsets.only(bottom: 6),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -5510,6 +6142,24 @@ class _PrHistoryMilestoneCard extends StatelessWidget {
                 ),
               ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRepTargetChip(String label, String value, BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF111319) : Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: context.isDark ? const Color(0x1FFFFFFF) : const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 8.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 1),
+          Text(value, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: context.textPrimary)),
         ],
       ),
     );

@@ -24,6 +24,7 @@ import '../../../../core/widgets/bouncy_pressable.dart';
 import 'exercise_visual_thumbnail.dart';
 import 'exercise_guide_sheet.dart';
 import 'plate_calculator_sheet.dart';
+import '../../../../domain/services/plate_calculator.dart';
 import 'ai_assistant_sheet.dart';
 import '../../../../domain/services/e1rm_calculator.dart';
 
@@ -641,6 +642,21 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
     final effectiveTargetWeight = _customNextWeight ?? nextGhostWeight;
     final effectiveTargetReps = _customNextReps ?? nextGhostReps;
 
+    final isLb = widget.unit == WeightUnit.lb;
+    final displayWeight = UnitConverter.fromKg(effectiveTargetWeight, widget.unit);
+    final exLower = ex.name.toLowerCase();
+    final isBarbell = ex.equipment == EquipmentType.barbell ||
+        exLower.contains('barbell') ||
+        exLower.contains('bench press') ||
+        exLower.contains('squat') ||
+        exLower.contains('deadlift') ||
+        exLower.contains('overhead press') ||
+        exLower.contains('clean') ||
+        exLower.contains('snatch') ||
+        exLower.contains('hip thrust') ||
+        exLower.contains('barbell row');
+    final barWeight = isLb ? 45.0 : 20.0;
+
     final bestSet = activeSets.isNotEmpty
         ? (List.of(activeSets)..sort((a, b) => E1rmCalculator.calculateEpley(b.weight, b.reps).compareTo(E1rmCalculator.calculateEpley(a.weight, a.reps)))).first
         : null;
@@ -1256,6 +1272,25 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                 ),
               ),
             ),
+
+          // Inline Barbell Plate Loading Visualizer Strip
+          if (isBarbell && displayWeight >= barWeight) () {
+            final plateResult = PlateCalculator.calculate(
+              targetWeight: displayWeight,
+              barWeight: barWeight,
+              isLb: isLb,
+            );
+            if (plateResult.platesPerSide.isNotEmpty) {
+              return _buildInlinePlateLoaderStrip(
+                result: plateResult,
+                displayWeight: displayWeight,
+                barWeight: barWeight,
+                isLb: isLb,
+                exerciseName: ex.name,
+              );
+            }
+            return const SizedBox.shrink();
+          }(),
 
           const SizedBox(height: 6),
 
@@ -2685,6 +2720,112 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
         ),
       ),
       child: rowContent,
+    );
+  }
+
+  Widget _buildInlinePlateLoaderStrip({
+    required PlateCalculationResult result,
+    required double displayWeight,
+    required double barWeight,
+    required bool isLb,
+    required String exerciseName,
+  }) {
+    final unitStr = isLb ? 'lb' : 'kg';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
+      child: BouncyPressable(
+        onTap: () {
+          AppHaptics.tap();
+          PlateCalculatorSheet.show(
+            context: context,
+            initialWeight: displayWeight,
+            unit: widget.unit,
+            exerciseName: exerciseName,
+            onWeightSelected: (w) => setState(() => _customNextWeight = UnitConverter.toKg(w, widget.unit)),
+          );
+        },
+        scaleDown: 0.98,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5.5),
+          decoration: BoxDecoration(
+            color: context.isDark ? const Color(0xFF131722) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFCBD5E1),
+              width: 0.9,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.fitness_center_rounded, size: 12, color: context.accent),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                'Load/side: ',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: context.textSecondary,
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final pc in result.platesPerSide) ...[
+                        Container(
+                          margin: const EdgeInsets.only(right: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: pc.spec.color,
+                            borderRadius: BorderRadius.circular(4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: pc.spec.color.withValues(alpha: 0.4),
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            '${pc.count > 1 ? '${pc.count}×' : ''}${pc.spec.weight.toString().replaceAll(RegExp(r'\.0$'), '')}$unitStr',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: pc.spec.textColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                      Text(
+                        '(${result.weightPerSide.toStringAsFixed(1)} $unitStr/side)',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          color: context.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.tune_rounded, size: 13, color: context.accent),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -6,12 +6,20 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/bouncy_pressable.dart';
 import '../../../data/providers.dart';
+import '../../../domain/models/active_workout_input.dart';
 
-class RestTimerOverlay extends ConsumerWidget {
+class RestTimerOverlay extends ConsumerStatefulWidget {
   const RestTimerOverlay({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RestTimerOverlay> createState() => _RestTimerOverlayState();
+}
+
+class _RestTimerOverlayState extends ConsumerState<RestTimerOverlay> {
+  bool _isIslandMode = false;
+
+  @override
+  Widget build(BuildContext context) {
     final timerService = ref.watch(restTimerProvider);
     final state = timerService.state;
 
@@ -19,12 +27,151 @@ class RestTimerOverlay extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final hasActiveInput = ref.watch(activeWorkoutInputProvider) != null;
+    final isIsland = _isIslandMode || hasActiveInput;
+
     final rem = state.remainingSeconds;
     final mins = rem ~/ 60;
     final secs = rem % 60;
     final timeStr = '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    if (isIsland) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+          child: RepaintBoundary(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.fromLTRB(10, 0, 8, 0),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xF5141620) : Colors.white.withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+                    border: Border.all(
+                      color: context.accent.withValues(alpha: isDark ? 0.45 : 0.35),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: context.accent.withValues(alpha: isDark ? 0.25 : 0.12),
+                        blurRadius: 14,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Circular Mini Progress Ring & Time
+                      InkWell(
+                        onTap: () {
+                          AppHaptics.tap();
+                          setState(() => _isIslandMode = false);
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    value: state.progress,
+                                    strokeWidth: 2.8,
+                                    backgroundColor: isDark ? const Color(0xFF1E212D) : const Color(0xFFE2E4EE),
+                                    valueColor: AlwaysStoppedAnimation<Color>(context.accent),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.timer_rounded,
+                                  size: 13,
+                                  color: context.accent,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              timeStr,
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                color: context.textPrimary,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // +30s Pill
+                      BouncyPressable(
+                        onTap: () {
+                          AppHaptics.step();
+                          timerService.addSeconds(30);
+                        },
+                        scaleDown: 0.90,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: context.chipBg,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: context.chipBorder),
+                          ),
+                          child: Text(
+                            '+30s',
+                            style: TextStyle(
+                              fontFamily: AppTypography.fontFamily,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: context.accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      // Skip Button
+                      BouncyPressable(
+                        onTap: () {
+                          AppHaptics.tap();
+                          timerService.stop();
+                        },
+                        scaleDown: 0.88,
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: context.chipBg,
+                            border: Border.all(color: context.chipBorder),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: context.textSecondary,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Expanded Full Dock View
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       child: RepaintBoundary(
@@ -107,7 +254,7 @@ class RestTimerOverlay extends ConsumerWidget {
                     ),
                   ),
 
-                  // Controls: -30s, +30s, Pause/Play, Skip
+                  // Controls: -30s, +30s, Pause/Play, Minimize to Island, Skip
                   _buildAdjustmentPill(
                     label: '-30s',
                     context: context,
@@ -149,6 +296,31 @@ class RestTimerOverlay extends ConsumerWidget {
                           state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                           color: context.textPrimary,
                           size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Minimize to Island Pill
+                  BouncyPressable(
+                    onTap: () {
+                      AppHaptics.tap();
+                      setState(() => _isIslandMode = true);
+                    },
+                    scaleDown: 0.88,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: context.chipBg,
+                        border: Border.all(color: context.chipBorder),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.unfold_less_rounded,
+                          color: context.textTertiary,
+                          size: 16,
                         ),
                       ),
                     ),
@@ -210,4 +382,3 @@ class RestTimerOverlay extends ConsumerWidget {
     );
   }
 }
-

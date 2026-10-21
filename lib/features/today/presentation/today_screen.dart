@@ -3260,29 +3260,121 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
               final item = activeExercises[index];
               final exSug = _suggestions.where((s) => s.payload['exerciseId'] == item.exercise.id).firstOrNull;
 
+              final currentGroup = item.supersetGroup;
+              final prevGroup = index > 0 ? activeExercises[index - 1].supersetGroup : null;
+              final nextGroup = index < activeExercises.length - 1 ? activeExercises[index + 1].supersetGroup : null;
+
+              final isFirstInGroup = currentGroup != null && currentGroup != prevGroup;
+              final isLastInGroup = currentGroup != null && currentGroup != nextGroup;
+              final isInGroup = currentGroup != null;
+
+              final card = ExerciseTableCard(
+                key: ValueKey('card_${item.id}'),
+                item: item,
+                unit: unit,
+                workoutDate: _selectedDate,
+                suggestion: exSug,
+                isHeroFocused: !isCompact || (_activeWorkoutExerciseId == item.id || (_activeWorkoutExerciseId == null && index == 0)),
+                onRefresh: _refreshWorkout,
+                onPrAchieved: (pr) {
+                  setState(() => _activePr = pr);
+                },
+                onRemoveExercise: () => _removeExercise(item),
+                onExerciseFocused: () {
+                  if (_activeWorkoutExerciseId != item.id) {
+                    setState(() => _activeWorkoutExerciseId = item.id);
+                  }
+                },
+              );
+
+              Widget content;
+              if (isInGroup) {
+                content = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isFirstInGroup)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentViolet.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.45)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.link_rounded, size: 13, color: AppColors.accentViolet),
+                              const SizedBox(width: 5),
+                              Text(
+                                'SUPERSET PAIR $currentGroup',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                  color: AppColors.accentViolet,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Alternate sets back-to-back',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: C.text3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 3.5,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentViolet,
+                              borderRadius: BorderRadius.vertical(
+                                top: isFirstInGroup ? const Radius.circular(4) : Radius.zero,
+                                bottom: isLastInGroup ? const Radius.circular(4) : Radius.zero,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.accentViolet.withValues(alpha: 0.35),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(child: card),
+                        ],
+                      ),
+                    ),
+                    if (!isLastInGroup)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 1, top: 2, bottom: 2),
+                        child: Container(
+                          width: 1.5,
+                          height: 8,
+                          color: AppColors.accentViolet.withValues(alpha: 0.35),
+                        ),
+                      ),
+                  ],
+                );
+              } else {
+                content = card;
+              }
+
               return ReorderableDelayedDragStartListener(
                 key: ValueKey(item.id),
                 index: index,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: S.md),
-                  child: ExerciseTableCard(
-                    key: ValueKey('card_${item.id}'),
-                    item: item,
-                    unit: unit,
-                    workoutDate: _selectedDate,
-                    suggestion: exSug,
-                    isHeroFocused: !isCompact || (_activeWorkoutExerciseId == item.id || (_activeWorkoutExerciseId == null && index == 0)),
-                    onRefresh: _refreshWorkout,
-                    onPrAchieved: (pr) {
-                      setState(() => _activePr = pr);
-                    },
-                    onRemoveExercise: () => _removeExercise(item),
-                    onExerciseFocused: () {
-                      if (_activeWorkoutExerciseId != item.id) {
-                        setState(() => _activeWorkoutExerciseId = item.id);
-                      }
-                    },
-                  ),
+                  child: content,
                 ),
               );
             },
