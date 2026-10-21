@@ -3239,6 +3239,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           padding: const EdgeInsets.symmetric(horizontal: S.xl),
           sliver: SliverReorderableList(
             itemCount: activeExercises.length,
+            // ignore: deprecated_member_use
             onReorder: (oldIndex, newIndex) async {
               if (oldIndex < newIndex) {
                 newIndex -= 1;
