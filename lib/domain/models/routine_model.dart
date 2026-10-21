@@ -36,4 +36,12 @@ class RoutineModel {
     this.items = const [],
     this.archived = false,
   });
+
+  String get bannerAssetPath {
+    final lower = name.toLowerCase();
+    if (lower.contains('push')) return 'assets/images/push_preset.jpg';
+    if (lower.contains('pull')) return 'assets/images/pull_preset.jpg';
+    if (lower.contains('leg')) return 'assets/images/legs_preset.jpg';
+    return 'assets/images/hero_workout.jpg';
+  }
 }

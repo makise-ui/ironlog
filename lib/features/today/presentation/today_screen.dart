@@ -788,6 +788,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           if (hadNoStartedAt) {
             await repo.startWorkout(_workout!.id, startedAt: start);
           }
+          ref.invalidate(streakAndWeekProvider);
           await _refreshWorkout();
           await BackupService.autoBackup(ref.read(databaseProvider));
           if (mounted) {
@@ -3497,7 +3498,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
               curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: hasActiveInput ? 312 : (hasActiveWorkout && !isFinished ? 68 : 20),
+              bottom: hasActiveInput ? 270 : (hasActiveWorkout && !isFinished ? 58 : 16),
               child: const RestTimerOverlay(),
             ),
 
