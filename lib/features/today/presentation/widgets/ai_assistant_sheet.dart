@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/haptics.dart';
@@ -24,6 +25,27 @@ import '../../../../domain/services/ai_memory_service.dart';
 import '../../../../domain/services/weight_step_learner.dart';
 import '../../../../domain/services/exercise_media_service.dart';
 import '../../../../data/providers.dart';
+
+enum ChatTextSize {
+  small(name: 'Small', baseSize: 12.0, scale: 0.88),
+  normal(name: 'Normal', baseSize: 13.5, scale: 1.0),
+  big(name: 'Big', baseSize: 16.0, scale: 1.18);
+
+  final String name;
+  final double baseSize;
+  final double scale;
+  const ChatTextSize({required this.name, required this.baseSize, required this.scale});
+}
+
+enum ChatSheetHeight {
+  small(name: 'Small (55%)', factor: 0.55),
+  medium(name: 'Medium (86%)', factor: 0.86),
+  expanded(name: 'Expanded (96%)', factor: 0.96);
+
+  final String name;
+  final double factor;
+  const ChatSheetHeight({required this.name, required this.factor});
+}
 
 class AiAssistantSheet extends ConsumerStatefulWidget {
   final bool isFullScreen;
@@ -72,6 +94,8 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
   bool _showHistorySidebar = false;
   bool _userScrolledUp = false;
   String? _dismissedPresetTitle;
+  ChatTextSize _textSize = ChatTextSize.normal;
+  ChatSheetHeight _sheetHeight = ChatSheetHeight.medium;
 
   final List<String> _quickPrompts = [
     'What should I eat after today\'s workout?',
@@ -99,6 +123,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     _initSpeech();
     _loadConfig();
     _loadCompanion();
+    _loadSavedSizes();
     if (widget.initialImagePath != null) {
       _selectedImagePath = widget.initialImagePath;
     }
@@ -515,6 +540,309 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     }
   }
 
+  Future<void> _loadSavedSizes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedTextSize = prefs.getString('ai_chat_text_size');
+    final savedHeight = prefs.getString('ai_chat_sheet_height');
+    if (mounted) {
+      setState(() {
+        if (savedTextSize != null) {
+          _textSize = ChatTextSize.values.firstWhere(
+            (e) => e.name.toLowerCase() == savedTextSize.toLowerCase(),
+            orElse: () => ChatTextSize.normal,
+          );
+        }
+        if (savedHeight != null) {
+          _sheetHeight = ChatSheetHeight.values.firstWhere(
+            (e) => e.name.toLowerCase() == savedHeight.toLowerCase(),
+            orElse: () => ChatSheetHeight.medium,
+          );
+        }
+      });
+    }
+  }
+
+  Future<void> _saveTextSize(ChatTextSize size) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ai_chat_text_size', size.name);
+  }
+
+  Future<void> _saveSheetHeight(ChatSheetHeight height) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ai_chat_sheet_height', height.name);
+  }
+
+  void _cycleSheetHeight() {
+    AppHaptics.selection();
+    setState(() {
+      if (_sheetHeight == ChatSheetHeight.small) {
+        _sheetHeight = ChatSheetHeight.medium;
+      } else if (_sheetHeight == ChatSheetHeight.medium) {
+        _sheetHeight = ChatSheetHeight.expanded;
+      } else {
+        _sheetHeight = ChatSheetHeight.small;
+      }
+    });
+    _saveSheetHeight(_sheetHeight);
+  }
+
+  void _showSizeAdjustmentDialog() {
+    AppHaptics.selection();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              decoration: BoxDecoration(
+                color: context.sheetBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border.all(color: context.sheetBorder),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: context.handleBar,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: context.accent.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.format_size_rounded, size: 18, color: context.accent),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Chat & Display Size',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'Adjust sheet height and text legibility',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: context.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // 1. Text & Bubble Scale
+                  Text(
+                    'TEXT & BUBBLE SCALE',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      color: context.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (final s in ChatTextSize.values) ...[
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: ScaleTap(
+                              onPressed: () {
+                                AppHaptics.selection();
+                                setState(() => _textSize = s);
+                                setModalState(() {});
+                                _saveTextSize(s);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: _textSize == s
+                                      ? context.accent
+                                      : (isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9)),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: _textSize == s
+                                        ? context.accent
+                                        : (isDark ? const Color(0x22FFFFFF) : const Color(0xFFCBD5E1)),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      s == ChatTextSize.small
+                                          ? 'A⁻'
+                                          : (s == ChatTextSize.normal ? 'A' : 'A⁺'),
+                                      style: TextStyle(
+                                        fontSize: s == ChatTextSize.small ? 13 : (s == ChatTextSize.normal ? 15 : 18),
+                                        fontWeight: FontWeight.w800,
+                                        color: _textSize == s ? Colors.white : context.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      s.name,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: _textSize == s ? Colors.white70 : context.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  if (!widget.isFullScreen) ...[
+                    const SizedBox(height: 18),
+                    // 2. Chat Sheet Height
+                    Text(
+                      'WINDOW HEIGHT',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: context.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        for (final h in ChatSheetHeight.values) ...[
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 3),
+                              child: ScaleTap(
+                                onPressed: () {
+                                  AppHaptics.selection();
+                                  setState(() => _sheetHeight = h);
+                                  setModalState(() {});
+                                  _saveSheetHeight(h);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: _sheetHeight == h
+                                        ? context.accent
+                                        : (isDark ? const Color(0xFF1E212D) : const Color(0xFFF1F5F9)),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _sheetHeight == h
+                                          ? context.accent
+                                          : (isDark ? const Color(0x22FFFFFF) : const Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        h == ChatSheetHeight.small
+                                            ? Icons.horizontal_split_rounded
+                                            : (h == ChatSheetHeight.medium
+                                                ? Icons.aspect_ratio_rounded
+                                                : Icons.fullscreen_rounded),
+                                        size: 18,
+                                        color: _sheetHeight == h ? Colors.white : context.textPrimary,
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        h.name,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: _sheetHeight == h ? Colors.white : context.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  // Live Preview Box
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12 * _textSize.scale,
+                      vertical: 8 * _textSize.scale,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF161922) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'PREVIEW',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: context.accent,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Keep up the great form! Rest 90 seconds, then hit your next working set.',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: _textSize.baseSize,
+                            height: 1.4,
+                            color: context.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _handleSend([String? presetText]) {
     final text = (presetText ?? _textController.text).trim();
     final attachedImagePath = _selectedImagePath;
@@ -668,16 +996,26 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
             children: [
               if (!widget.isFullScreen) ...[
                 Center(
-                  child: Container(
-                    width: 38,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.handleBar,
-                      borderRadius: BorderRadius.circular(2),
+                  child: GestureDetector(
+                    onTap: _cycleSheetHeight,
+                    behavior: HitTestBehavior.translucent,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                      child: Tooltip(
+                        message: 'Tap to resize sheet (${_sheetHeight.name})',
+                        child: Container(
+                          width: 44,
+                          height: 4.5,
+                          decoration: BoxDecoration(
+                            color: context.handleBar,
+                            borderRadius: BorderRadius.circular(2.5),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
               ],
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -762,6 +1100,12 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                               tooltip: 'Agent Memories',
                               color: context.accent,
                               onPressed: _showMemoriesSheet,
+                            ),
+                            _buildHeaderIconButton(
+                              icon: Icons.format_size_rounded,
+                              tooltip: 'Adjust Chat & Text Size',
+                              color: context.accent,
+                              onPressed: _showSizeAdjustmentDialog,
                             ),
                             if (!widget.isFullScreen)
                               _buildHeaderIconButton(
@@ -1141,7 +1485,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                             textInputAction: TextInputAction.newline,
                             style: TextStyle(
                               color: context.textPrimary,
-                              fontSize: 14.5,
+                              fontSize: _textSize.baseSize + 0.5,
                               height: 1.4,
                             ),
                             onChanged: (_) => setState(() {}),
@@ -1151,7 +1495,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                                   : 'Message AI coach…',
                               hintStyle: TextStyle(
                                 color: context.textTertiary,
-                                fontSize: 14,
+                                fontSize: _textSize.baseSize,
                               ),
                               border: InputBorder.none,
                               isDense: true,
@@ -1257,8 +1601,10 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
             ],
     );
 
-    final mainContainer = Container(
-      height: widget.isFullScreen ? double.infinity : MediaQuery.of(context).size.height * 0.86,
+    final mainContainer = AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      height: widget.isFullScreen ? double.infinity : MediaQuery.of(context).size.height * _sheetHeight.factor,
       decoration: containerDecoration,
       child: SafeArea(
         top: widget.isFullScreen,
@@ -1852,7 +2198,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     if (isUser) {
       return Container(
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: 14 * _textSize.scale, vertical: 10 * _textSize.scale),
         decoration: BoxDecoration(
           color: context.accent,
           borderRadius: const BorderRadius.only(
@@ -2017,56 +2363,56 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
           styleSheet: MarkdownStyleSheet(
             p: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 13.5,
+              fontSize: _textSize.baseSize,
               height: 1.45,
               color: isUser ? Colors.black : context.textPrimary,
               fontWeight: isUser ? FontWeight.w600 : FontWeight.w400,
             ),
             strong: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 13.5,
+              fontSize: _textSize.baseSize,
               height: 1.45,
               fontWeight: FontWeight.w700,
               color: isUser ? Colors.black : context.textPrimary,
             ),
             em: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 13.5,
+              fontSize: _textSize.baseSize,
               fontStyle: FontStyle.italic,
               color: isUser ? Colors.black87 : context.textSecondary,
             ),
             h1: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 16,
+              fontSize: _textSize.baseSize + 3.0,
               fontWeight: FontWeight.w800,
               color: isUser ? Colors.black : context.textPrimary,
             ),
             h2: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 15,
+              fontSize: _textSize.baseSize + 2.0,
               fontWeight: FontWeight.w700,
               color: isUser ? Colors.black : context.textPrimary,
             ),
             h3: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 14,
+              fontSize: _textSize.baseSize + 1.0,
               fontWeight: FontWeight.w700,
               color: isUser ? Colors.black : context.textPrimary,
             ),
             listBullet: TextStyle(
-              fontSize: 13.5,
+              fontSize: _textSize.baseSize,
               fontWeight: FontWeight.w700,
               color: isUser ? Colors.black : context.accent,
             ),
             tableHead: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 12,
+              fontSize: (_textSize.baseSize - 1.5).clamp(10.0, 20.0),
               fontWeight: FontWeight.w700,
               color: isUser ? Colors.black : context.accent,
             ),
             tableBody: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 12,
+              fontSize: (_textSize.baseSize - 1.5).clamp(10.0, 20.0),
               color: isUser ? Colors.black : context.textPrimary,
             ),
             tableBorder: TableBorder.all(
