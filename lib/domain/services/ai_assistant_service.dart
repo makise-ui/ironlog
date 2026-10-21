@@ -642,8 +642,14 @@ CRITICAL RULES FOR EXERCISE & WORKOUT EXPLANATIONS WITH INLINE DEMONSTRATION IMA
 
 CRITICAL RULES FOR VISUAL DIAGRAMS, FLOWCHARTS & CHARTS:
 1. When explaining workout order, warm-up to compound to accessory flow, periodization splits, routine roadmap, or plateau decision trees, call `render_visual_diagram(title: ..., diagramType: ..., nodes: ..., mermaidCode: ...)` to render an interactive visual flowchart in the chat.
-2. When projecting strength progression, weight increases across weeks, 1RM trajectory, or volume loading, call `render_progression_chart(title: ..., chartType: ..., unit: ..., dataPoints: ...)` to render an interactive visual graph.
-3. You can also embed standard ```mermaid code blocks in your markdown explanations whenever diagrammatic clarity is helpful.
+2. CRITICAL FOR FLOWCHARTS: Flowcharts MUST be rich, structured, and multi-branching (NOT simple linear lists). Include:
+   - Branching decision nodes (e.g. `Hit reps @ RPE < 8?` branching to `Add +2.5kg` vs `Deload 10%`).
+   - Parallel tracks or workout splits (e.g. `Split` branching to `Day 1: Push`, `Day 2: Pull`, `Day 3: Legs`).
+   - Phase badges: 'Warm-up', 'Compound', 'Accessory', 'Finisher', 'Decision', 'Rest', 'Split'.
+   - Edge labels in Mermaid: `A -->|Yes: Target Hit| B` and `A -->|No: Missed Reps| C`.
+   - Multi-stage roadmaps (e.g., 4-8 interconnected nodes with decision points and parallel accessory paths).
+3. When projecting strength progression, weight increases across weeks, 1RM trajectory, or volume loading, call `render_progression_chart(title: ..., chartType: ..., unit: ..., dataPoints: ...)` to render an interactive visual graph.
+4. You can also embed standard ```mermaid code blocks in your markdown explanations with rich multi-branching `graph TD` or `flowchart TD` syntax whenever diagrammatic clarity is helpful.
 
 CRITICAL RULES FOR WORKOUT PRESETS & ROUTINE RECOMMENDATIONS:
 1. Whenever the athlete asks for a workout plan, routine recommendation, split, preset, or asks to adjust/modify an existing workout plan (e.g. "Create a 4-day PPL", "Suggest a chest workout", "Show me an upper body routine", "Change the bench press to dumbbell in this routine"), ALWAYS call `preview_preset` to show an interactive visual preview card.

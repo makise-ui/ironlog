@@ -1065,7 +1065,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // Quick Action Buttons
+                        // Quick Action Buttons (Compact Clean Header)
                         Row(
                           children: [
                             _buildHeaderIconButton(
@@ -1073,63 +1073,8 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                               tooltip: 'New Conversation',
                               onPressed: _clearChat,
                             ),
-                            _buildHeaderIconButton(
-                              icon: Icons.history_rounded,
-                              tooltip: 'Conversation History',
-                              onPressed: () {
-                                ref.read(aiChatNotifierProvider.notifier).loadAllSessions();
-                                setState(() => _showHistorySidebar = true);
-                              },
-                            ),
-                            _buildHeaderIconButton(
-                              icon: Icons.delete_outline_rounded,
-                              tooltip: 'Delete Conversation',
-                              color: AppColors.error,
-                              onPressed: _deleteCurrentChat,
-                            ),
-                            _buildHeaderIconButton(
-                              icon: Icons.tune_rounded,
-                              tooltip: 'Configure AI Provider',
-                              onPressed: () {
-                                if (!widget.isFullScreen) Navigator.of(context).pop();
-                                context.go('/settings');
-                              },
-                            ),
-                            _buildHeaderIconButton(
-                              icon: Icons.psychology_rounded,
-                              tooltip: 'Agent Memories',
-                              color: context.accent,
-                              onPressed: _showMemoriesSheet,
-                            ),
-                            _buildHeaderIconButton(
-                              icon: Icons.format_size_rounded,
-                              tooltip: 'Adjust Chat & Text Size',
-                              color: context.accent,
-                              onPressed: _showSizeAdjustmentDialog,
-                            ),
-                            if (!widget.isFullScreen)
-                              _buildHeaderIconButton(
-                                icon: Icons.open_in_full_rounded,
-                                tooltip: 'Open Full Screen',
-                                onPressed: () {
-                                  final nav = Navigator.of(context, rootNavigator: true);
-                                  nav.pop();
-                                  nav.push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const Scaffold(
-                                        backgroundColor: Colors.transparent,
-                                        body: AiAssistantSheet(isFullScreen: true),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              )
-                            else
-                              _buildHeaderIconButton(
-                                icon: Icons.close_fullscreen_rounded,
-                                tooltip: 'Exit Full Screen',
-                                onPressed: () => Navigator.of(context).pop(),
-                              ),
+                            const SizedBox(width: 4),
+                            _buildHeaderOverflowMenu(),
                           ],
                         ),
                       ],
@@ -1816,6 +1761,150 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     );
   }
 
+  Widget _buildHeaderOverflowMenu() {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        popupMenuTheme: PopupMenuThemeData(
+          color: context.isDark ? const Color(0xFF1E2638) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+              color: context.isDark ? const Color(0x3364B5F6) : const Color(0xFFE2E8F0),
+              width: 1,
+            ),
+          ),
+          elevation: 8,
+        ),
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: 'More Options',
+        padding: EdgeInsets.zero,
+        icon: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          decoration: BoxDecoration(
+            color: context.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: context.accent.withValues(alpha: 0.25),
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.more_horiz_rounded, size: 16, color: context.accent),
+              const SizedBox(width: 2),
+              Icon(Icons.arrow_drop_down_rounded, size: 14, color: context.accent),
+            ],
+          ),
+        ),
+        onSelected: (value) {
+          AppHaptics.selection();
+          switch (value) {
+            case 'size':
+              _showSizeAdjustmentDialog();
+              break;
+            case 'history':
+              ref.read(aiChatNotifierProvider.notifier).loadAllSessions();
+              setState(() => _showHistorySidebar = true);
+              break;
+            case 'memories':
+              _showMemoriesSheet();
+              break;
+            case 'settings':
+              if (!widget.isFullScreen) Navigator.of(context).pop();
+              context.go('/settings');
+              break;
+            case 'fullscreen':
+              if (!widget.isFullScreen) {
+                final nav = Navigator.of(context, rootNavigator: true);
+                nav.pop();
+                nav.push(
+                  MaterialPageRoute(
+                    builder: (_) => const Scaffold(
+                      backgroundColor: Colors.transparent,
+                      body: AiAssistantSheet(isFullScreen: true),
+                    ),
+                  ),
+                );
+              } else {
+                Navigator.of(context).pop();
+              }
+              break;
+            case 'delete':
+              _deleteCurrentChat();
+              break;
+          }
+        },
+        itemBuilder: (context) => [
+          _buildPopupMenuItem(
+            value: 'size',
+            icon: Icons.format_size_rounded,
+            label: 'Chat & Text Size',
+            iconColor: context.accent,
+          ),
+          _buildPopupMenuItem(
+            value: 'history',
+            icon: Icons.history_rounded,
+            label: 'Conversation History',
+          ),
+          _buildPopupMenuItem(
+            value: 'memories',
+            icon: Icons.psychology_rounded,
+            label: 'Agent Memories',
+            iconColor: context.accent,
+          ),
+          _buildPopupMenuItem(
+            value: 'settings',
+            icon: Icons.tune_rounded,
+            label: 'AI Provider Settings',
+          ),
+          _buildPopupMenuItem(
+            value: 'fullscreen',
+            icon: widget.isFullScreen ? Icons.close_fullscreen_rounded : Icons.open_in_full_rounded,
+            label: widget.isFullScreen ? 'Exit Full Screen' : 'Open Full Screen',
+          ),
+          const PopupMenuDivider(height: 8),
+          _buildPopupMenuItem(
+            value: 'delete',
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete Conversation',
+            iconColor: AppColors.error,
+            textColor: AppColors.error,
+          ),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildPopupMenuItem({
+    required String value,
+    required IconData icon,
+    required String label,
+    Color? iconColor,
+    Color? textColor,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 38,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: iconColor ?? context.textSecondary),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: textColor ?? context.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return ListView(
       controller: _scrollController,
@@ -2301,7 +2390,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     bool isStreaming = false,
   }) {
     // If the message contains a ```mermaid block, parse and render as interactive visual flowchart
-    final mermaidRegex = RegExp(r'```(?:mermaid)?\s*([\s\S]*?graph\s+(?:TD|LR|TB|BT)[\s\S]*?)```', caseSensitive: false);
+    final mermaidRegex = RegExp(r'```(?:mermaid)?\s*([\s\S]*?(?:graph|flowchart)\s+(?:TD|LR|TB|BT|RL)[\s\S]*?)```', caseSensitive: false);
     if (!isUser && mermaidRegex.hasMatch(text)) {
       final matches = mermaidRegex.allMatches(text).toList();
       final List<Widget> children = [];
@@ -4286,14 +4375,25 @@ class _InlineChatExerciseImage extends StatelessWidget {
                 maxScale: 3.5,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (c, child, progress) {
-                      if (progress == null) return child;
-                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                    },
-                  ),
+                  child: url.startsWith('assets/')
+                      ? Image.asset(url, fit: BoxFit.contain)
+                      : Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (c, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                          },
+                          errorBuilder: (c, e, s) {
+                            final local = ExerciseMediaService.getVerifiedMedia(label);
+                            if (local != null) {
+                              return Image.asset(local.source, fit: BoxFit.contain);
+                            }
+                            return const Center(
+                              child: Icon(Icons.broken_image_rounded, size: 48, color: Colors.white54),
+                            );
+                          },
+                        ),
                 ),
               ),
               Positioned(
@@ -4881,14 +4981,37 @@ class _MultiExerciseVisualsCardState extends State<_MultiExerciseVisualsCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image Thumbnail
-                      ClipRRect(
+                      // Image Thumbnail with Tap to Enlarge
+                      InkWell(
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                        child: Container(
-                          height: 94,
-                          width: double.infinity,
-                          color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFF1F5F9),
-                          child: _buildAdaptiveExerciseThumbnail(imgUrl, name, context),
+                        onTap: () {
+                          AppHaptics.selection();
+                          _showEnlargedExerciseModal(context, item);
+                        },
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                          child: Stack(
+                            children: [
+                              Container(
+                                height: 94,
+                                width: double.infinity,
+                                color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFF1F5F9),
+                                child: _buildAdaptiveExerciseThumbnail(imgUrl, name, context),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.65),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: const Icon(Icons.fullscreen_rounded, size: 13, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       Padding(
@@ -4896,16 +5019,22 @@ class _MultiExerciseVisualsCardState extends State<_MultiExerciseVisualsCard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                height: 1.25,
-                                color: context.textPrimary,
+                            InkWell(
+                              onTap: () {
+                                AppHaptics.selection();
+                                _showEnlargedExerciseModal(context, item);
+                              },
+                              child: Text(
+                                name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                  color: context.textPrimary,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -4999,6 +5128,1029 @@ class _MultiExerciseVisualsCardState extends State<_MultiExerciseVisualsCard> {
       child: Icon(Icons.fitness_center_rounded, size: 28, color: context.textTertiary),
     );
   }
+
+  Future<void> _showEnlargedExerciseModal(BuildContext context, Map<String, dynamic> item) async {
+    final name = item['name']?.toString() ?? 'Exercise';
+    final imgUrl = item['imageUrl']?.toString();
+    final muscle = item['primaryMuscle']?.toString() ?? 'General';
+    final equipment = item['equipment']?.toString();
+
+    // Ensure keyboard and active focus are cleared
+    FocusScope.of(context).unfocus(disposition: UnfocusDisposition.scope);
+    FocusManager.instance.primaryFocus?.unfocus(disposition: UnfocusDisposition.scope);
+
+    await showDialog(
+      context: context,
+      useRootNavigator: true,
+      barrierColor: Colors.black.withValues(alpha: 0.88),
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header bar: muscle pill + close button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: ctx.accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: ctx.accent.withValues(alpha: 0.4), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.fitness_center_rounded, size: 13, color: ctx.accent),
+                        const SizedBox(width: 5),
+                        Text(
+                          muscle.toUpperCase(),
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: ctx.accent,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Enlarged interactive image viewer
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.52,
+                  maxWidth: double.infinity,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F131C),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 3.5,
+                  child: Center(
+                    child: _buildAdaptiveExerciseThumbnail(imgUrl, name, ctx),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Bottom card with details and coach cues button
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: ctx.isDark ? const Color(0xFF1B2230) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: ctx.isDark ? const Color(0x3364B5F6) : const Color(0xFF90CAF9),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: ctx.textPrimary,
+                      ),
+                    ),
+                    if (equipment != null && equipment.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Equipment: $equipment',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: ctx.textSecondary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Pinch to zoom • Drag to pan',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: ctx.textTertiary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: BouncyPressable(
+                            onTap: () {
+                              Navigator.of(ctx).pop();
+                              widget.onAskExercise(name);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              decoration: BoxDecoration(
+                                color: ctx.accent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.black),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Ask Coach Cues & Tips',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (context.mounted) {
+      FocusScope.of(context).unfocus(disposition: UnfocusDisposition.scope);
+      FocusManager.instance.primaryFocus?.unfocus(disposition: UnfocusDisposition.scope);
+    }
+  }
+}
+
+// ── Flowchart & Visual Diagram Engine (Multi-Branching Mermaid Graph) ─────────
+
+class FlowchartNode {
+  final String id;
+  final String label;
+  final String phase;
+  final String? description;
+  final bool isDecision;
+  final String? shape;
+  final List<String> next;
+
+  FlowchartNode({
+    required this.id,
+    required this.label,
+    required this.phase,
+    this.description,
+    this.isDecision = false,
+    this.shape,
+    this.next = const [],
+  });
+}
+
+class FlowchartEdge {
+  final String from;
+  final String to;
+  final String? label;
+
+  FlowchartEdge({
+    required this.from,
+    required this.to,
+    this.label,
+  });
+}
+
+class FlowchartGraph {
+  final String title;
+  final String direction;
+  final List<FlowchartNode> nodes;
+  final List<FlowchartEdge> edges;
+
+  FlowchartGraph({
+    required this.title,
+    this.direction = 'TD',
+    required this.nodes,
+    required this.edges,
+  });
+}
+
+class MermaidFlowchartParser {
+  static FlowchartGraph parse(
+    String code, {
+    String defaultTitle = 'Visual Flowchart',
+    List<Map<String, dynamic>>? fallbackNodes,
+  }) {
+    final cleanCode = code
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(r'\n', '\n');
+
+    final lines = cleanCode.split('\n');
+    String direction = 'TD';
+    final Map<String, FlowchartNode> nodesMap = {};
+    final List<FlowchartEdge> edges = [];
+
+    // Parse direction
+    final dirMatch = RegExp(r'(?:graph|flowchart)\s+([A-Za-z]{2})', caseSensitive: false).firstMatch(cleanCode);
+    if (dirMatch != null) {
+      direction = dirMatch.group(1)?.toUpperCase() ?? 'TD';
+    }
+
+    void registerNode(String id, String label, {bool isDecision = false, String? shape}) {
+      final cleanId = id.trim();
+      final cleanLabel = label.trim();
+      if (cleanId.isEmpty) return;
+
+      if (!nodesMap.containsKey(cleanId)) {
+        final phase = _inferPhase(cleanLabel, isDecision: isDecision);
+        nodesMap[cleanId] = FlowchartNode(
+          id: cleanId,
+          label: cleanLabel.isNotEmpty ? cleanLabel : cleanId,
+          phase: phase,
+          isDecision: isDecision,
+          shape: shape,
+        );
+      }
+    }
+
+    // Node shape regexes
+    final pillRegex = RegExp(r'([A-Za-z0-9_]+)\s*\(\[\s*"?([^"\]\)]+)"?\s*\]\)');
+    final diamondRegex = RegExp(r'([A-Za-z0-9_]+)\s*\{\s*"?([^"\}]+)"?\s*\}');
+    final roundRegex = RegExp(r'([A-Za-z0-9_]+)\s*\(\s*"?([^"\)]+)"?\s*\)');
+    final squareRegex = RegExp(r'([A-Za-z0-9_]+)\s*\[\s*"?([^"\]]+)"?\s*\]');
+
+    final edgeLabeled1 = RegExp(r'(.+?)\s*(?:-->|==>|-\.->)\s*\|([^|]+)\|\s*(.+)');
+    final edgeLabeled2 = RegExp(r'(.+?)\s*--\s*([^-]+)\s*-->\s*(.+)');
+    final edgeSimple = RegExp(r'(.+?)\s*(?:-->|==>|-\.->)\s*(.+)');
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty ||
+          trimmed.startsWith('%%') ||
+          trimmed.startsWith('graph ') ||
+          trimmed.startsWith('flowchart ')) {
+        continue;
+      }
+
+      // 1. Extract node definitions
+      for (final m in pillRegex.allMatches(trimmed)) {
+        registerNode(m.group(1)!, m.group(2)!, shape: 'pill');
+      }
+      for (final m in diamondRegex.allMatches(trimmed)) {
+        registerNode(m.group(1)!, m.group(2)!, isDecision: true, shape: 'diamond');
+      }
+      for (final m in roundRegex.allMatches(trimmed)) {
+        if (!m.group(0)!.contains('([')) {
+          registerNode(m.group(1)!, m.group(2)!, shape: 'round');
+        }
+      }
+      for (final m in squareRegex.allMatches(trimmed)) {
+        registerNode(m.group(1)!, m.group(2)!, shape: 'square');
+      }
+
+      // 2. Extract edge connections
+      final m1 = edgeLabeled1.allMatches(trimmed);
+      final m2 = edgeLabeled2.allMatches(trimmed);
+      if (m1.isNotEmpty) {
+        for (final m in m1) {
+          _addEdges(m.group(1)!, m.group(3)!, m.group(2)?.trim(), edges, registerNode);
+        }
+      } else if (m2.isNotEmpty) {
+        for (final m in m2) {
+          _addEdges(m.group(1)!, m.group(3)!, m.group(2)?.trim(), edges, registerNode);
+        }
+      } else {
+        for (final m in edgeSimple.allMatches(trimmed)) {
+          _addEdges(m.group(1)!, m.group(2)!, null, edges, registerNode);
+        }
+      }
+    }
+
+    // 3. Fallback nodes from toolcall
+    if (fallbackNodes != null && fallbackNodes.isNotEmpty) {
+      for (int i = 0; i < fallbackNodes.length; i++) {
+        final fn = fallbackNodes[i];
+        final id = fn['id']?.toString() ?? '${i + 1}';
+        final label = fn['label']?.toString() ?? id;
+        final phase = fn['phase']?.toString() ?? _inferPhase(label);
+        final desc = fn['description']?.toString();
+        final rawNext = fn['next'];
+        final nextList = rawNext is List
+            ? rawNext.map((e) => e.toString()).toList()
+            : (i < fallbackNodes.length - 1 ? ['${i + 2}'] : <String>[]);
+
+        final existing = nodesMap[id];
+        final isDec = existing?.isDecision ?? (phase.toLowerCase().contains('decis') || label.contains('?'));
+
+        nodesMap[id] = FlowchartNode(
+          id: id,
+          label: existing != null && existing.label.isNotEmpty ? existing.label : label,
+          phase: phase,
+          description: desc,
+          isDecision: isDec,
+          shape: existing?.shape,
+          next: nextList,
+        );
+
+        for (final nxt in nextList) {
+          if (!edges.any((e) => e.from == id && e.to == nxt)) {
+            edges.add(FlowchartEdge(from: id, to: nxt));
+          }
+        }
+      }
+    }
+
+    return FlowchartGraph(
+      title: defaultTitle,
+      direction: direction,
+      nodes: nodesMap.values.toList(),
+      edges: edges,
+    );
+  }
+
+  static void _addEdges(
+    String fromStr,
+    String toStr,
+    String? label,
+    List<FlowchartEdge> edges,
+    void Function(String id, String label, {bool isDecision, String? shape}) registerNode,
+  ) {
+    final fromIds = _extractIds(fromStr);
+    final toIds = _extractIds(toStr);
+
+    for (final f in fromIds) {
+      registerNode(f, f);
+      for (final t in toIds) {
+        registerNode(t, t);
+        if (!edges.any((e) => e.from == f && e.to == t)) {
+          edges.add(FlowchartEdge(from: f, to: t, label: label));
+        }
+      }
+    }
+  }
+
+  static List<String> _extractIds(String str) {
+    final tokens = str.split('&');
+    final List<String> result = [];
+    for (final tok in tokens) {
+      final m = RegExp(r'([A-Za-z0-9_]+)').firstMatch(tok.trim());
+      if (m != null) {
+        result.add(m.group(1)!);
+      }
+    }
+    return result;
+  }
+
+  static String _inferPhase(String label, {bool isDecision = false}) {
+    if (isDecision) return 'Decision';
+    final lower = label.toLowerCase();
+    if (lower.contains('?')) return 'Decision';
+    if (lower.contains('warm')) return 'Warm-up';
+    if (lower.contains('compound') ||
+        lower.contains('heavy') ||
+        lower.contains('squat') ||
+        lower.contains('bench') ||
+        lower.contains('deadlift') ||
+        lower.contains('press')) {
+      return 'Compound';
+    }
+    if (lower.contains('accessory') ||
+        lower.contains('hypertrophy') ||
+        lower.contains('curl') ||
+        lower.contains('raise') ||
+        lower.contains('fly') ||
+        lower.contains('extension') ||
+        lower.contains('pull') ||
+        lower.contains('row')) {
+      return 'Accessory';
+    }
+    if (lower.contains('finish') ||
+        lower.contains('burn') ||
+        lower.contains('pump') ||
+        lower.contains('drop') ||
+        lower.contains('cooldown')) {
+      return 'Finisher';
+    }
+    if (lower.contains('rest') || lower.contains('deload') || lower.contains('recover')) {
+      return 'Rest';
+    }
+    if (lower.contains('split') ||
+        lower.contains('day 1') ||
+        lower.contains('day 2') ||
+        lower.contains('day 3') ||
+        lower.contains('push') ||
+        lower.contains('legs')) {
+      return 'Split';
+    }
+    return 'Step';
+  }
+
+  static List<List<FlowchartNode>> computeLayers(
+    List<FlowchartNode> nodes,
+    List<FlowchartEdge> edges,
+  ) {
+    if (nodes.isEmpty) return [];
+
+    final nodeMap = {for (final n in nodes) n.id: n};
+    final incomingCount = <String, int>{for (final n in nodes) n.id: 0};
+    final outgoing = <String, List<String>>{for (final n in nodes) n.id: []};
+
+    for (final e in edges) {
+      if (nodeMap.containsKey(e.from) && nodeMap.containsKey(e.to)) {
+        incomingCount[e.to] = (incomingCount[e.to] ?? 0) + 1;
+        outgoing[e.from]!.add(e.to);
+      }
+    }
+
+    var roots = nodes.where((n) => (incomingCount[n.id] ?? 0) == 0).map((n) => n.id).toList();
+    if (roots.isEmpty) {
+      roots = [nodes.first.id];
+    }
+
+    final levelMap = <String, int>{};
+    for (final r in roots) {
+      levelMap[r] = 0;
+    }
+
+    final queue = List<String>.from(roots);
+    final visited = <String>{};
+
+    while (queue.isNotEmpty) {
+      final curr = queue.removeAt(0);
+      visited.add(curr);
+      final currLevel = levelMap[curr] ?? 0;
+
+      for (final next in outgoing[curr] ?? []) {
+        final existingLevel = levelMap[next] ?? 0;
+        final newLevel = currLevel + 1;
+        if (newLevel > existingLevel) {
+          levelMap[next] = newLevel;
+        }
+        if (!visited.contains(next) && !queue.contains(next)) {
+          queue.add(next);
+        }
+      }
+    }
+
+    int maxLevel = levelMap.values.fold(0, (max, v) => v > max ? v : max);
+    for (final n in nodes) {
+      if (!levelMap.containsKey(n.id)) {
+        maxLevel++;
+        levelMap[n.id] = maxLevel;
+      }
+    }
+
+    final Map<int, List<FlowchartNode>> layersMap = {};
+    for (final n in nodes) {
+      final lvl = levelMap[n.id] ?? 0;
+      layersMap.putIfAbsent(lvl, () => []).add(n);
+    }
+
+    final sortedKeys = layersMap.keys.toList()..sort();
+    return sortedKeys.map((k) => layersMap[k]!).toList();
+  }
+}
+
+// ── Flowchart Graphical Visualizer Widget ────────────────────────────────────
+
+class _FlowchartGraphView extends StatefulWidget {
+  final FlowchartGraph graph;
+
+  const _FlowchartGraphView({
+    required this.graph,
+  });
+
+  @override
+  State<_FlowchartGraphView> createState() => _FlowchartGraphViewState();
+}
+
+class _FlowchartGraphViewState extends State<_FlowchartGraphView> {
+  bool _zoomMode = false;
+
+  Color _getPhaseColor(String phase, BuildContext context) {
+    final lower = phase.toLowerCase();
+    if (lower.contains('warm')) return const Color(0xFFF59E0B);
+    if (lower.contains('compound') || lower.contains('heavy') || lower.contains('primary')) {
+      return context.accent;
+    }
+    if (lower.contains('accessory') || lower.contains('hypertrophy') || lower.contains('secondary')) {
+      return const Color(0xFF8B5CF6);
+    }
+    if (lower.contains('finish') || lower.contains('pump') || lower.contains('burn')) {
+      return const Color(0xFF10B981);
+    }
+    if (lower.contains('decision') || lower.contains('eval')) {
+      return const Color(0xFFF59E0B);
+    }
+    if (lower.contains('rest') || lower.contains('deload')) {
+      return const Color(0xFF64748B);
+    }
+    if (lower.contains('split') || lower.contains('day')) {
+      return const Color(0xFF38BDF8);
+    }
+    return context.accent;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final layers = MermaidFlowchartParser.computeLayers(widget.graph.nodes, widget.graph.edges);
+    if (layers.isEmpty) {
+      return const Center(child: Text('No diagram nodes available'));
+    }
+
+    Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (int i = 0; i < layers.length; i++) ...[
+          _buildLayerRow(layers[i], i),
+          if (i < layers.length - 1)
+            _buildConnectorBetweenLayers(layers[i], layers[i + 1]),
+        ],
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Controls Toolbar (Nodes & Connections stats + Zoom/Pan Mode toggle)
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFE2E8F0),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.hub_rounded, size: 12, color: context.accent),
+              const SizedBox(width: 5),
+              Text(
+                '${widget.graph.nodes.length} nodes • ${widget.graph.edges.length} branches',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: context.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              ScaleTap(
+                onPressed: () {
+                  AppHaptics.selection();
+                  setState(() => _zoomMode = !_zoomMode);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _zoomMode ? context.accent.withValues(alpha: 0.2) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _zoomMode ? context.accent : Colors.transparent,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _zoomMode ? Icons.zoom_out_map_rounded : Icons.pan_tool_outlined,
+                        size: 11,
+                        color: _zoomMode ? context.accent : context.textSecondary,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        _zoomMode ? 'Interactive Pan' : 'Scroll View',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: _zoomMode ? context.accent : context.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Graph Canvas
+        _zoomMode
+            ? SizedBox(
+                height: 380,
+                width: double.infinity,
+                child: InteractiveViewer(
+                  constrained: false,
+                  minScale: 0.4,
+                  maxScale: 2.8,
+                  boundaryMargin: const EdgeInsets.all(80),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: content,
+                    ),
+                  ),
+                ),
+              )
+            : SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: MediaQuery.of(context).size.width * 0.84,
+                  ),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                      child: content,
+                    ),
+                  ),
+                ),
+              ),
+      ],
+    );
+  }
+
+  Widget _buildLayerRow(List<FlowchartNode> layerNodes, int layerIndex) {
+    if (layerNodes.length == 1) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320, minWidth: 160),
+          child: _buildNodeCard(layerNodes.first),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int i = 0; i < layerNodes.length; i++) ...[
+          if (i > 0) const SizedBox(width: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180, minWidth: 120),
+            child: _buildNodeCard(layerNodes[i]),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildConnectorBetweenLayers(
+    List<FlowchartNode> parentLayer,
+    List<FlowchartNode> childLayer,
+  ) {
+    final connectingEdges = widget.graph.edges.where((e) {
+      return parentLayer.any((p) => p.id == e.from) &&
+          childLayer.any((c) => c.id == e.to);
+    }).toList();
+
+    // Case 1: 1 parent -> 1 child
+    if (parentLayer.length == 1 && childLayer.length == 1) {
+      final label = connectingEdges.isNotEmpty ? connectingEdges.first.label : null;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 1.5,
+            height: label != null && label.isNotEmpty ? 8 : 12,
+            color: context.accent.withValues(alpha: 0.45),
+          ),
+          if (label != null && label.isNotEmpty) ...[
+            _buildEdgeLabelBadge(label),
+            Container(
+              width: 1.5,
+              height: 6,
+              color: context.accent.withValues(alpha: 0.45),
+            ),
+          ],
+          Icon(Icons.keyboard_arrow_down_rounded, size: 15, color: context.accent),
+        ],
+      );
+    }
+
+    // Case 2: 1 parent -> Multiple children (Branch Split!)
+    if (parentLayer.length == 1 && childLayer.length > 1) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 1.5,
+            height: 10,
+            color: context.accent.withValues(alpha: 0.45),
+          ),
+          Container(
+            height: 1.5,
+            width: math.max(60.0, (childLayer.length - 1) * 140.0),
+            color: context.accent.withValues(alpha: 0.45),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (int c = 0; c < childLayer.length; c++) ...[
+                if (c > 0)
+                  SizedBox(
+                    width: math.max(12.0, 140.0 - 24.0),
+                  ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 1.5,
+                      height: 6,
+                      color: context.accent.withValues(alpha: 0.45),
+                    ),
+                    Builder(builder: (context) {
+                      final edge = connectingEdges.firstWhere(
+                        (e) => e.to == childLayer[c].id,
+                        orElse: () => FlowchartEdge(from: '', to: ''),
+                      );
+                      if (edge.label != null && edge.label!.isNotEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: _buildEdgeLabelBadge(edge.label!),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }),
+                    Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: context.accent),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ],
+      );
+    }
+
+    // Case 3: Multiple parents -> 1 child (Branch Merge!)
+    if (parentLayer.length > 1 && childLayer.length == 1) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (int p = 0; p < parentLayer.length; p++) ...[
+                if (p > 0)
+                  SizedBox(
+                    width: math.max(12.0, 140.0 - 24.0),
+                  ),
+                Container(
+                  width: 1.5,
+                  height: 8,
+                  color: context.accent.withValues(alpha: 0.45),
+                ),
+              ],
+            ],
+          ),
+          Container(
+            height: 1.5,
+            width: math.max(60.0, (parentLayer.length - 1) * 140.0),
+            color: context.accent.withValues(alpha: 0.45),
+          ),
+          Container(
+            width: 1.5,
+            height: 6,
+            color: context.accent.withValues(alpha: 0.45),
+          ),
+          Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: context.accent),
+        ],
+      );
+    }
+
+    // Default multi-to-multi
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Icon(Icons.arrow_downward_rounded, size: 14, color: context.accent),
+    );
+  }
+
+  Widget _buildEdgeLabelBadge(String label) {
+    final lower = label.toLowerCase();
+    Color bg = context.accent.withValues(alpha: 0.15);
+    Color fg = context.accent;
+
+    if (lower.contains('yes') || lower.contains('pass') || lower.contains('+')) {
+      bg = const Color(0xFF10B981).withValues(alpha: 0.18);
+      fg = const Color(0xFF10B981);
+    } else if (lower.contains('no') || lower.contains('fail') || lower.contains('-')) {
+      bg = const Color(0xFFEF4444).withValues(alpha: 0.18);
+      fg = const Color(0xFFEF4444);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: fg.withValues(alpha: 0.3), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNodeCard(FlowchartNode node) {
+    final phaseColor = _getPhaseColor(node.phase, context);
+    final isDark = context.isDark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          AppHaptics.selection();
+          _showNodeDetailsDialog(node);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1B2230) : Colors.white,
+            borderRadius: BorderRadius.circular(node.shape == 'pill' ? 20 : 10),
+            border: Border.all(
+              color: node.isDecision
+                  ? const Color(0xFFF59E0B)
+                  : phaseColor.withValues(alpha: isDark ? 0.45 : 0.6),
+              width: node.isDecision ? 1.4 : 1.1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (node.isDecision ? const Color(0xFFF59E0B) : phaseColor).withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (node.isDecision) ...[
+                    const Icon(Icons.alt_route_rounded, size: 12, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 3),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: (node.isDecision ? const Color(0xFFF59E0B) : phaseColor).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      (node.isDecision ? 'DECISION' : node.phase).toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        color: node.isDecision ? const Color(0xFFF59E0B) : phaseColor,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                node.label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                  color: context.textPrimary,
+                ),
+              ),
+              if (node.description != null && node.description!.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  node.description!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10.5,
+                    height: 1.25,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showNodeDetailsDialog(FlowchartNode node) {
+    final phaseColor = _getPhaseColor(node.phase, context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.isDark ? const Color(0xFF1E2638) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: phaseColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: phaseColor.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                node.phase.toUpperCase(),
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: phaseColor),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              node.label,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: ctx.textPrimary,
+              ),
+            ),
+            if (node.description != null && node.description!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                node.description!,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: ctx.textSecondary,
+                ),
+              ),
+            ],
+            if (node.next.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Connected Steps: ${node.next.join(", ")}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: ctx.accent,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Close', style: TextStyle(color: ctx.textSecondary)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Visual Diagram & Flowchart Card (Interactive In-Chat UI) ────────────────
@@ -5012,7 +6164,7 @@ class _VisualDiagramCard extends StatefulWidget {
 }
 
 class _VisualDiagramCardState extends State<_VisualDiagramCard> {
-  bool _showMermaidCode = false;
+  int _activeTab = 0; // 0 = Flowchart Graph, 1 = Step Cards, 2 = Mermaid Code
   bool _isCollapsed = false;
 
   Color _getPhaseColor(String phase, BuildContext context) {
@@ -5041,6 +6193,12 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
     final rawNodes = widget.data['nodes'] as List?;
     final nodes = rawNodes?.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
     final mermaidCode = widget.data['mermaidCode']?.toString() ?? '';
+
+    final graph = MermaidFlowchartParser.parse(
+      mermaidCode,
+      defaultTitle: title,
+      fallbackNodes: nodes,
+    );
 
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 4),
@@ -5097,24 +6255,7 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                   ),
                 ),
               ),
-              if (mermaidCode.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: Icon(
-                    _showMermaidCode ? Icons.visibility_rounded : Icons.code_rounded,
-                    size: 15,
-                    color: context.textTertiary,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: _showMermaidCode ? 'Show Visual Flow' : 'Show Mermaid Syntax',
-                  onPressed: () {
-                    AppHaptics.selection();
-                    setState(() => _showMermaidCode = !_showMermaidCode);
-                  },
-                ),
-              ],
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               ScaleTap(
                 onPressed: () {
                   AppHaptics.tap();
@@ -5157,7 +6298,7 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
               child: Row(
                 children: [
                   Text(
-                    '${nodes.length} phase workflow ($diagramType) • Tap to expand chart',
+                    '${graph.nodes.length} nodes (${graph.edges.length} connections) • Tap to expand flowchart',
                     style: TextStyle(fontSize: 11, color: context.textSecondary),
                   ),
                   const Spacer(),
@@ -5166,109 +6307,161 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
               ),
             ),
           ] else ...[
-
-          if (summary != null && summary.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              summary,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 12,
-                height: 1.35,
-                color: context.textSecondary,
+            if (summary != null && summary.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                summary,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  height: 1.35,
+                  color: context.textSecondary,
+                ),
               ),
-            ),
-          ],
+            ],
 
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
 
-          if (_showMermaidCode && mermaidCode.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Mermaid Syntax',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
-                      ),
-                      BouncyPressable(
-                        onTap: () {
-                          Clipboard.setData(ClipboardData(text: mermaidCode));
-                          AppHaptics.tap();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Mermaid code copied to clipboard'), duration: Duration(seconds: 2)),
-                          );
-                        },
-                        child: Row(
-                          children: [
-                            Icon(Icons.copy_rounded, size: 12, color: context.accent),
-                            const SizedBox(width: 4),
-                            Text('Copy', style: TextStyle(fontSize: 11, color: context.accent, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  SelectableText(
-                    mermaidCode,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11.5,
-                      height: 1.35,
-                      color: Color(0xFF38BDF8),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            // Mode Selector Tabs (Flowchart, Step Cards, Mermaid Code)
+            Row(
               children: [
-                for (int i = 0; i < nodes.length; i++) ...[
-                  _buildNodeItem(nodes[i], i, i == nodes.length - 1),
-                  if (i < nodes.length - 1)
-                    Center(
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 3),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: context.accent.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.arrow_downward_rounded, size: 14, color: context.accent),
-                      ),
-                    ),
+                _buildModePill(0, Icons.account_tree_outlined, 'Flowchart'),
+                const SizedBox(width: 6),
+                _buildModePill(1, Icons.view_agenda_outlined, 'Steps'),
+                if (mermaidCode.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  _buildModePill(2, Icons.code_rounded, 'Mermaid'),
                 ],
               ],
             ),
+
+            const SizedBox(height: 10),
+
+            if (_activeTab == 0)
+              _FlowchartGraphView(graph: graph)
+            else if (_activeTab == 1)
+              _buildStepCardsList(graph.nodes)
+            else if (_activeTab == 2 && mermaidCode.isNotEmpty)
+              _buildMermaidCodeView(mermaidCode),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildNodeItem(Map<String, dynamic> node, int index, bool isLast) {
-    final rawLabel = node['label']?.toString() ?? 'Step ${index + 1}';
-    final cleanLabel = rawLabel.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n').trim();
-    final phase = node['phase']?.toString() ?? 'Step';
-    final rawDesc = node['description']?.toString();
-    final cleanDesc = rawDesc?.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n').trim();
-    final phaseColor = _getPhaseColor(phase, context);
+  Widget _buildModePill(int index, IconData icon, String label) {
+    final isSelected = _activeTab == index;
+    return ScaleTap(
+      onPressed: () {
+        AppHaptics.selection();
+        setState(() => _activeTab = index);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+        decoration: BoxDecoration(
+          color: isSelected ? context.accent : (context.isDark ? const Color(0xFF1B2230) : const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 11.5,
+              color: isSelected ? Colors.black : context.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? Colors.black : context.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    final labelLines = cleanLabel.split('\n').where((s) => s.trim().isNotEmpty).toList();
-    final title = labelLines.isNotEmpty ? labelLines.first.trim() : 'Step ${index + 1}';
-    final extraDetails = labelLines.length > 1 ? labelLines.sublist(1).join('\n').trim() : null;
+  Widget _buildMermaidCodeView(String code) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Mermaid Syntax',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+              ),
+              BouncyPressable(
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: code));
+                  AppHaptics.tap();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Mermaid code copied to clipboard'), duration: Duration(seconds: 2)),
+                  );
+                },
+                child: Row(
+                  children: [
+                    Icon(Icons.copy_rounded, size: 12, color: context.accent),
+                    const SizedBox(width: 4),
+                    Text('Copy', style: TextStyle(fontSize: 11, color: context.accent, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SelectableText(
+            code,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 11.5,
+              height: 1.35,
+              color: Color(0xFF38BDF8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepCardsList(List<FlowchartNode> nodes) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (int i = 0; i < nodes.length; i++) ...[
+          _buildNodeItem(nodes[i], i, i == nodes.length - 1),
+          if (i < nodes.length - 1)
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.arrow_downward_rounded, size: 14, color: context.accent),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildNodeItem(FlowchartNode node, int index, bool isLast) {
+    final phaseColor = _getPhaseColor(node.phase, context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -5276,7 +6469,9 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
         color: context.isDark ? const Color(0xFF1B2230) : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+          color: node.isDecision
+              ? const Color(0xFFF59E0B)
+              : (context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0)),
         ),
       ),
       child: Row(
@@ -5286,9 +6481,9 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              color: phaseColor.withValues(alpha: 0.18),
+              color: (node.isDecision ? const Color(0xFFF59E0B) : phaseColor).withValues(alpha: 0.18),
               shape: BoxShape.circle,
-              border: Border.all(color: phaseColor, width: 1.2),
+              border: Border.all(color: node.isDecision ? const Color(0xFFF59E0B) : phaseColor, width: 1.2),
             ),
             child: Center(
               child: Text(
@@ -5297,7 +6492,7 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                   fontFamily: 'Inter',
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
-                  color: phaseColor,
+                  color: node.isDecision ? const Color(0xFFF59E0B) : phaseColor,
                 ),
               ),
             ),
@@ -5311,7 +6506,7 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                   children: [
                     Expanded(
                       child: Text(
-                        title,
+                        node.label,
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12.5,
@@ -5323,25 +6518,25 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: phaseColor.withValues(alpha: 0.12),
+                        color: (node.isDecision ? const Color(0xFFF59E0B) : phaseColor).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        phase.toUpperCase(),
+                        (node.isDecision ? 'DECISION' : node.phase).toUpperCase(),
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 9,
                           fontWeight: FontWeight.w700,
-                          color: phaseColor,
+                          color: node.isDecision ? const Color(0xFFF59E0B) : phaseColor,
                         ),
                       ),
                     ),
                   ],
                 ),
-                if (extraDetails != null && extraDetails.isNotEmpty) ...[
+                if (node.description != null && node.description!.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(
-                    extraDetails,
+                    node.description!,
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 11.5,
@@ -5350,15 +6545,15 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                     ),
                   ),
                 ],
-                if (cleanDesc != null && cleanDesc.isNotEmpty) ...[
+                if (node.next.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(
-                    cleanDesc,
+                    '➔ Next: ${node.next.join(", ")}',
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 11.5,
-                      height: 1.3,
-                      color: context.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: context.accent,
                     ),
                   ),
                 ],
@@ -5561,197 +6756,20 @@ class _ProgressionChartCard extends StatelessWidget {
 }
 
 // ── Native Mermaid Diagram Renderer (Interactive In-Chat UI) ────────────────
-class _MermaidDiagramNativeCard extends StatefulWidget {
+class _MermaidDiagramNativeCard extends StatelessWidget {
   final String mermaidCode;
 
   const _MermaidDiagramNativeCard({required this.mermaidCode});
 
   @override
-  State<_MermaidDiagramNativeCard> createState() => _MermaidDiagramNativeCardState();
-}
-
-class _MermaidDiagramNativeCardState extends State<_MermaidDiagramNativeCard> {
-  bool _showCode = false;
-
-  List<Map<String, String>> _parseMermaidNodes(String code) {
-    final List<Map<String, String>> nodes = [];
-    final lines = code.split('\n');
-    final nodeRegex = RegExp(r'([A-Za-z0-9_]+)\s*\[\s*"?([^"\]]+)"?\s*\]');
-
-    for (final line in lines) {
-      final matches = nodeRegex.allMatches(line);
-      for (final m in matches) {
-        final id = m.group(1) ?? '';
-        final rawLabel = m.group(2) ?? '';
-        if (id.isNotEmpty && !nodes.any((n) => n['id'] == id)) {
-          final cleanLabel = rawLabel
-              .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-              .replaceAll(r'\n', '\n')
-              .trim();
-          nodes.add({'id': id, 'label': cleanLabel});
-        }
-      }
-    }
-    return nodes;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final nodes = _parseMermaidNodes(widget.mermaidCode);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF141923) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.isDark ? const Color(0x3364B5F6) : const Color(0xFF90CAF9),
-          width: 1.1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: context.accent.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.account_tree_rounded, size: 13, color: context.accent),
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  'Workflow Diagram',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: context.textPrimary,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  _showCode ? Icons.visibility_rounded : Icons.code_rounded,
-                  size: 14,
-                  color: context.textTertiary,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: _showCode ? 'View Flow' : 'View Code',
-                onPressed: () {
-                  AppHaptics.selection();
-                  setState(() => _showCode = !_showCode);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (_showCode || nodes.isEmpty)
-            SelectableText(
-              widget.mermaidCode,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 11,
-                height: 1.35,
-                color: Color(0xFF38BDF8),
-              ),
-            )
-          else
-            Column(
-              children: [
-                for (int i = 0; i < nodes.length; i++) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7.5),
-                    decoration: BoxDecoration(
-                      color: context.isDark ? const Color(0xFF1B2230) : Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 18,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            color: context.accent.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${i + 1}',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                color: context.accent,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Builder(
-                            builder: (context) {
-                              final text = nodes[i]['label'] ?? '';
-                              final lines = text.split('\n').where((s) => s.trim().isNotEmpty).toList();
-                              if (lines.isEmpty) return const SizedBox.shrink();
-                              final title = lines.first.trim();
-                              final details = lines.length > 1 ? lines.sublist(1).join('\n').trim() : null;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    title,
-                                    softWrap: true,
-                                    style: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: context.textPrimary,
-                                    ),
-                                  ),
-                                  if (details != null && details.isNotEmpty) ...[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      details,
-                                      softWrap: true,
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 11,
-                                        height: 1.3,
-                                        color: context.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (i < nodes.length - 1)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2.5),
-                      child: Icon(Icons.arrow_downward_rounded, size: 14, color: context.accent),
-                    ),
-                ],
-              ],
-            ),
-        ],
-      ),
+    return _VisualDiagramCard(
+      data: {
+        'title': 'Workflow Flowchart',
+        'diagramType': 'FLOWCHART',
+        'mermaidCode': mermaidCode,
+        'nodes': [],
+      },
     );
   }
 }
