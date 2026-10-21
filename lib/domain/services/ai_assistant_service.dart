@@ -12,6 +12,7 @@ import '../models/ai_chat_message.dart';
 import '../models/chibi_avatar_model.dart';
 import 'ai_tool_service.dart';
 import 'ai_memory_service.dart';
+import 'ai_model_fetcher_service.dart';
 import 'app_notification_service.dart';
 
 final aiAssistantServiceProvider = Provider<AiAssistantService>((ref) {
@@ -476,11 +477,8 @@ TODAY'S WORKOUT LOG ($dateFormatted):
         }
       } else {
         // Universal / OpenAI-compatible / Local AI (Ollama, LM Studio, etc.)
-        var base = config.baseUrl.trim();
-        if (base.endsWith('/')) base = base.substring(0, base.length - 1);
-        final url = Uri.parse(
-          base.endsWith('/chat/completions') ? base : '$base/chat/completions',
-        );
+        final resolvedEndpoint = AiModelFetcherService.resolveChatEndpoint(config.baseUrl);
+        final url = Uri.parse(resolvedEndpoint);
 
         final headers = <String, String>{
           'Content-Type': 'application/json',
@@ -784,11 +782,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
   }) async* {
     yield const AiThinkingEvent('Connecting to AI...');
 
-    var base = config.baseUrl.trim();
-    if (base.endsWith('/')) base = base.substring(0, base.length - 1);
-    final endpoint = Uri.parse(
-      base.endsWith('/chat/completions') ? base : '$base/chat/completions',
-    );
+    final resolvedEndpoint = AiModelFetcherService.resolveChatEndpoint(config.baseUrl);
+    final endpoint = Uri.parse(resolvedEndpoint);
 
     final athleteProfile = await _getAthleteProfilePrompt();
     final todayWorkoutContext = await _getTodayWorkoutContextPrompt();

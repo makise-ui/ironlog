@@ -1325,7 +1325,10 @@ class _ProfileEditorSheetState extends ConsumerState<_ProfileEditorSheet> {
                   TextField(
                     controller: _baseUrlController,
                     style: TextStyle(fontSize: 13, color: context.textPrimary, fontFamily: 'monospace'),
-                    decoration: _inputDecoration('e.g. https://api.kilo.ai/api/gateway'),
+                    decoration: _inputDecoration('e.g. https://api.kilo.ai/api/gateway').copyWith(
+                      helperText: 'Direct base URL (e.g. /gateway for Kilo, /v1 for OpenAI). /models is queried directly.',
+                      helperStyle: TextStyle(fontSize: 10.5, color: context.textTertiary),
+                    ),
                   ),
                   const SizedBox(height: 12),
 

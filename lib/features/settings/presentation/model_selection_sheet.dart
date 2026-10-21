@@ -5,6 +5,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/bouncy_pressable.dart';
 import '../../../domain/models/remote_ai_model.dart';
+import '../../../domain/services/ai_model_fetcher_service.dart';
 
 class ModelSelectionSheet extends StatefulWidget {
   final List<RemoteAiModel> models;
@@ -86,14 +87,6 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final filtered = _filteredModels;
     final freeCount = widget.models.where((m) => m.isFree).length;
-
-    String host = '';
-    try {
-      final uri = Uri.parse(widget.endpointUrl);
-      host = uri.host.isNotEmpty ? uri.host : widget.endpointUrl;
-    } catch (_) {
-      host = widget.endpointUrl;
-    }
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -178,7 +171,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              host,
+                              AiModelFetcherService.resolveModelsEndpoint(widget.endpointUrl),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: context.textTertiary,
