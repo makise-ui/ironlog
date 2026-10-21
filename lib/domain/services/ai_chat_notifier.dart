@@ -798,6 +798,12 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
           return 'Exercise guide ready';
         case 'get_exercise_image':
           return 'Demonstration visual ready';
+        case 'get_multiple_exercise_images':
+          return 'Exercise visuals batch ready';
+        case 'render_visual_diagram':
+          return 'Visual diagram ready';
+        case 'render_progression_chart':
+          return 'Progression chart ready';
         default:
           return '$toolName finished';
       }

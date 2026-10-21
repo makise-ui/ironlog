@@ -82,6 +82,33 @@ class ExerciseImageSearchService {
     _memorySearchCache[exerciseName.trim().toLowerCase()] = results;
   }
 
+  /// Retrieves verified images for multiple exercises simultaneously in parallel.
+  /// Top gym movements resolve in 0ms via static table; cached in <2ms; uncached fetched concurrently.
+  static Future<Map<String, String?>> searchMultipleExerciseImages(
+    List<String> exerciseNames,
+  ) async {
+    final Map<String, String?> results = {};
+    if (exerciseNames.isEmpty) return results;
+
+    final futures = exerciseNames.map((name) async {
+      final clean = name.trim();
+      if (clean.isEmpty) return MapEntry(name, null);
+      try {
+        final candidates = await searchWebExerciseImages(clean);
+        final url = candidates.isNotEmpty ? candidates.first.fullUrl : null;
+        return MapEntry(name, url);
+      } catch (_) {
+        return MapEntry(name, null);
+      }
+    });
+
+    final entries = await Future.wait(futures);
+    for (final entry in entries) {
+      results[entry.key] = entry.value;
+    }
+    return results;
+  }
+
   /// Searches demonstration images with instant static and disk cache priority (<1ms),
   /// falling back to fast web search.
   static Future<List<ExerciseImageCandidate>> searchWebExerciseImages(String exerciseName) async {

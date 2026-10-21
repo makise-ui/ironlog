@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -1783,6 +1784,31 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
                   onStartNow: (title, exercises) => _handleStartPresetWorkout(title, exercises),
                   onAskChanges: (prompt) => _handleAskPresetChanges(prompt),
                 ),
+
+          // ── Multi-Exercise Visuals Gallery (Interactive In-Chat) ─────────────
+          if (!isUser && msg.toolResults != null)
+            for (final tr in msg.toolResults!)
+              if (tr.toolName == 'get_multiple_exercise_images' && tr.data != null && tr.data is Map)
+                _MultiExerciseVisualsCard(
+                  data: Map<String, dynamic>.from(tr.data as Map),
+                  onAskExercise: (exName) => _handleAskAboutExercise(exName),
+                ),
+
+          // ── Visual Diagram & Flowchart Card (Interactive In-Chat) ───────────
+          if (!isUser && msg.toolResults != null)
+            for (final tr in msg.toolResults!)
+              if (tr.toolName == 'render_visual_diagram' && tr.data != null && tr.data is Map)
+                _VisualDiagramCard(
+                  data: Map<String, dynamic>.from(tr.data as Map),
+                ),
+
+          // ── Progression Chart Card (Interactive In-Chat) ────────────────────
+          if (!isUser && msg.toolResults != null)
+            for (final tr in msg.toolResults!)
+              if (tr.toolName == 'render_progression_chart' && tr.data != null && tr.data is Map)
+                _ProgressionChartCard(
+                  data: Map<String, dynamic>.from(tr.data as Map),
+                ),
         ],
       ),
     );
@@ -1898,6 +1924,52 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     required bool isUser,
     bool isStreaming = false,
   }) {
+    // If the message contains a ```mermaid block, parse and render as interactive visual flowchart
+    final mermaidRegex = RegExp(r'```(?:mermaid)?\s*([\s\S]*?graph\s+(?:TD|LR|TB|BT)[\s\S]*?)```', caseSensitive: false);
+    if (!isUser && mermaidRegex.hasMatch(text)) {
+      final matches = mermaidRegex.allMatches(text).toList();
+      final List<Widget> children = [];
+      int lastIndex = 0;
+
+      for (final match in matches) {
+        if (match.start > lastIndex) {
+          final chunk = text.substring(lastIndex, match.start).trim();
+          if (chunk.isNotEmpty) {
+            children.add(_buildMarkdownBodyOnly(chunk, isUser: isUser));
+          }
+        }
+
+        final mermaidContent = match.group(1)?.trim() ?? '';
+        if (mermaidContent.isNotEmpty) {
+          children.add(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: _MermaidDiagramNativeCard(mermaidCode: mermaidContent),
+            ),
+          );
+        }
+
+        lastIndex = match.end;
+      }
+
+      if (lastIndex < text.length) {
+        final remaining = text.substring(lastIndex).trim();
+        if (remaining.isNotEmpty) {
+          children.add(_buildMarkdownBodyOnly(remaining, isUser: isUser));
+        }
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      );
+    }
+
+    return _buildMarkdownBodyOnly(text, isUser: isUser);
+  }
+
+  Widget _buildMarkdownBodyOnly(String text, {required bool isUser}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -2090,6 +2162,10 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
 
   void _handleAskPresetChanges(String prompt) {
     _handleSend(prompt);
+  }
+
+  void _handleAskAboutExercise(String exerciseName) {
+    _handleSend('Can you explain proper form cues, muscle targets, and tips for $exerciseName?');
   }
 }
 
@@ -2703,7 +2779,7 @@ class _AgentQuestionCardState extends State<_AgentQuestionCard> {
 
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 4),
-      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.94),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: context.isDark ? const Color(0xFF161B26) : const Color(0xFFF1F5F9),
@@ -2814,78 +2890,168 @@ class _AgentQuestionCardState extends State<_AgentQuestionCard> {
           ),
           const SizedBox(height: 10),
 
-          // Option chips
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final opt in options)
-                BouncyPressable(
-                  onTap: isAnswered ? null : () => widget.onAnswer(opt),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: selectedOption == opt
-                          ? context.accent
-                          : (context.isDark ? const Color(0xFF1E2433) : Colors.white),
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(
+          // Option choices - handles both long sentences (full-width) & short tags without any overflow
+          if (options.any((o) => o.length > 22)) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final opt in options)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: BouncyPressable(
+                      onTap: isAnswered ? null : () => widget.onAnswer(opt),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
+                        decoration: BoxDecoration(
+                          color: selectedOption == opt
+                              ? context.accent
+                              : (context.isDark ? const Color(0xFF1E2433) : Colors.white),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: selectedOption == opt
+                                ? context.accent
+                                : (context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFCBD5E1)),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (selectedOption == opt) ...[
+                              const Icon(Icons.check_circle_rounded, size: 15, color: Colors.black),
+                              const SizedBox(width: 8),
+                            ],
+                            Expanded(
+                              child: Text(
+                                opt,
+                                softWrap: true,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                  color: selectedOption == opt
+                                      ? Colors.black
+                                      : context.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (isAnswered && !options.contains(selectedOption))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
+                      decoration: BoxDecoration(
+                        color: context.accent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, size: 15, color: Colors.black),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              selectedOption,
+                              softWrap: true,
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12.5,
+                                height: 1.35,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ] else ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final opt in options)
+                  BouncyPressable(
+                    onTap: isAnswered ? null : () => widget.onAnswer(opt),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
                         color: selectedOption == opt
                             ? context.accent
-                            : (context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFCBD5E1)),
-                        width: 1.0,
+                            : (context.isDark ? const Color(0xFF1E2433) : Colors.white),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: selectedOption == opt
+                              ? context.accent
+                              : (context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFCBD5E1)),
+                          width: 1.0,
+                        ),
                       ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (selectedOption == opt) ...[
+                            const Icon(Icons.check_rounded, size: 13, color: Colors.black),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              opt,
+                              softWrap: true,
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: selectedOption == opt
+                                    ? Colors.black
+                                    : context.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (isAnswered && !options.contains(selectedOption))
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: context.accent,
+                      borderRadius: BorderRadius.circular(9),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (selectedOption == opt) ...[
-                          const Icon(Icons.check_rounded, size: 13, color: Colors.black),
-                          const SizedBox(width: 4),
-                        ],
-                        Text(
-                          opt,
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: selectedOption == opt
-                                ? Colors.black
-                                : context.textPrimary,
+                        const Icon(Icons.check_rounded, size: 13, color: Colors.black),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            selectedOption,
+                            softWrap: true,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-
-              // If answered with a custom option that wasn't in preset chips
-              if (isAnswered && !options.contains(selectedOption))
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: context.accent,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_rounded, size: 13, color: Colors.black),
-                      const SizedBox(width: 4),
-                      Text(
-                        selectedOption,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+              ],
+            ),
+          ],
 
           // Custom Write-In Option when not answered
           if (!isAnswered) ...[
@@ -2910,13 +3076,16 @@ class _AgentQuestionCardState extends State<_AgentQuestionCard> {
                     children: [
                       Icon(Icons.edit_note_rounded, size: 14, color: context.accent),
                       const SizedBox(width: 5),
-                      Text(
-                        'Write custom answer...',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: context.accent,
+                      Flexible(
+                        child: Text(
+                          'Write custom answer...',
+                          softWrap: true,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: context.accent,
+                          ),
                         ),
                       ),
                     ],
@@ -3998,6 +4167,857 @@ class _ManageMemoriesSheetState extends ConsumerState<_ManageMemoriesSheet> {
     );
   }
 }
+
+// ── Multi-Exercise Visuals Gallery (Interactive In-Chat UI) ─────────────────
+class _MultiExerciseVisualsCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final Function(String exerciseName) onAskExercise;
+
+  const _MultiExerciseVisualsCard({
+    required this.data,
+    required this.onAskExercise,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rawItems = data['items'] as List?;
+    final items = rawItems?.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.94),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF141923) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDark ? const Color(0x3364B5F6) : const Color(0xFF90CAF9),
+          width: 1.1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.collections_rounded, size: 14, color: context.accent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Exercise Visuals & Targets',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${items.length} MOVEMENTS',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: context.accent,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 196,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: items.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final name = item['name']?.toString() ?? 'Exercise';
+                final imgUrl = item['imageUrl']?.toString();
+                final muscle = item['primaryMuscle']?.toString() ?? 'General';
+
+                return Container(
+                  width: 154,
+                  decoration: BoxDecoration(
+                    color: context.isDark ? const Color(0xFF1B2230) : Colors.white,
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Image Thumbnail
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                        child: Container(
+                          height: 94,
+                          width: double.infinity,
+                          color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFF1F5F9),
+                          child: (imgUrl != null && imgUrl.isNotEmpty)
+                              ? Image.network(
+                                  imgUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Center(
+                                    child: Icon(Icons.fitness_center_rounded, size: 28, color: context.textTertiary),
+                                  ),
+                                )
+                              : Center(
+                                  child: Icon(Icons.fitness_center_rounded, size: 28, color: context.textTertiary),
+                                ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                height: 1.25,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: context.accent.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    muscle.toUpperCase(),
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.accent,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            BouncyPressable(
+                              onTap: () {
+                                AppHaptics.selection();
+                                onAskExercise(name);
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Ask Cues',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: context.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Visual Diagram & Flowchart Card (Interactive In-Chat UI) ────────────────
+class _VisualDiagramCard extends StatefulWidget {
+  final Map<String, dynamic> data;
+
+  const _VisualDiagramCard({required this.data});
+
+  @override
+  State<_VisualDiagramCard> createState() => _VisualDiagramCardState();
+}
+
+class _VisualDiagramCardState extends State<_VisualDiagramCard> {
+  bool _showMermaidCode = false;
+
+  Color _getPhaseColor(String phase, BuildContext context) {
+    final lower = phase.toLowerCase();
+    if (lower.contains('warm')) return const Color(0xFFF59E0B);
+    if (lower.contains('compound') || lower.contains('heavy') || lower.contains('primary')) {
+      return context.accent;
+    }
+    if (lower.contains('accessory') || lower.contains('hypertrophy') || lower.contains('secondary')) {
+      return const Color(0xFF8B5CF6);
+    }
+    if (lower.contains('finish') || lower.contains('pump') || lower.contains('burn')) {
+      return const Color(0xFF10B981);
+    }
+    if (lower.contains('rest') || lower.contains('deload')) {
+      return const Color(0xFF64748B);
+    }
+    return context.accent;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = widget.data['title']?.toString() ?? 'Visual Flowchart';
+    final diagramType = widget.data['diagramType']?.toString().toUpperCase() ?? 'FLOWCHART';
+    final summary = widget.data['summary']?.toString();
+    final rawNodes = widget.data['nodes'] as List?;
+    final nodes = rawNodes?.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+    final mermaidCode = widget.data['mermaidCode']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.94),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF141923) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDark ? const Color(0x3364B5F6) : const Color(0xFF90CAF9),
+          width: 1.1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.account_tree_rounded, size: 14, color: context.accent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  diagramType,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: context.accent,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              if (mermaidCode.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: Icon(
+                    _showMermaidCode ? Icons.visibility_rounded : Icons.code_rounded,
+                    size: 15,
+                    color: context.textTertiary,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: _showMermaidCode ? 'Show Visual Flow' : 'Show Mermaid Syntax',
+                  onPressed: () {
+                    AppHaptics.selection();
+                    setState(() => _showMermaidCode = !_showMermaidCode);
+                  },
+                ),
+              ],
+            ],
+          ),
+
+          if (summary != null && summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              summary,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                height: 1.35,
+                color: context.textSecondary,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 10),
+
+          if (_showMermaidCode && mermaidCode.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Mermaid Syntax',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+                      ),
+                      BouncyPressable(
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: mermaidCode));
+                          AppHaptics.tap();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Mermaid code copied to clipboard'), duration: Duration(seconds: 2)),
+                          );
+                        },
+                        child: Row(
+                          children: [
+                            Icon(Icons.copy_rounded, size: 12, color: context.accent),
+                            const SizedBox(width: 4),
+                            Text('Copy', style: TextStyle(fontSize: 11, color: context.accent, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  SelectableText(
+                    mermaidCode,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: Color(0xFF38BDF8),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (int i = 0; i < nodes.length; i++) ...[
+                  _buildNodeItem(nodes[i], i, i == nodes.length - 1),
+                  if (i < nodes.length - 1)
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: context.accent.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.arrow_downward_rounded, size: 14, color: context.accent),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNodeItem(Map<String, dynamic> node, int index, bool isLast) {
+    final label = node['label']?.toString() ?? 'Step ${index + 1}';
+    final phase = node['phase']?.toString() ?? 'Step';
+    final desc = node['description']?.toString();
+    final phaseColor = _getPhaseColor(phase, context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF1B2230) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: phaseColor.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+              border: Border.all(color: phaseColor, width: 1.2),
+            ),
+            child: Center(
+              child: Text(
+                '${index + 1}',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  color: phaseColor,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: phaseColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        phase.toUpperCase(),
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: phaseColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (desc != null && desc.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    desc,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: context.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Progression Chart Card (Interactive In-Chat UI) ─────────────────────────
+class _ProgressionChartCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+
+  const _ProgressionChartCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = data['title']?.toString() ?? 'Progression Chart';
+    final unit = data['unit']?.toString() ?? 'kg';
+    final summary = data['summary']?.toString();
+    final rawPoints = data['dataPoints'] as List?;
+    final points = rawPoints?.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+
+    if (points.isEmpty) return const SizedBox.shrink();
+
+    final values = points.map((p) => (p['value'] as num?)?.toDouble() ?? 0.0).toList();
+    final minVal = values.reduce((a, b) => a < b ? a : b);
+    final maxVal = values.reduce((a, b) => a > b ? a : b);
+    final double minY = (minVal * 0.9).clamp(0.0, double.infinity);
+    final double maxY = maxVal > minY ? maxVal * 1.15 : minY + 10;
+    final gain = maxVal - minVal;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.94),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF141923) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.isDark ? const Color(0x3364B5F6) : const Color(0xFF90CAF9),
+          width: 1.1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.trending_up_rounded, size: 14, color: context.accent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '+${gain.toStringAsFixed(1)} $unit',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: context.accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (summary != null && summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              summary,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                height: 1.35,
+                color: context.textSecondary,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          SizedBox(
+            height: 160,
+            child: LineChart(
+              LineChartData(
+                minY: minY,
+                maxY: maxY,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: ((maxY - minY) / 3).clamp(1.0, double.infinity),
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: context.isDark ? const Color(0x1AFFFFFF) : const Color(0x1F000000),
+                    strokeWidth: 1,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 34,
+                      interval: ((maxY - minY) / 3).clamp(1.0, double.infinity),
+                      getTitlesWidget: (value, meta) => Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontFamily: 'Inter',
+                          color: context.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 22,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx >= 0 && idx < points.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              points[idx]['label']?.toString() ?? '',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontFamily: 'Inter',
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: points.asMap().entries.map((entry) {
+                      final val = (entry.value['value'] as num?)?.toDouble() ?? 0.0;
+                      return FlSpot(entry.key.toDouble(), val);
+                    }).toList(),
+                    isCurved: true,
+                    curveSmoothness: 0.35,
+                    color: context.accent,
+                    barWidth: 2.8,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          context.accent.withValues(alpha: 0.3),
+                          context.accent.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Native Mermaid Diagram Renderer (Interactive In-Chat UI) ────────────────
+class _MermaidDiagramNativeCard extends StatefulWidget {
+  final String mermaidCode;
+
+  const _MermaidDiagramNativeCard({required this.mermaidCode});
+
+  @override
+  State<_MermaidDiagramNativeCard> createState() => _MermaidDiagramNativeCardState();
+}
+
+class _MermaidDiagramNativeCardState extends State<_MermaidDiagramNativeCard> {
+  bool _showCode = false;
+
+  List<Map<String, String>> _parseMermaidNodes(String code) {
+    final List<Map<String, String>> nodes = [];
+    final lines = code.split('\n');
+    final nodeRegex = RegExp(r'([A-Za-z0-9_]+)\s*\[\s*"?([^"\]]+)"?\s*\]');
+
+    for (final line in lines) {
+      final matches = nodeRegex.allMatches(line);
+      for (final m in matches) {
+        final id = m.group(1) ?? '';
+        final label = m.group(2) ?? '';
+        if (id.isNotEmpty && !nodes.any((n) => n['id'] == id)) {
+          nodes.add({'id': id, 'label': label.trim()});
+        }
+      }
+    }
+    return nodes;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nodes = _parseMermaidNodes(widget.mermaidCode);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF141923) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: context.isDark ? const Color(0x3364B5F6) : const Color(0xFF90CAF9),
+          width: 1.1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.account_tree_rounded, size: 13, color: context.accent),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Workflow Diagram',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  _showCode ? Icons.visibility_rounded : Icons.code_rounded,
+                  size: 14,
+                  color: context.textTertiary,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: _showCode ? 'View Flow' : 'View Code',
+                onPressed: () {
+                  AppHaptics.selection();
+                  setState(() => _showCode = !_showCode);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_showCode || nodes.isEmpty)
+            SelectableText(
+              widget.mermaidCode,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 11,
+                height: 1.35,
+                color: Color(0xFF38BDF8),
+              ),
+            )
+          else
+            Column(
+              children: [
+                for (int i = 0; i < nodes.length; i++) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7.5),
+                    decoration: BoxDecoration(
+                      color: context.isDark ? const Color(0xFF1B2230) : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: context.accent.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${i + 1}',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: context.accent,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            nodes[i]['label'] ?? '',
+                            softWrap: true,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (i < nodes.length - 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2.5),
+                      child: Icon(Icons.arrow_downward_rounded, size: 14, color: context.accent),
+                    ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 
 
 

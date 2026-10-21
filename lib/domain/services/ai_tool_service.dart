@@ -840,6 +840,116 @@ class AiToolService {
             },
           },
         },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'get_multiple_exercise_images',
+            'description': 'Retrieve demonstration visuals, equipment details, and muscle targets for multiple exercises simultaneously in a single fast parallel batch call. Call this whenever recommending or explaining 2 or more exercises so all visuals load together in one go.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'exerciseNames': {
+                  'type': 'array',
+                  'items': {'type': 'string'},
+                  'description': 'List of exercise names (e.g. ["Barbell Bench Press", "Incline Dumbbell Press", "Dips", "Cable Flyes"]).',
+                },
+              },
+              'required': ['exerciseNames'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'render_visual_diagram',
+            'description': 'Render an interactive visual flowchart, routine roadmap, periodization timeline, or decision tree in the chat. Use this to visually walk the athlete through workout order, split layout, warm-up flow, or plateau breakthroughs.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'title': {
+                  'type': 'string',
+                  'description': 'Title of the diagram (e.g. "Push Day Execution Flow", "Plateau Breakthrough Decision Tree").',
+                },
+                'diagramType': {
+                  'type': 'string',
+                  'enum': ['flowchart', 'timeline', 'decision_tree', 'split_overview'],
+                  'description': 'Category of visual diagram.',
+                },
+                'summary': {
+                  'type': 'string',
+                  'description': 'Brief coach explanation of the diagram.',
+                },
+                'nodes': {
+                  'type': 'array',
+                  'items': {
+                    'type': 'object',
+                    'properties': {
+                      'id': {'type': 'string', 'description': 'Unique node identifier (e.g. "1", "2")'},
+                      'label': {'type': 'string', 'description': 'Step or exercise name'},
+                      'phase': {'type': 'string', 'description': 'Phase badge: Warm-up, Compound, Accessory, Finisher, Rest, Decision'},
+                      'description': {'type': 'string', 'description': 'Sets x reps, key cues, or decision branches'},
+                      'next': {
+                        'type': 'array',
+                        'items': {'type': 'string'},
+                        'description': 'Next connected node IDs in the sequence',
+                      },
+                    },
+                    'required': ['id', 'label'],
+                  },
+                  'description': 'Ordered nodes and connections in the diagram.',
+                },
+                'mermaidCode': {
+                  'type': 'string',
+                  'description': 'Optional raw Mermaid.js graph definition (e.g. "graph TD\\nA[Dynamic Warm-up] --> B[Bench Press 4x6]\\nB --> C[Incline DB Press 3x10]").',
+                },
+              },
+              'required': ['title', 'nodes'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'render_progression_chart',
+            'description': 'Render an interactive visual line or bar progression chart in the chat. Use this to visually illustrate strength progression, load forecasts over weeks, volume accumulation, or rep-max trends.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'title': {
+                  'type': 'string',
+                  'description': 'Title of the chart (e.g. "Bench Press 8-Week Linear Progression Forecast").',
+                },
+                'chartType': {
+                  'type': 'string',
+                  'enum': ['line', 'bar'],
+                  'description': 'Type of chart.',
+                },
+                'unit': {
+                  'type': 'string',
+                  'description': 'Unit of measurement (e.g. "kg", "lbs", "sets", "reps").',
+                },
+                'summary': {
+                  'type': 'string',
+                  'description': 'Coach takeaway or interpretation of the graph.',
+                },
+                'dataPoints': {
+                  'type': 'array',
+                  'items': {
+                    'type': 'object',
+                    'properties': {
+                      'label': {'type': 'string', 'description': 'X-axis label (e.g. "W1", "W2", "W3", "Day 1")'},
+                      'value': {'type': 'number', 'description': 'Y-axis value (e.g. 70.0, 72.5, 75.0)'},
+                      'note': {'type': 'string', 'description': 'Optional milestone note'},
+                    },
+                    'required': ['label', 'value'],
+                  },
+                  'description': 'Ordered list of data points to plot.',
+                },
+              },
+              'required': ['title', 'dataPoints'],
+            },
+          },
+        },
       ];
 
   /// Execute a tool by name with arguments
@@ -1068,6 +1178,32 @@ class AiToolService {
         case 'get_nutrition_overview':
           return await _executeGetNutritionOverview(
             dateStr: call.arguments['date']?.toString(),
+          );
+        case 'get_multiple_exercise_images':
+          final rawNames = call.arguments['exerciseNames'];
+          final names = rawNames is List
+              ? rawNames.map((e) => e.toString()).toList()
+              : <String>[];
+          return await _executeGetMultipleExerciseImages(names);
+        case 'render_visual_diagram':
+          final rawNodes = call.arguments['nodes'];
+          final nodes = rawNodes is List ? rawNodes : <dynamic>[];
+          return await _executeRenderVisualDiagram(
+            title: call.arguments['title']?.toString() ?? 'Visual Flowchart',
+            diagramType: call.arguments['diagramType']?.toString() ?? 'flowchart',
+            summary: call.arguments['summary']?.toString(),
+            nodes: nodes,
+            mermaidCode: call.arguments['mermaidCode']?.toString(),
+          );
+        case 'render_progression_chart':
+          final rawPoints = call.arguments['dataPoints'];
+          final points = rawPoints is List ? rawPoints : <dynamic>[];
+          return await _executeRenderProgressionChart(
+            title: call.arguments['title']?.toString() ?? 'Progression Chart',
+            chartType: call.arguments['chartType']?.toString() ?? 'line',
+            unit: call.arguments['unit']?.toString() ?? 'kg',
+            summary: call.arguments['summary']?.toString(),
+            dataPoints: points,
           );
         case 'export_backup':
           return await _executeExportBackup();
@@ -3340,6 +3476,157 @@ class AiToolService {
         'trackingType': matched != null ? matched.trackingType.name : 'standard',
         'imageUrl': imageUrl,
         'markdownImageTag': imageUrl != null ? '![$imageTitle]($imageUrl)' : null,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeGetMultipleExerciseImages(
+    List<String> exerciseNames,
+  ) async {
+    final cleanNames = exerciseNames
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .take(12)
+        .toList();
+
+    if (cleanNames.isEmpty) {
+      return const AiToolExecutionResult(
+        toolName: 'get_multiple_exercise_images',
+        success: false,
+        summary: 'No exercise names provided.',
+      );
+    }
+
+    final exRepo = _ref.read(exerciseRepositoryProvider);
+    final allEx = await exRepo.getExercises();
+
+    // Fast parallel image retrieval (0ms static, <2ms disk cache, parallel network)
+    final imagesMap = await ExerciseImageSearchService.searchMultipleExerciseImages(cleanNames);
+
+    final List<Map<String, dynamic>> items = [];
+    final StringBuffer mdSummary = StringBuffer();
+
+    for (final name in cleanNames) {
+      final matched = allEx.where((e) => e.name.toLowerCase() == name.toLowerCase()).firstOrNull ??
+          allEx.where((e) => e.name.toLowerCase().contains(name.toLowerCase())).firstOrNull;
+
+      final imgUrl = imagesMap[name];
+      final primaryMuscle = matched?.muscleGroupId ?? 'General';
+      final equipment = matched?.equipment.name ?? 'Gym equipment';
+
+      items.add({
+        'name': matched?.name ?? name,
+        'imageUrl': imgUrl,
+        'primaryMuscle': primaryMuscle,
+        'equipment': equipment,
+        'trackingType': matched?.trackingType.name ?? 'standard',
+        'markdownImageTag': imgUrl != null ? '![$name]($imgUrl)' : null,
+      });
+
+      if (imgUrl != null) {
+        mdSummary.writeln('![$name]($imgUrl)\n*$name* (${primaryMuscle.toUpperCase()})\n');
+      }
+    }
+
+    return AiToolExecutionResult(
+      toolName: 'get_multiple_exercise_images',
+      success: true,
+      summary: 'Retrieved demonstration visuals for ${items.length} exercises in one batch.',
+      data: {
+        'count': items.length,
+        'items': items,
+        'markdownGallery': mdSummary.toString().trim(),
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeRenderVisualDiagram({
+    required String title,
+    required String diagramType,
+    String? summary,
+    required List<dynamic> nodes,
+    String? mermaidCode,
+  }) async {
+    final parsedNodes = <Map<String, dynamic>>[];
+    for (int i = 0; i < nodes.length; i++) {
+      final node = nodes[i];
+      if (node is Map) {
+        final rawNext = node['next'];
+        final nextList = rawNext is List
+            ? rawNext.map((e) => e.toString()).toList()
+            : (i < nodes.length - 1 ? ['${i + 2}'] : <String>[]);
+
+        parsedNodes.add({
+          'id': node['id']?.toString() ?? '${i + 1}',
+          'label': node['label']?.toString() ?? 'Step ${i + 1}',
+          'phase': node['phase']?.toString() ?? 'Step',
+          'description': node['description']?.toString(),
+          'next': nextList,
+        });
+      }
+    }
+
+    // Auto-generate mermaid syntax if none provided
+    String generatedMermaid = mermaidCode ?? '';
+    if (generatedMermaid.isEmpty && parsedNodes.isNotEmpty) {
+      final sb = StringBuffer('graph TD\n');
+      for (final n in parsedNodes) {
+        final id = n['id'];
+        final label = n['label'].toString().replaceAll('[', '(').replaceAll(']', ')');
+        sb.writeln('  $id["$label"]');
+        final nextList = n['next'] as List<String>;
+        for (final nxt in nextList) {
+          sb.writeln('  $id --> $nxt');
+        }
+      }
+      generatedMermaid = sb.toString();
+    }
+
+    return AiToolExecutionResult(
+      toolName: 'render_visual_diagram',
+      success: true,
+      summary: 'Rendered visual diagram: $title (${parsedNodes.length} steps)',
+      data: {
+        'title': title,
+        'diagramType': diagramType,
+        'summary': summary,
+        'nodes': parsedNodes,
+        'mermaidCode': generatedMermaid,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeRenderProgressionChart({
+    required String title,
+    required String chartType,
+    required String unit,
+    String? summary,
+    required List<dynamic> dataPoints,
+  }) async {
+    final parsedPoints = <Map<String, dynamic>>[];
+    for (final dp in dataPoints) {
+      if (dp is Map) {
+        final label = dp['label']?.toString() ?? '';
+        final val = _asDouble(dp['value']) ?? 0.0;
+        final note = dp['note']?.toString();
+        parsedPoints.add({
+          'label': label,
+          'value': val,
+          'note': note,
+        });
+      }
+    }
+
+    return AiToolExecutionResult(
+      toolName: 'render_progression_chart',
+      success: true,
+      summary: 'Rendered progression chart: $title (${parsedPoints.length} points)',
+      data: {
+        'title': title,
+        'chartType': chartType,
+        'unit': unit,
+        'summary': summary,
+        'dataPoints': parsedPoints,
       },
     );
   }

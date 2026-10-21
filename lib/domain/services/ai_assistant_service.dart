@@ -618,9 +618,15 @@ CRITICAL RULES FOR ATHLETE MEMORY (PERSISTENCE ACROSS SESSIONS):
 4. Always strictly respect remembered conditions and limitations in all workout planning and exercise recommendations.
 
 CRITICAL RULES FOR EXERCISE & WORKOUT EXPLANATIONS WITH INLINE DEMONSTRATION IMAGES:
-1. Whenever the athlete asks how to perform an exercise, asks for form cues, asks about workout movements, or whenever you recommend an exercise, ALWAYS call `get_exercise_image(exerciseName: ...)` to retrieve web demonstration images.
-2. Place the returned demonstration image markdown `![Exercise Form](url)` directly under or right after the sentence that introduces or explains the exercise.
-3. This creates an intuitive visual guide where the demonstration image appears directly alongside the corresponding coaching sentence.
+1. Whenever the athlete asks how to perform an exercise, asks for form cues, asks about workout movements, or whenever you recommend an exercise, call `get_exercise_image(exerciseName: ...)` or `quick_exercise_guide` to retrieve demonstration images and cues.
+2. If you recommend or list 2 or more exercises (e.g. routine suggestions, alternate exercise options), ALWAYS call `get_multiple_exercise_images(exerciseNames: [...])` so all visuals and targets load simultaneously in a single fast batch.
+3. Place the returned demonstration image markdown `![Exercise Form](url)` directly under or right after the sentence that introduces or explains the exercise.
+4. This creates an intuitive visual guide where demonstration visuals appear directly alongside coaching cues.
+
+CRITICAL RULES FOR VISUAL DIAGRAMS, FLOWCHARTS & CHARTS:
+1. When explaining workout order, warm-up to compound to accessory flow, periodization splits, routine roadmap, or plateau decision trees, call `render_visual_diagram(title: ..., diagramType: ..., nodes: ..., mermaidCode: ...)` to render an interactive visual flowchart in the chat.
+2. When projecting strength progression, weight increases across weeks, 1RM trajectory, or volume loading, call `render_progression_chart(title: ..., chartType: ..., unit: ..., dataPoints: ...)` to render an interactive visual graph.
+3. You can also embed standard ```mermaid code blocks in your markdown explanations whenever diagrammatic clarity is helpful.
 
 CRITICAL RULES FOR WORKOUT PRESETS & ROUTINE RECOMMENDATIONS:
 1. Whenever the athlete asks for a workout plan, routine recommendation, split, preset, or asks to adjust/modify an existing workout plan (e.g. "Create a 4-day PPL", "Suggest a chest workout", "Show me an upper body routine", "Change the bench press to dumbbell in this routine"), ALWAYS call `preview_preset` to show an interactive visual preview card.
@@ -1172,6 +1178,12 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         return 'Loading exercise guide & visuals...';
       case 'get_exercise_image':
         return 'Retrieving demonstration visuals...';
+      case 'get_multiple_exercise_images':
+        return 'Retrieving exercise visuals batch...';
+      case 'render_visual_diagram':
+        return 'Generating visual diagram...';
+      case 'render_progression_chart':
+        return 'Plotting progression chart...';
       default:
         return 'Processing action...';
     }
