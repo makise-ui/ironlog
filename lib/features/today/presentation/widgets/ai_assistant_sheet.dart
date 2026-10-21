@@ -67,6 +67,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
   ChibiAvatar _companion = ChibiAvatar.aiko;
   String? _selectedImagePath;
   bool _showHistorySidebar = false;
+  bool _userScrolledUp = false;
 
   final List<String> _quickPrompts = [
     'What should I eat after today\'s workout?',
@@ -520,6 +521,7 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     _textController.clear();
     setState(() {
       _selectedImagePath = null;
+      _userScrolledUp = false;
     });
 
     ref.read(aiChatNotifierProvider.notifier).sendMessage(
@@ -575,14 +577,18 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     }
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool smooth = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+        if (smooth) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+          );
+        } else {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
       }
     });
   }
@@ -617,13 +623,22 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
     ref.listen<AiChatState>(aiChatNotifierProvider, (prev, next) {
       final prevLen = prev?.messages.length ?? 0;
       final nextLen = next.messages.length;
-      final isStreaming = next.messages.isNotEmpty && next.messages.last.isStreaming;
+      final isStreaming = next.isLoading || (next.messages.isNotEmpty && next.messages.last.isStreaming);
       final contentChanged = prev?.messages.isNotEmpty == true &&
           next.messages.isNotEmpty &&
           prev!.messages.last.content.length != next.messages.last.content.length;
 
-      if (prevLen != nextLen || (isStreaming && contentChanged)) {
+      if (prevLen != nextLen) {
+        _userScrolledUp = false;
         _scrollToBottom();
+      } else if (isStreaming && contentChanged) {
+        // ONLY autoscroll if user has NOT scrolled up to read higher content
+        if (!_userScrolledUp && _scrollController.hasClients) {
+          final distance = _scrollController.position.maxScrollExtent - _scrollController.position.pixels;
+          if (distance <= 90) {
+            _scrollToBottom(smooth: false);
+          }
+        }
       }
     });
 
@@ -848,17 +863,79 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
 
           // Messages Timeline
           Expanded(
-            child: messages.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = messages[index];
-                      return _buildMessageBubble(msg);
-                    },
+            child: Stack(
+              children: [
+                messages.isEmpty
+                    ? _buildEmptyState()
+                    : NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (_scrollController.hasClients) {
+                            final max = _scrollController.position.maxScrollExtent;
+                            final current = _scrollController.position.pixels;
+                            final distanceFromBottom = max - current;
+
+                            if (distanceFromBottom > 110 && !_userScrolledUp) {
+                              setState(() => _userScrolledUp = true);
+                            } else if (distanceFromBottom <= 30 && _userScrolledUp) {
+                              setState(() => _userScrolledUp = false);
+                            }
+                          }
+                          return false;
+                        },
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final msg = messages[index];
+                            return _buildMessageBubble(msg);
+                          },
+                        ),
+                      ),
+                if (_userScrolledUp)
+                  Positioned(
+                    bottom: 12,
+                    right: 16,
+                    child: ScaleTap(
+                      onPressed: () {
+                        AppHaptics.selection();
+                        setState(() => _userScrolledUp = false);
+                        _scrollToBottom();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: context.cardBg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: context.accent.withValues(alpha: 0.6), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_downward_rounded, size: 14, color: context.accent),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Scroll to bottom',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
+              ],
+            ),
           ),
 
           // Quick Prompt Pills

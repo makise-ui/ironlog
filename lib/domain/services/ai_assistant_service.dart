@@ -1162,6 +1162,16 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         return 'Exporting database backup...';
       case 'search_web':
         return 'Searching training knowledge...';
+      case 'calculate_1rm_and_plates':
+        return 'Calculating 1RM & plate loading...';
+      case 'search_exercise_catalog':
+        return 'Searching exercise library...';
+      case 'get_nutrition_overview':
+        return 'Retrieving nutrition & macro summary...';
+      case 'quick_exercise_guide':
+        return 'Loading exercise guide & visuals...';
+      case 'get_exercise_image':
+        return 'Retrieving demonstration visuals...';
       default:
         return 'Processing action...';
     }

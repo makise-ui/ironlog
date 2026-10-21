@@ -15,6 +15,8 @@ import '../../core/utils/unit_converter.dart';
 import '../models/ai_chat_message.dart';
 import 'ai_memory_service.dart';
 import 'exercise_image_search_service.dart';
+import 'plate_calculator.dart';
+import '../../features/nutrition/data/nutrition_service.dart';
 
 class AiToolService {
   final Ref _ref;
@@ -735,7 +737,7 @@ class AiToolService {
           'type': 'function',
           'function': {
             'name': 'get_exercise_image',
-            'description': 'Search the web for high-quality demonstration form images of a specific exercise or workout movement. Returns image URLs to embed inline into your explanation using markdown `![Exercise Form](url)`. Call this whenever explaining how to do an exercise or giving form cues.',
+            'description': 'Search for high-quality demonstration form images of a specific exercise or workout movement. Returns image URLs to embed inline into your explanation using markdown `![Exercise Form](url)`. Call this whenever explaining how to do an exercise or giving form cues.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -745,6 +747,96 @@ class AiToolService {
                 },
               },
               'required': ['exerciseName'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'quick_exercise_guide',
+            'description': 'Ultra-fast instant exercise guide with zero lag. Retrieves muscle groups worked, equipment, step-by-step form cues, common pitfalls, and verified demonstration image in a single instant response.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'exerciseName': {
+                  'type': 'string',
+                  'description': 'Name of the exercise (e.g. "Barbell Bench Press", "Romanian Deadlift", "Lat Pulldown").',
+                },
+              },
+              'required': ['exerciseName'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'calculate_1rm_and_plates',
+            'description': 'Calculate estimated One-Rep Max (1RM) using Epley & Brzycki scientific formulas, generate training percentage loads (60% to 95%), and determine exact barbell plate combinations per side for any target load.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'weight': {
+                  'type': 'number',
+                  'description': 'Weight lifted (in kg or lbs).',
+                },
+                'reps': {
+                  'type': 'integer',
+                  'description': 'Number of reps completed (e.g. 5, 8, 10).',
+                },
+                'targetWeight': {
+                  'type': 'number',
+                  'description': 'Optional specific target load to calculate plate loading for (defaults to calculated 1RM).',
+                },
+                'isLb': {
+                  'type': 'boolean',
+                  'description': 'Whether the athlete uses pounds (lbs). Defaults to false (kg).',
+                },
+              },
+              'required': ['weight', 'reps'],
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'search_exercise_catalog',
+            'description': 'Fast search across the 1,400+ exercise library by muscle group, equipment type, or search keyword. Returns matched exercises with equipment, target muscle, and tracking mode.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'query': {
+                  'type': 'string',
+                  'description': 'Search keyword (e.g., "incline", "pulldown", "curl", "squat").',
+                },
+                'muscleGroupId': {
+                  'type': 'string',
+                  'description': 'Filter by target muscle group (e.g., chest, back, shoulders, arms, legs, core, cardio).',
+                },
+                'equipment': {
+                  'type': 'string',
+                  'description': 'Filter by equipment type (e.g., barbell, dumbbell, cable, machine, bodyweight).',
+                },
+                'limit': {
+                  'type': 'integer',
+                  'description': 'Maximum number of exercises to return (default 8).',
+                },
+              },
+            },
+          },
+        },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'get_nutrition_overview',
+            'description': 'Retrieve today\'s (or past date\'s) nutrition summary, including total calories consumed, protein (g), carbs (g), fat (g), water intake (ml), and AI-calculated targets based on the user\'s workout and goals.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'date': {
+                  'type': 'string',
+                  'description': 'Date to query (e.g., "today", "yesterday", or "YYYY-MM-DD"). Defaults to today.',
+                },
+              },
             },
           },
         },
@@ -954,6 +1046,28 @@ class AiToolService {
         case 'get_exercise_image':
           return await _executeGetExerciseImage(
             exerciseName: call.arguments['exerciseName']?.toString() ?? '',
+          );
+        case 'quick_exercise_guide':
+          return await _executeQuickExerciseGuide(
+            exerciseName: call.arguments['exerciseName']?.toString() ?? '',
+          );
+        case 'calculate_1rm_and_plates':
+          return await _executeCalculate1rmAndPlates(
+            weight: _asDouble(call.arguments['weight']) ?? 0.0,
+            reps: _asInt(call.arguments['reps']) ?? 1,
+            targetWeight: _asDouble(call.arguments['targetWeight']),
+            isLb: call.arguments['isLb'] == true || call.arguments['isLb']?.toString() == 'true',
+          );
+        case 'search_exercise_catalog':
+          return await _executeSearchExerciseCatalog(
+            query: call.arguments['query']?.toString(),
+            muscleGroupId: call.arguments['muscleGroupId']?.toString(),
+            equipment: call.arguments['equipment']?.toString(),
+            limit: _asInt(call.arguments['limit']) ?? 8,
+          );
+        case 'get_nutrition_overview':
+          return await _executeGetNutritionOverview(
+            dateStr: call.arguments['date']?.toString(),
           );
         case 'export_backup':
           return await _executeExportBackup();
@@ -3029,6 +3143,203 @@ class AiToolService {
         'images': topImages,
         'primaryImageUrl': primaryUrl,
         'markdownTag': '![$primaryTitle]($primaryUrl)',
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeCalculate1rmAndPlates({
+    required double weight,
+    required int reps,
+    double? targetWeight,
+    bool isLb = false,
+  }) async {
+    if (weight <= 0 || reps <= 0) {
+      return const AiToolExecutionResult(
+        toolName: 'calculate_1rm_and_plates',
+        success: false,
+        summary: 'Weight and reps must be greater than zero.',
+      );
+    }
+
+    final epley1rm = E1rmCalculator.calculateEpley(weight, reps);
+    final brzycki1rm = reps < 37 ? weight * (36.0 / (37.0 - reps)) : epley1rm;
+    final estimated1rm = double.parse(((epley1rm + brzycki1rm) / 2.0).toStringAsFixed(1));
+
+    final percentages = {
+      '95%': (estimated1rm * 0.95).toStringAsFixed(1),
+      '90%': (estimated1rm * 0.90).toStringAsFixed(1),
+      '85%': (estimated1rm * 0.85).toStringAsFixed(1),
+      '80%': (estimated1rm * 0.80).toStringAsFixed(1),
+      '75%': (estimated1rm * 0.75).toStringAsFixed(1),
+      '70%': (estimated1rm * 0.70).toStringAsFixed(1),
+      '60%': (estimated1rm * 0.60).toStringAsFixed(1),
+    };
+
+    final calcTarget = targetWeight != null && targetWeight > 0 ? targetWeight : estimated1rm;
+    final plateResult = PlateCalculator.calculate(
+      targetWeight: calcTarget,
+      barWeight: isLb ? 45.0 : 20.0,
+      isLb: isLb,
+    );
+
+    final unitStr = isLb ? 'lbs' : 'kg';
+    return AiToolExecutionResult(
+      toolName: 'calculate_1rm_and_plates',
+      success: true,
+      summary: 'Calculated 1RM: $estimated1rm $unitStr based on $weight $unitStr × $reps reps.',
+      data: {
+        'weight': weight,
+        'reps': reps,
+        'unit': unitStr,
+        'estimated1RM': estimated1rm,
+        'epley1RM': double.parse(epley1rm.toStringAsFixed(1)),
+        'percentages': percentages,
+        'plateLoading': {
+          'targetWeight': calcTarget,
+          'barWeight': isLb ? 45.0 : 20.0,
+          'platesPerSide': plateResult.platesPerSide.map((p) => '${p.spec.weight}$unitStr × ${p.count}').toList(),
+          'totalAchieved': plateResult.totalLoadedWeight,
+          'remainder': plateResult.remainder,
+        },
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeSearchExerciseCatalog({
+    String? query,
+    String? muscleGroupId,
+    String? equipment,
+    int limit = 8,
+  }) async {
+    final exRepo = _ref.read(exerciseRepositoryProvider);
+    final all = await exRepo.getExercises();
+
+    var filtered = all;
+    if (muscleGroupId != null && muscleGroupId.trim().isNotEmpty) {
+      final cleanMuscle = muscleGroupId.trim().toLowerCase();
+      filtered = filtered.where((e) =>
+          e.muscleGroupId.toLowerCase() == cleanMuscle ||
+          e.secondaryGroups.any((s) => s.toLowerCase() == cleanMuscle)).toList();
+    }
+
+    if (equipment != null && equipment.trim().isNotEmpty) {
+      final cleanEq = equipment.trim().toLowerCase();
+      filtered = filtered.where((e) => e.equipment.name.toLowerCase() == cleanEq).toList();
+    }
+
+    if (query != null && query.trim().isNotEmpty) {
+      final cleanQ = query.trim().toLowerCase();
+      filtered = filtered.where((e) =>
+          e.name.toLowerCase().contains(cleanQ) ||
+          e.muscleGroupId.toLowerCase().contains(cleanQ) ||
+          e.secondaryGroups.any((s) => s.toLowerCase().contains(cleanQ))).toList();
+    }
+
+    final top = filtered.take(limit.clamp(1, 20)).map((e) => {
+      'id': e.id,
+      'name': e.name,
+      'muscleGroup': e.muscleGroupId,
+      'equipment': e.equipment.name,
+      'loadMode': e.loadMode.name,
+      'trackingType': e.trackingType.name,
+    }).toList();
+
+    return AiToolExecutionResult(
+      toolName: 'search_exercise_catalog',
+      success: true,
+      summary: 'Found ${top.length} exercises matching criteria.',
+      data: {
+        'count': top.length,
+        'exercises': top,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeGetNutritionOverview({
+    String? dateStr,
+  }) async {
+    DateTime targetDate = DateTime.now();
+    if (dateStr != null && dateStr.trim().isNotEmpty) {
+      final lower = dateStr.trim().toLowerCase();
+      if (lower == 'yesterday') {
+        targetDate = DateTime.now().subtract(const Duration(days: 1));
+      } else if (lower != 'today') {
+        final parsed = DateTime.tryParse(dateStr.trim());
+        if (parsed != null) targetDate = parsed;
+      }
+    }
+
+    final nutritionService = _ref.read(nutritionServiceProvider);
+    final dailyLog = await nutritionService.getDailyLog(targetDate);
+
+    final mealsSummary = dailyLog.meals.map((m) => {
+      'name': m.name,
+      'calories': m.calories,
+      'proteinG': m.protein,
+      'carbsG': m.carbs,
+      'fatG': m.fat,
+    }).toList();
+
+    return AiToolExecutionResult(
+      toolName: 'get_nutrition_overview',
+      success: true,
+      summary: 'Nutrition for ${DateFormat('yyyy-MM-dd').format(targetDate)}: ${dailyLog.consumedCalories} kcal / ${dailyLog.target.calories} target.',
+      data: {
+        'date': DateFormat('yyyy-MM-dd').format(targetDate),
+        'consumed': {
+          'calories': dailyLog.consumedCalories,
+          'proteinG': dailyLog.consumedProtein,
+          'carbsG': dailyLog.consumedCarbs,
+          'fatG': dailyLog.consumedFat,
+          'waterMl': dailyLog.waterMl,
+        },
+        'targets': {
+          'calories': dailyLog.target.calories,
+          'proteinG': dailyLog.target.protein,
+          'carbsG': dailyLog.target.carbs,
+          'fatG': dailyLog.target.fat,
+          'waterMl': dailyLog.target.waterMl,
+        },
+        'mealsCount': dailyLog.meals.length,
+        'meals': mealsSummary,
+        'postWorkoutTip': dailyLog.target.postWorkoutTip,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeQuickExerciseGuide({
+    required String exerciseName,
+  }) async {
+    final clean = exerciseName.trim();
+    if (clean.isEmpty) {
+      return const AiToolExecutionResult(
+        toolName: 'quick_exercise_guide',
+        success: false,
+        summary: 'Exercise name cannot be empty.',
+      );
+    }
+
+    final exRepo = _ref.read(exerciseRepositoryProvider);
+    final allEx = await exRepo.getExercises();
+    final matched = allEx.where((e) => e.name.toLowerCase() == clean.toLowerCase()).firstOrNull ??
+        allEx.where((e) => e.name.toLowerCase().contains(clean.toLowerCase())).firstOrNull;
+
+    // Fast image lookup
+    final imgResults = await ExerciseImageSearchService.searchWebExerciseImages(clean);
+    final imageUrl = imgResults.firstOrNull?.fullUrl;
+    final imageTitle = imgResults.firstOrNull?.title ?? '$clean Form';
+
+    return AiToolExecutionResult(
+      toolName: 'quick_exercise_guide',
+      success: true,
+      summary: 'Guide retrieved for "$clean".',
+      data: {
+        'name': matched?.name ?? clean,
+        'muscleGroup': matched?.muscleGroupId ?? 'General',
+        'equipment': matched?.equipment.name ?? 'Gym equipment',
+        'trackingType': matched != null ? matched.trackingType.name : 'standard',
+        'imageUrl': imageUrl,
+        'markdownImageTag': imageUrl != null ? '![$imageTitle]($imageUrl)' : null,
       },
     );
   }

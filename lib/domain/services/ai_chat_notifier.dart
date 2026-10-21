@@ -788,6 +788,16 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
           return 'Web research complete';
         case 'ask_user_question':
           return 'Question presented';
+        case 'calculate_1rm_and_plates':
+          return '1RM & Plate Calculator ready';
+        case 'search_exercise_catalog':
+          return 'Exercise catalog searched';
+        case 'get_nutrition_overview':
+          return 'Nutrition overview retrieved';
+        case 'quick_exercise_guide':
+          return 'Exercise guide ready';
+        case 'get_exercise_image':
+          return 'Demonstration visual ready';
         default:
           return '$toolName finished';
       }
