@@ -10,7 +10,6 @@ import 'package:ironlog/domain/services/plate_calculator.dart';
 import 'package:ironlog/domain/services/strength_decay_service.dart';
 import 'package:ironlog/core/utils/unit_converter.dart';
 import 'package:ironlog/domain/models/active_workout_input.dart';
-import 'package:ironlog/domain/models/exercise_model.dart';
 import 'package:ironlog/domain/models/set_model.dart';
 import 'package:ironlog/domain/services/warmup_generator.dart';
 import 'package:ironlog/domain/services/weight_step_learner.dart';
