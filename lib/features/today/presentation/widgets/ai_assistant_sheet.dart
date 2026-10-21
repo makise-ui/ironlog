@@ -21,6 +21,7 @@ import '../../../../domain/services/ai_assistant_service.dart';
 import '../../../../domain/services/ai_chat_notifier.dart';
 import '../../../../domain/services/ai_memory_service.dart';
 import '../../../../domain/services/weight_step_learner.dart';
+import '../../../../domain/services/exercise_media_service.dart';
 import '../../../../data/providers.dart';
 
 class AiAssistantSheet extends ConsumerStatefulWidget {
@@ -1808,6 +1809,15 @@ class _AiAssistantSheetState extends ConsumerState<AiAssistantSheet> with Single
               if (tr.toolName == 'render_progression_chart' && tr.data != null && tr.data is Map)
                 _ProgressionChartCard(
                   data: Map<String, dynamic>.from(tr.data as Map),
+                ),
+
+          // ── PR History & Milestone Showcase Card (Interactive In-Chat) ───────
+          if (!isUser && msg.toolResults != null)
+            for (final tr in msg.toolResults!)
+              if (tr.toolName == 'visualize_pr_history' && tr.data != null && tr.data is Map)
+                _PrHistoryMilestoneCard(
+                  data: Map<String, dynamic>.from(tr.data as Map),
+                  onAskBreakPr: (exName) => _handleSend('Give me a dedicated periodized progression strategy to break my PR on $exName.'),
                 ),
         ],
       ),
@@ -3618,45 +3628,62 @@ class _InlineChatExerciseImage extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
-              Image.network(
-                imageUrl,
-                width: double.infinity,
-                height: 200,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return ShimmerLoading(
-                    width: double.infinity,
-                    height: 200,
-                    borderRadius: BorderRadius.circular(14),
-                    label: 'Loading $displayLabel...',
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: double.infinity,
-                    height: 120,
-                    padding: const EdgeInsets.all(12),
-                    color: isDark ? const Color(0xFF161924) : const Color(0xFFE2E8F0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.fitness_center_rounded, size: 22, color: context.accent),
-                        const SizedBox(height: 6),
-                        Text(
-                          displayLabel,
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: context.textSecondary,
+              if (imageUrl.startsWith('assets/'))
+                Image.asset(
+                  imageUrl,
+                  width: double.infinity,
+                  height: 200,
+                  fit: BoxFit.cover,
+                )
+              else
+                Image.network(
+                  imageUrl,
+                  width: double.infinity,
+                  height: 200,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return ShimmerLoading(
+                      width: double.infinity,
+                      height: 200,
+                      borderRadius: BorderRadius.circular(14),
+                      label: 'Loading $displayLabel...',
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    final local = ExerciseMediaService.getVerifiedMedia(displayLabel);
+                    if (local != null) {
+                      return Image.asset(
+                        local.source,
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      );
+                    }
+                    return Container(
+                      width: double.infinity,
+                      height: 120,
+                      padding: const EdgeInsets.all(12),
+                      color: isDark ? const Color(0xFF161924) : const Color(0xFFE2E8F0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.fitness_center_rounded, size: 22, color: context.accent),
+                          const SizedBox(height: 6),
+                          Text(
+                            displayLabel,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: context.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               // Bottom Pill Tag Badge
               Positioned(
                 bottom: 8,
@@ -4274,17 +4301,7 @@ class _MultiExerciseVisualsCard extends StatelessWidget {
                           height: 94,
                           width: double.infinity,
                           color: context.isDark ? const Color(0xFF0F131C) : const Color(0xFFF1F5F9),
-                          child: (imgUrl != null && imgUrl.isNotEmpty)
-                              ? Image.network(
-                                  imgUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Center(
-                                    child: Icon(Icons.fitness_center_rounded, size: 28, color: context.textTertiary),
-                                  ),
-                                )
-                              : Center(
-                                  child: Icon(Icons.fitness_center_rounded, size: 28, color: context.textTertiary),
-                                ),
+                          child: _buildAdaptiveExerciseThumbnail(imgUrl, name, context),
                         ),
                       ),
                       Padding(
@@ -4362,6 +4379,36 @@ class _MultiExerciseVisualsCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAdaptiveExerciseThumbnail(String? imgUrl, String exerciseName, BuildContext context) {
+    if (imgUrl != null && imgUrl.isNotEmpty) {
+      if (imgUrl.startsWith('assets/')) {
+        return Image.asset(imgUrl, fit: BoxFit.cover);
+      }
+      if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) {
+        return Image.network(
+          imgUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            final local = ExerciseMediaService.getVerifiedMedia(exerciseName);
+            if (local != null) {
+              return Image.asset(local.source, fit: BoxFit.cover);
+            }
+            return Center(
+              child: Icon(Icons.fitness_center_rounded, size: 28, color: context.textTertiary),
+            );
+          },
+        );
+      }
+    }
+    final local = ExerciseMediaService.getVerifiedMedia(exerciseName);
+    if (local != null) {
+      return Image.asset(local.source, fit: BoxFit.cover);
+    }
+    return Center(
+      child: Icon(Icons.fitness_center_rounded, size: 28, color: context.textTertiary),
     );
   }
 }
@@ -4572,10 +4619,16 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
   }
 
   Widget _buildNodeItem(Map<String, dynamic> node, int index, bool isLast) {
-    final label = node['label']?.toString() ?? 'Step ${index + 1}';
+    final rawLabel = node['label']?.toString() ?? 'Step ${index + 1}';
+    final cleanLabel = rawLabel.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n').trim();
     final phase = node['phase']?.toString() ?? 'Step';
-    final desc = node['description']?.toString();
+    final rawDesc = node['description']?.toString();
+    final cleanDesc = rawDesc?.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n').trim();
     final phaseColor = _getPhaseColor(phase, context);
+
+    final labelLines = cleanLabel.split('\n').where((s) => s.trim().isNotEmpty).toList();
+    final title = labelLines.isNotEmpty ? labelLines.first.trim() : 'Step ${index + 1}';
+    final extraDetails = labelLines.length > 1 ? labelLines.sublist(1).join('\n').trim() : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -4618,7 +4671,7 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                   children: [
                     Expanded(
                       child: Text(
-                        label,
+                        title,
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12.5,
@@ -4645,10 +4698,22 @@ class _VisualDiagramCardState extends State<_VisualDiagramCard> {
                     ),
                   ],
                 ),
-                if (desc != null && desc.isNotEmpty) ...[
+                if (extraDetails != null && extraDetails.isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text(
-                    desc,
+                    extraDetails,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11.5,
+                      height: 1.3,
+                      color: context.textSecondary,
+                    ),
+                  ),
+                ],
+                if (cleanDesc != null && cleanDesc.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    cleanDesc,
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 11.5,
@@ -4877,9 +4942,13 @@ class _MermaidDiagramNativeCardState extends State<_MermaidDiagramNativeCard> {
       final matches = nodeRegex.allMatches(line);
       for (final m in matches) {
         final id = m.group(1) ?? '';
-        final label = m.group(2) ?? '';
+        final rawLabel = m.group(2) ?? '';
         if (id.isNotEmpty && !nodes.any((n) => n['id'] == id)) {
-          nodes.add({'id': id, 'label': label.trim()});
+          final cleanLabel = rawLabel
+              .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+              .replaceAll(r'\n', '\n')
+              .trim();
+          nodes.add({'id': id, 'label': cleanLabel});
         }
       }
     }
@@ -4990,15 +5059,44 @@ class _MermaidDiagramNativeCardState extends State<_MermaidDiagramNativeCard> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            nodes[i]['label'] ?? '',
-                            softWrap: true,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: context.textPrimary,
-                            ),
+                          child: Builder(
+                            builder: (context) {
+                              final text = nodes[i]['label'] ?? '';
+                              final lines = text.split('\n').where((s) => s.trim().isNotEmpty).toList();
+                              if (lines.isEmpty) return const SizedBox.shrink();
+                              final title = lines.first.trim();
+                              final details = lines.length > 1 ? lines.sublist(1).join('\n').trim() : null;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    title,
+                                    softWrap: true,
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textPrimary,
+                                    ),
+                                  ),
+                                  if (details != null && details.isNotEmpty) ...[
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      details,
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 11,
+                                        height: 1.3,
+                                        color: context.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -5012,6 +5110,406 @@ class _MermaidDiagramNativeCardState extends State<_MermaidDiagramNativeCard> {
                 ],
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Personal Record & Strength Milestone Showcase (Interactive In-Chat UI) ───
+class _PrHistoryMilestoneCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final Function(String exerciseName)? onAskBreakPr;
+
+  const _PrHistoryMilestoneCard({
+    required this.data,
+    this.onAskBreakPr,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSingle = data['isSingleExercise'] == true;
+    final unit = data['unit']?.toString() ?? 'kg';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.94),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF161720) : const Color(0xFFFBFBFD),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: const Color(0xFFFFD700).withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFD700).withValues(alpha: context.isDark ? 0.08 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.emoji_events_rounded, size: 14, color: Colors.black),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isSingle ? 'PERSONAL RECORD MILESTONE' : 'RECENT PERSONAL RECORDS',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.7,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
+              ),
+              if (isSingle && data['percentageGain'] != null && data['percentageGain'] != '0')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '+${data['percentageGain']}%',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF10B981),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
+          if (isSingle) ...[
+            const SizedBox(height: 10),
+            // Exercise Title & Muscle
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    data['exerciseName']?.toString() ?? 'Exercise',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: context.textPrimary,
+                    ),
+                  ),
+                ),
+                if (data['muscleGroup'] != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: context.accent.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      data['muscleGroup'].toString().toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.accent,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Milestone Stat Grid
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: context.isDark ? const Color(0xFF1E202B) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '🥇 Max Weight',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${data['maxWeight'] ?? 0} $unit',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: context.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'for ${data['maxWeightReps'] ?? 1} reps',
+                          style: TextStyle(fontSize: 10, color: context.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: context.isDark ? const Color(0xFF1E202B) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '⚡ Est. 1RM',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${((data['peakE1rm'] as num?) ?? 0).toStringAsFixed(1)} $unit',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFFFD700),
+                          ),
+                        ),
+                        const Text(
+                          'Epley Formula',
+                          style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Rep Ladder
+            if (data['repLadder'] != null && data['repLadder'] is Map) ...[
+              const SizedBox(height: 10),
+              const Text(
+                'REP MAX LADDER',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 5),
+              Wrap(
+                spacing: 6,
+                runSpacing: 5,
+                children: [
+                  for (final entry in (data['repLadder'] as Map).entries)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: context.isDark ? const Color(0xFF1E202B) : Colors.white,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: context.isDark ? const Color(0x22FFFFFF) : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                      child: Text(
+                        '${entry.key}RM: ${entry.value} $unit',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+
+            // Mini Progression Timeline Curve
+            if (data['timeline'] != null && (data['timeline'] as List).length >= 2) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 110,
+                child: Builder(
+                  builder: (context) {
+                    final points = (data['timeline'] as List).whereType<Map>().toList();
+                    final values = points.map((p) => (p['weight'] as num).toDouble()).toList();
+                    final minVal = values.reduce((a, b) => a < b ? a : b);
+                    final maxVal = values.reduce((a, b) => a > b ? a : b);
+                    final double minY = (minVal * 0.9).clamp(0.0, double.infinity);
+                    final double maxY = maxVal > minY ? maxVal * 1.12 : minY + 10;
+
+                    return LineChart(
+                      LineChartData(
+                        minY: minY,
+                        maxY: maxY,
+                        gridData: const FlGridData(show: false),
+                        titlesData: FlTitlesData(
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 18,
+                              interval: 1,
+                              getTitlesWidget: (val, meta) {
+                                final idx = val.toInt();
+                                if (idx >= 0 && idx < points.length) {
+                                  return Text(
+                                    points[idx]['label']?.toString() ?? '',
+                                    style: const TextStyle(fontSize: 8.5, color: Color(0xFF94A3B8)),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                          ),
+                        ),
+                        borderData: FlBorderData(show: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: points.asMap().entries.map((e) {
+                              return FlSpot(e.key.toDouble(), (e.value['weight'] as num).toDouble());
+                            }).toList(),
+                            isCurved: true,
+                            color: const Color(0xFFFFD700),
+                            barWidth: 2.4,
+                            dotData: const FlDotData(show: true),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  const Color(0xFFFFD700).withValues(alpha: 0.25),
+                                  const Color(0xFFFFD700).withValues(alpha: 0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 10),
+            BouncyPressable(
+              onTap: () {
+                AppHaptics.selection();
+                final exName = data['exerciseName']?.toString();
+                if (exName != null && onAskBreakPr != null) {
+                  onAskBreakPr!(exName);
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.4)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bolt_rounded, size: 14, color: Color(0xFFFFD700)),
+                    SizedBox(width: 5),
+                    Text(
+                      'Ask AI How to Break This PR',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFFD700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            // Multi-Exercise Recent PRs
+            const SizedBox(height: 8),
+            for (final pr in (data['records'] as List? ?? []))
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: context.isDark ? const Color(0xFF1E202B) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, size: 14, color: Color(0xFFFFD700)),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        pr['exerciseName']?.toString() ?? 'Exercise',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: context.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${pr['value'] ?? 0} $unit',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFFFD700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );

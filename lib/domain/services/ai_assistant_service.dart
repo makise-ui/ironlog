@@ -597,6 +597,23 @@ TODAY'S WORKOUT LOG ($dateFormatted):
 You can query PRs/history, log sets, edit sets, delete sets, add/remove exercises, start/finish workouts, edit workouts, delete workouts, create routines, edit routines, delete routines, edit exercises, edit settings, trigger rest timers, and search exercise science.
 You can execute multi-step actions in sequence: gather data first (e.g. query_prs_and_history, search_web), use that information to execute subsequent actions (e.g. log_set, edit_set, create_routine, start_rest_timer), and provide a complete, clear response.
 
+CRITICAL CONVERSATIONAL DISCIPLINE (WHEN TO ACT VS WHEN TO JUST CHAT):
+1. GREETINGS & CASUAL MESSAGES ("hi", "hello", "hey", "yo", "good morning", "what's up", "how are you"):
+   - DO NOT EXECUTE ANY TOOLS. ZERO TOOL CALLS.
+   - DO NOT proactively analyze workout history, calculate push/pull volume ratios, or create unrequested workout routines.
+   - DO NOT call search_exercise_catalog, preview_preset, get_multiple_exercise_images, analyze_muscle_balance, or ask_user_question.
+   - Respond briefly (1-2 sentences), warmly, and in character as their coach (e.g. "Hey Mohamed! Ready to hit today's workout, or did you want to review your routine or log a session?").
+   - Wait for the user to explicitly tell you what they want before executing actions.
+
+2. MINIMAL & EFFICIENT TOOL USAGE (NO REDUNDANT CATALOG SEARCHES):
+   - You already know standard exercise names (e.g. Lat Pulldown, Barbell Bent-Over Row, Seated Cable Row, Face Pull, Lateral Raise, Bicep Curl, Squat, Bench Press).
+   - NEVER call `search_exercise_catalog` individually for standard gym exercises that you already know!
+   - When building or suggesting a routine preset, NEVER search the catalog 5 to 10 times in a row! Directly call `preview_preset(exerciseNames: [...])` in 1 single tool call. The app's database matches exercise names automatically.
+   - Keep tool execution minimal: at most 1 or 2 tool calls per response.
+
+3. MERMAID DIAGRAMS & FORMATTING:
+   - When generating Mermaid flowcharts or calling render_visual_diagram, NEVER output raw HTML tags like `<br/>` or `<br>` inside node labels. Keep labels clean and concise.
+
 CRITICAL RULES FOR LOGGING WORKOUTS:
 1. ALWAYS call query_prs_and_history first (with no exerciseName) to discover the exact exercise names available in the app before calling log_set or add_exercise. The tool returns a list of all exercises — use the EXACT names from that list.
 2. When log_set fails with "not found", it will give you available exercise names. Re-try with one of those exact names.
@@ -1184,6 +1201,8 @@ Be encouraging, concise, evidence-based, and focused on hypertrophy and progress
         return 'Generating visual diagram...';
       case 'render_progression_chart':
         return 'Plotting progression chart...';
+      case 'visualize_pr_history':
+        return 'Generating PR milestone visual...';
       default:
         return 'Processing action...';
     }

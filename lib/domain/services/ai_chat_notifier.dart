@@ -804,6 +804,8 @@ class AiChatNotifier extends StateNotifier<AiChatState> with WidgetsBindingObser
           return 'Visual diagram ready';
         case 'render_progression_chart':
           return 'Progression chart ready';
+        case 'visualize_pr_history':
+          return 'PR milestones ready';
         default:
           return '$toolName finished';
       }

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'exercise_media_service.dart';
 
 class ExerciseImageCandidate {
   final String title;
@@ -32,49 +33,54 @@ class ExerciseImageSearchService {
 
   static final Map<String, List<ExerciseImageCandidate>> _memorySearchCache = {};
 
-  /// Instant verified demonstration visual map for the most common gym exercises.
-  /// Resolves in 0ms without hitting the network.
+  /// Instant verified demonstration visual map for common gym exercises.
+  /// Resolves in 0ms using bundled high-resolution offline GIF assets.
   static final Map<String, String> _instantStaticImageMap = {
-    'bench press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Bench-press-1.svg/500px-Bench-press-1.svg.png',
-    'barbell bench press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Bench-press-1.svg/500px-Bench-press-1.svg.png',
-    'incline bench press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Bench-press-1.svg/500px-Bench-press-1.svg.png',
-    'dumbbell bench press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Bench-press-1.svg/500px-Bench-press-1.svg.png',
-    'squat': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Squats.svg/500px-Squats.svg.png',
-    'barbell squat': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Squats.svg/500px-Squats.svg.png',
-    'back squat': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Squats.svg/500px-Squats.svg.png',
-    'front squat': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Squats.svg/500px-Squats.svg.png',
-    'deadlift': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Deadlift.svg/500px-Deadlift.svg.png',
-    'barbell deadlift': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Deadlift.svg/500px-Deadlift.svg.png',
-    'romanian deadlift': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Deadlift.svg/500px-Deadlift.svg.png',
-    'pull up': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Pull-up-1.svg/500px-Pull-up-1.svg.png',
-    'pull-up': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Pull-up-1.svg/500px-Pull-up-1.svg.png',
-    'chin up': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Pull-up-1.svg/500px-Pull-up-1.svg.png',
-    'overhead press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Overhead-press-1.svg/500px-Overhead-press-1.svg.png',
-    'military press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Overhead-press-1.svg/500px-Overhead-press-1.svg.png',
-    'shoulder press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Overhead-press-1.svg/500px-Overhead-press-1.svg.png',
-    'dumbbell shoulder press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Overhead-press-1.svg/500px-Overhead-press-1.svg.png',
-    'bicep curl': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Biceps-curl-1.svg/500px-Biceps-curl-1.svg.png',
-    'barbell curl': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Biceps-curl-1.svg/500px-Biceps-curl-1.svg.png',
-    'dumbbell curl': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Biceps-curl-1.svg/500px-Biceps-curl-1.svg.png',
-    'barbell row': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Bent-over-row-1.svg/500px-Bent-over-row-1.svg.png',
-    'bent over row': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Bent-over-row-1.svg/500px-Bent-over-row-1.svg.png',
-    'dumbbell row': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Bent-over-row-1.svg/500px-Bent-over-row-1.svg.png',
-    'dip': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Dip-1.svg/500px-Dip-1.svg.png',
-    'dips': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Dip-1.svg/500px-Dip-1.svg.png',
-    'tricep dip': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Dip-1.svg/500px-Dip-1.svg.png',
-    'tricep pushdown': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Dip-1.svg/500px-Dip-1.svg.png',
-    'lateral raise': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Lateral-raise-1.svg/500px-Lateral-raise-1.svg.png',
-    'leg press': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Leg-press-1.svg/500px-Leg-press-1.svg.png',
-    'leg extension': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Leg-extension-1.svg/500px-Leg-extension-1.svg.png',
-    'leg curl': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Leg-curl-1.svg/500px-Leg-curl-1.svg.png',
-    'push up': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Pushup-1.svg/500px-Pushup-1.svg.png',
-    'push-up': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Pushup-1.svg/500px-Pushup-1.svg.png',
-    'pushups': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Pushup-1.svg/500px-Pushup-1.svg.png',
-    'plank': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Plank-1.svg/500px-Plank-1.svg.png',
-    'crunch': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Crunch-1.svg/500px-Crunch-1.svg.png',
-    'crunches': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Crunch-1.svg/500px-Crunch-1.svg.png',
-    'standing calf raise': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Standing-calf-raise-1.svg/500px-Standing-calf-raise-1.svg.png',
-    'calf raise': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Standing-calf-raise-1.svg/500px-Standing-calf-raise-1.svg.png',
+    'bench press': 'assets/exercises/barbell_bench_press.gif',
+    'barbell bench press': 'assets/exercises/barbell_bench_press.gif',
+    'incline bench press': 'assets/exercises/incline_barbell_bench.gif',
+    'incline barbell bench press': 'assets/exercises/incline_barbell_bench.gif',
+    'decline bench press': 'assets/exercises/decline_barbell_bench.gif',
+    'dumbbell bench press': 'assets/exercises/dumbbell_bench_press.gif',
+    'squat': 'assets/exercises/barbell_squat.gif',
+    'barbell squat': 'assets/exercises/barbell_squat.gif',
+    'back squat': 'assets/exercises/barbell_squat.gif',
+    'hack squat': 'assets/exercises/hack_squat.gif',
+    'deadlift': 'assets/exercises/barbell_deadlift.gif',
+    'barbell deadlift': 'assets/exercises/barbell_deadlift.gif',
+    'romanian deadlift': 'assets/exercises/romanian_deadlift.gif',
+    'pull up': 'assets/exercises/pull_up.gif',
+    'pull-up': 'assets/exercises/pull_up.gif',
+    'pullups': 'assets/exercises/pull_up.gif',
+    'chin up': 'assets/exercises/pull_up.gif',
+    'chin-up': 'assets/exercises/pull_up.gif',
+    'overhead press': 'assets/exercises/overhead_press.gif',
+    'military press': 'assets/exercises/overhead_press.gif',
+    'shoulder press': 'assets/exercises/overhead_press.gif',
+    'bicep curl': 'assets/exercises/dumbbell_bicep_curl.gif',
+    'barbell curl': 'assets/exercises/dumbbell_bicep_curl.gif',
+    'dumbbell curl': 'assets/exercises/dumbbell_bicep_curl.gif',
+    'barbell row': 'assets/exercises/barbell_bent_over_row.gif',
+    'bent over row': 'assets/exercises/barbell_bent_over_row.gif',
+    'barbell bent-over row': 'assets/exercises/barbell_bent_over_row.gif',
+    'barbell bent over row': 'assets/exercises/barbell_bent_over_row.gif',
+    'lat pulldown': 'assets/exercises/cable_lat_pulldown.gif',
+    'cable lat pulldown': 'assets/exercises/cable_lat_pulldown.gif',
+    'seated cable row': 'assets/exercises/cable_seated_row.gif',
+    'cable row': 'assets/exercises/cable_seated_row.gif',
+    'dip': 'assets/exercises/tricep_dips.gif',
+    'dips': 'assets/exercises/tricep_dips.gif',
+    'tricep dip': 'assets/exercises/tricep_dips.gif',
+    'tricep pushdown': 'assets/exercises/cable_tricep_pushdown.gif',
+    'cable tricep pushdown': 'assets/exercises/cable_tricep_pushdown.gif',
+    'skull crusher': 'assets/exercises/skull_crusher.gif',
+    'skull crushers': 'assets/exercises/skull_crusher.gif',
+    'lateral raise': 'assets/exercises/dumbbell_lateral_raise.gif',
+    'dumbbell lateral raise': 'assets/exercises/dumbbell_lateral_raise.gif',
+    'leg press': 'assets/exercises/sled_leg_press.gif',
+    'leg extension': 'assets/exercises/lever_leg_extension.gif',
+    'dumbbell fly': 'assets/exercises/dumbbell_fly.gif',
+    'pec deck': 'assets/exercises/lever_seated_fly.gif',
   };
 
   /// Pre-populates the cache for testing to prevent network requests.
@@ -116,6 +122,22 @@ class ExerciseImageSearchService {
     if (clean.isEmpty) return [];
 
     final cacheKey = clean.toLowerCase();
+
+    // 0. Instant lookup from bundled local offline GIF animations (0ms, 100% reliable)
+    final localMedia = ExerciseMediaService.getVerifiedMedia(clean);
+    if (localMedia != null) {
+      final instant = [
+        ExerciseImageCandidate(
+          title: '$clean Form',
+          thumbnailUrl: localMedia.source,
+          fullUrl: localMedia.source,
+          source: 'Local Offline Asset',
+          positionTag: 'VERIFIED FORM ANIMATION',
+        ),
+      ];
+      _memorySearchCache[cacheKey] = instant;
+      return instant;
+    }
 
     // 1. Instant static lookup for top common movements (0ms)
     for (final entry in _instantStaticImageMap.entries) {

@@ -950,6 +950,26 @@ class AiToolService {
             },
           },
         },
+        {
+          'type': 'function',
+          'function': {
+            'name': 'visualize_pr_history',
+            'description': 'Render an interactive Personal Record (PR) milestone showcase card in the chat. Displays all-time max weight PR, estimated 1RM, rep PR ladder (3RM, 5RM, 8RM), volume PRs, and an interactive strength progression curve over time for specific exercises or overall training.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'exerciseName': {
+                  'type': 'string',
+                  'description': 'Name of the exercise to display PR milestones for (e.g., "Barbell Bench Press", "Barbell Squat", "Conventional Deadlift"). If omitted, displays recent all-time PR records across all exercises.',
+                },
+                'summary': {
+                  'type': 'string',
+                  'description': 'Coach takeaway or highlight message about the PR milestone.',
+                },
+              },
+            },
+          },
+        },
       ];
 
   /// Execute a tool by name with arguments
@@ -1204,6 +1224,11 @@ class AiToolService {
             unit: call.arguments['unit']?.toString() ?? 'kg',
             summary: call.arguments['summary']?.toString(),
             dataPoints: points,
+          );
+        case 'visualize_pr_history':
+          return await _executeVisualizePrHistory(
+            exerciseName: call.arguments['exerciseName']?.toString(),
+            summary: call.arguments['summary']?.toString(),
           );
         case 'export_backup':
           return await _executeExportBackup();
@@ -3627,6 +3652,116 @@ class AiToolService {
         'unit': unit,
         'summary': summary,
         'dataPoints': parsedPoints,
+      },
+    );
+  }
+
+  Future<AiToolExecutionResult> _executeVisualizePrHistory({
+    String? exerciseName,
+    String? summary,
+  }) async {
+    final workoutRepo = _ref.read(workoutRepositoryProvider);
+    final exRepo = _ref.read(exerciseRepositoryProvider);
+    final settingsRepo = _ref.read(settingsRepositoryProvider);
+    final unit = await settingsRepo.getWeightUnit();
+    final unitStr = unit.name;
+
+    if (exerciseName != null && exerciseName.trim().isNotEmpty) {
+      final clean = exerciseName.trim();
+      final allEx = await exRepo.getExercises();
+      final matched = allEx.where((e) => e.name.toLowerCase() == clean.toLowerCase()).firstOrNull ??
+          allEx.where((e) => e.name.toLowerCase().contains(clean.toLowerCase())).firstOrNull;
+
+      if (matched != null) {
+        final history = await workoutRepo.getAllHistoricalSetsForExercise(matched.id);
+        final workingSets = history.where((s) => !s.archived && s.weight > 0 && s.reps > 0).toList();
+
+        if (workingSets.isNotEmpty) {
+          workingSets.sort((a, b) => a.completedAt.compareTo(b.completedAt));
+
+          final maxWeightSet = workingSets.reduce((a, b) => a.weight >= b.weight ? a : b);
+          final maxE1rmSet = workingSets.reduce((a, b) {
+            final e1 = E1rmCalculator.calculate(a.weight, a.reps);
+            final e2 = E1rmCalculator.calculate(b.weight, b.reps);
+            return e1 >= e2 ? a : b;
+          });
+          final peakE1rm = E1rmCalculator.calculate(maxE1rmSet.weight, maxE1rmSet.reps);
+
+          final Map<String, double> repLadder = {};
+          for (final targetReps in [1, 3, 5, 8, 10]) {
+            final setsAtReps = workingSets.where((s) => s.reps >= targetReps).toList();
+            if (setsAtReps.isNotEmpty) {
+              final best = setsAtReps.map((s) => s.weight).reduce((a, b) => a > b ? a : b);
+              repLadder[targetReps.toString()] = best;
+            }
+          }
+
+          final List<Map<String, dynamic>> progressTimeline = [];
+          double runningMax = 0;
+          for (final s in workingSets) {
+            if (s.weight >= runningMax) {
+              runningMax = s.weight;
+              final dateLabel = '${s.completedAt.month}/${s.completedAt.day}';
+              progressTimeline.add({
+                'label': dateLabel,
+                'weight': s.weight,
+                'reps': s.reps,
+                'e1rm': E1rmCalculator.calculate(s.weight, s.reps),
+                'date': s.completedAt.toIso8601String(),
+              });
+            }
+          }
+
+          final firstWeight = (progressTimeline.first['weight'] as num).toDouble();
+          final lastWeight = maxWeightSet.weight;
+          final weightGain = lastWeight - firstWeight;
+          final percentageGain = firstWeight > 0 ? ((weightGain / firstWeight) * 100).toStringAsFixed(1) : '0';
+
+          return AiToolExecutionResult(
+            toolName: 'visualize_pr_history',
+            success: true,
+            summary: summary ?? 'PR showcase for ${matched.name}: Peak ${maxWeightSet.weight}$unitStr × ${maxWeightSet.reps} (e1RM: ${peakE1rm.toStringAsFixed(1)}$unitStr).',
+            data: {
+              'isSingleExercise': true,
+              'exerciseName': matched.name,
+              'muscleGroup': matched.muscleGroupId,
+              'unit': unitStr,
+              'maxWeight': maxWeightSet.weight,
+              'maxWeightReps': maxWeightSet.reps,
+              'maxWeightDate': maxWeightSet.completedAt.toIso8601String(),
+              'peakE1rm': peakE1rm,
+              'e1rmReps': maxE1rmSet.reps,
+              'e1rmWeight': maxE1rmSet.weight,
+              'weightGain': weightGain,
+              'percentageGain': percentageGain,
+              'totalSessionsLogged': workingSets.length,
+              'repLadder': repLadder,
+              'timeline': progressTimeline,
+            },
+          );
+        }
+      }
+    }
+
+    final recentPrs = await workoutRepo.getRecentPrs(limit: 6);
+    final prItems = recentPrs.map((pr) {
+      return {
+        'exerciseName': pr.exerciseName,
+        'kind': pr.formattedKind,
+        'value': pr.value,
+        'muscle': pr.muscleGroupId,
+        'date': pr.achievedAt.toIso8601String(),
+      };
+    }).toList();
+
+    return AiToolExecutionResult(
+      toolName: 'visualize_pr_history',
+      success: true,
+      summary: summary ?? 'Personal Records across all exercises (${prItems.length} records found).',
+      data: {
+        'isSingleExercise': false,
+        'unit': unitStr,
+        'records': prItems,
       },
     );
   }
