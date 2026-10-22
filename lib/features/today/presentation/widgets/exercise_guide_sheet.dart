@@ -805,40 +805,49 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.speed_rounded, size: 16, color: badgeColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    'NEUROMUSCULAR READINESS',
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.speed_rounded, size: 15, color: badgeColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'NEUROMUSCULAR READINESS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: isDark ? const Color(0xFFA3A3A3) : const Color(0xFF71717A),
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    analysis.statusLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                      color: isDark ? const Color(0xFFA3A3A3) : const Color(0xFF71717A),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: badgeColor,
                     ),
                   ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(
-                  analysis.statusLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: badgeColor,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -889,17 +898,29 @@ class _ExerciseGuideSheetState extends ConsumerState<ExerciseGuideSheet> {
   }) {
     return Column(
       children: [
-        Text(label, style: TextStyle(fontSize: 11, color: context.textTertiary)),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11, color: context.textTertiary),
+        ),
         const SizedBox(height: 2),
         Text(
           value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
             color: valueColor ?? context.textPrimary,
           ),
         ),
-        Text(subtitle, style: TextStyle(fontSize: 10, color: context.textSecondary)),
+        Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 10, color: context.textSecondary),
+        ),
       ],
     );
   }

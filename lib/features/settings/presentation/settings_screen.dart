@@ -5,10 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/haptics.dart';
+import '../../../core/utils/unit_converter.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/scale_tap.dart';
-import '../../../core/widgets/glass_button.dart';
-import '../../../core/widgets/glass_tile.dart';
 import '../../../data/providers.dart';
 import '../../../domain/services/backup_service.dart';
 import '../../../domain/services/app_notification_service.dart';
@@ -266,8 +265,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-
-
   void _showClearConfirmationDialog() {
     AppHaptics.warning();
     showDialog(
@@ -330,6 +327,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       debugPrint('Error clearing test data: $e');
     } finally {
       if (mounted) setState(() => _isClearing = false);
+    }
+  }
+
+  Future<void> _checkAppUpdates() async {
+    setState(() => _isCheckingUpdates = true);
+    AppHaptics.tap();
+    try {
+      final res = await ref.read(appUpdateServiceProvider).checkForUpdates(isManual: true);
+      if (mounted && context.mounted) {
+        if (res.isUpdateAvailable) {
+          WhatsNewSheet.show(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('IronLog is up to date (${AppUpdateService.currentVersion})!'),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isCheckingUpdates = false);
     }
   }
 
@@ -408,20 +427,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: AppSpacing.md),
 
           // ── Category 1: AI Coach & Intelligence ──────────────────
-          const Text('AI COACH & INTELLIGENCE', style: AppTypography.labelSmall),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            onTap: () async {
-              AppHaptics.tap();
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
-              );
-              _loadAiConfig();
-            },
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
+          _buildSectionCard(
+            title: 'AI COACH & INTELLIGENCE',
+            children: [
+              _buildRowItem(
+                leading: Container(
+                  padding: const EdgeInsets.all(9),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -429,677 +440,542 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         AppColors.accentViolet,
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
                         color: context.accent.withValues(alpha: 0.25),
-                        blurRadius: 8,
+                        blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.black, size: 20),
+                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.black, size: 18),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'AI Assistant & Profiles',
-                              style: AppTypography.titleMedium,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: !_aiConfig.requireApiKey
-                                  ? AppColors.workingSet.withValues(alpha: 0.16)
-                                  : (_aiConfig.apiKey.isNotEmpty
-                                      ? context.accent.withValues(alpha: 0.16)
-                                      : context.chipBg),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              !_aiConfig.requireApiKey
-                                  ? 'Free'
-                                  : (_aiConfig.apiKey.isNotEmpty ? 'Active' : 'No Key'),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: !_aiConfig.requireApiKey
-                                    ? AppColors.workingSet
-                                    : (_aiConfig.apiKey.isNotEmpty ? context.accent : context.textTertiary),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${_aiConfig.name} • ${_aiConfig.modelName}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
+                titleWidget: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'AI Assistant & Profiles',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: context.textTertiary),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('AI Coach Chat', style: AppTypography.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Launch workout coach & live app controller',
-                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
-                  label: const Text('Open Chat'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.accent,
-                    foregroundColor: Colors.black,
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () => AiAssistantSheet.show(context),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-
-          // ── Category: Notifications & AI Alerts ───────────────────
-          const Text('NOTIFICATIONS & AI ALERTS', style: AppTypography.labelSmall),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('AI Background Alerts', style: AppTypography.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Notify when AI finishes responding while app is minimized',
-                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _aiNotificationsEnabled,
-                  activeTrackColor: context.accent,
-                  onChanged: (val) async {
-                    AppHaptics.tap();
-                    setState(() => _aiNotificationsEnabled = val);
-                    await ref.read(settingsRepositoryProvider).setAiNotificationsEnabled(val);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Automatic AI Suggestions', style: AppTypography.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Daily coach tips, streak motivation & workout suggestions',
-                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _aiSuggestionsEnabled,
-                  activeTrackColor: context.accent,
-                  onChanged: (val) async {
-                    AppHaptics.tap();
-                    setState(() => _aiSuggestionsEnabled = val);
-                    await ref.read(settingsRepositoryProvider).setAiSuggestionsEnabled(val);
-                    if (val) {
-                      await AppNotificationService.instance.scheduleDailyCoachSuggestion();
-                    } else {
-                      await AppNotificationService.instance.cancelDailyCoachSuggestion();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Rest Timer Notifications', style: AppTypography.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Alert when rest countdown ends while IronLog is in background',
-                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _restTimerNotifsEnabled,
-                  activeTrackColor: context.accent,
-                  onChanged: (val) async {
-                    AppHaptics.tap();
-                    setState(() => _restTimerNotifsEnabled = val);
-                    await ref.read(settingsRepositoryProvider).setRestTimerNotificationsEnabled(val);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Test AI Suggestion', style: AppTypography.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Preview an instant AI Coach suggestion notification',
-                        style: AppTypography.labelSmall.copyWith(color: context.textTertiary),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.notifications_active_rounded, size: 14),
-                  label: const Text('Test Alert'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accentViolet,
-                    foregroundColor: Colors.white,
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () async {
-                    AppHaptics.step();
-                    await AppNotificationService.instance.sendContextualAiSuggestion(
-                      ref.read(workoutRepositoryProvider),
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('AI Coaching suggestion notification sent! Check notification shade.'),
-                          backgroundColor: context.isDark ? const Color(0xFF2B2B2B) : const Color(0xFF3F3F46),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // ── Category 2: Workout & Training ───────────────────────
-          const Text('WORKOUT & TRAINING', style: AppTypography.labelSmall),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            onTap: () async {
-              await showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (ctx) => const OnboardingSheet(),
-              );
-              _loadStats();
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Personal Profile', style: AppTypography.titleMedium),
-                    Text('Tap to Edit', style: TextStyle(color: context.textTertiary, fontSize: 12)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _buildStatPill('Age', '$_userAge yrs'),
-                    const SizedBox(width: AppSpacing.sm),
-                    _buildStatPill('Weight', '$_userWeight ${unit.name}'),
-                    const SizedBox(width: AppSpacing.sm),
-                    _buildStatPill('Height', '$_userHeight cm'),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '$_userGender • $_userGoal',
-                  style: TextStyle(fontSize: 12, color: context.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Weight Unit', style: AppTypography.titleMedium),
-                      SizedBox(height: 2),
-                      Text('Default unit used for logs and metrics', style: AppTypography.labelSmall),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: () {
-                    AppHaptics.step();
-                    ref.read(weightUnitNotifierProvider.notifier).toggle();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: context.cardElevated,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-                      border: Border.all(
-                        color: context.cardBorder,
-                        width: 1.0,
-                      ),
                     ),
-                    child: Text(
-                      unit.name.toUpperCase(),
-                      style: TextStyle(
-                        fontFamily: AppTypography.fontFamily,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: context.textPrimary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Include Warm-ups in Volume', style: AppTypography.titleMedium),
-                      SizedBox(height: 2),
-                      Text('Count warm-up sets towards total volume', style: AppTypography.labelSmall),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Switch(
-                  value: _includeWarmup,
-                  activeThumbColor: context.isDark ? const Color(0xFF171717) : Colors.white,
-                  activeTrackColor: context.accent,
-                  inactiveThumbColor: context.textTertiary,
-                  inactiveTrackColor: context.isDark ? const Color(0xFF383838) : const Color(0xFFE5E5E5),
-                  onChanged: (val) async {
-                    AppHaptics.step();
-                    setState(() => _includeWarmup = val);
-                    await ref.read(settingsRepositoryProvider).setIncludeWarmupInVolume(val);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-
-          GlassTile(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Keep Screen Awake', style: AppTypography.titleMedium),
-                      SizedBox(height: 2),
-                      Text('Prevent display from sleeping during active workouts', style: AppTypography.labelSmall),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Switch(
-                  value: ref.watch(keepScreenAwakeProvider),
-                  activeThumbColor: context.isDark ? const Color(0xFF171717) : Colors.white,
-                  activeTrackColor: context.accent,
-                  inactiveThumbColor: context.textTertiary,
-                  inactiveTrackColor: context.isDark ? const Color(0xFF383838) : const Color(0xFFE5E5E5),
-                  onChanged: (val) async {
-                    AppHaptics.step();
-                    await ref.read(keepScreenAwakeProvider.notifier).setEnabled(val);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // ── Category 3: Appearance & Theme ───────────────────────
-          const Text('APPEARANCE & THEME', style: AppTypography.labelSmall),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Appearance Mode', style: AppTypography.titleMedium),
-                    Text('Dark / Light', style: AppTypography.labelSmall),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildThemeOption(
-                      label: 'Dark',
-                      icon: Icons.dark_mode_rounded,
-                      isSelected: currentTheme == ThemeMode.dark,
-                      onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildThemeOption(
-                      label: 'Light',
-                      icon: Icons.light_mode_rounded,
-                      isSelected: currentTheme == ThemeMode.light,
-                      onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildThemeOption(
-                      label: 'System',
-                      icon: Icons.brightness_auto_rounded,
-                      isSelected: currentTheme == ThemeMode.system,
-                      onTap: () => ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Divider(height: 1, color: context.cardBorder),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Accent Theme', style: AppTypography.titleMedium),
-                    Text(
-                      AppColors.accentPresets[currentPreset]?.name ?? 'Cobalt Sapphire',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.accent),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: AccentPreset.values.map((preset) {
-                    final data = AppColors.accentPresets[preset]!;
-                    final isSelected = currentPreset == preset;
-                    final previewColor = context.isDark ? data.darkColor : data.lightColor;
-                    return GestureDetector(
-                      onTap: () {
-                        AppHaptics.mediumImpact();
-                        ref.read(accentPresetProvider.notifier).setPreset(preset);
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? previewColor.withValues(alpha: context.isDark ? 0.20 : 0.12)
-                              : context.chipBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isSelected ? previewColor : context.chipBorder,
-                            width: isSelected ? 1.5 : 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 14,
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: previewColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.25),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 7),
-                            Text(
-                              data.name,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                color: isSelected ? context.textPrimary : context.textSecondary,
-                              ),
-                            ),
-                            if (isSelected) ...[
-                              const SizedBox(width: 5),
-                              Icon(Icons.check_rounded, size: 14, color: previewColor),
-                            ],
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // Database & Debug Seeder
-          const Text('DATABASE & PERFORMANCE', style: AppTypography.labelSmall),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Local SQLite Database', style: AppTypography.titleMedium),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: context.isDark ? C.surfaceHi : const Color(0xFFF0F0F1),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        border: Border.all(color: context.isDark ? C.hairline : const Color(0xFFE2E8F0)),
+                        color: !_aiConfig.requireApiKey
+                            ? AppColors.workingSet.withValues(alpha: 0.16)
+                            : (_aiConfig.apiKey.isNotEmpty
+                                ? context.accent.withValues(alpha: 0.16)
+                                : context.chipBg),
+                        borderRadius: BorderRadius.circular(5),
                       ),
                       child: Text(
-                        'Offline-First',
+                        !_aiConfig.requireApiKey
+                            ? 'Free'
+                            : (_aiConfig.apiKey.isNotEmpty ? 'Active' : 'No Key'),
                         style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: !_aiConfig.requireApiKey
+                              ? AppColors.workingSet
+                              : (_aiConfig.apiKey.isNotEmpty ? context.accent : context.textTertiary),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    _buildStatPill('Workouts', '$_totalWorkoutsCount'),
-                    const SizedBox(width: AppSpacing.sm),
-                    _buildStatPill('Logged Sets', '$_totalSetsCount'),
-                    const SizedBox(width: AppSpacing.sm),
-                    _buildStatPill('Exercises', '$_totalExercisesCount'),
-                  ],
+                subtitleWidget: Text(
+                  '${_aiConfig.name} • ${_aiConfig.modelName}',
+                  style: TextStyle(fontSize: 11.5, color: context.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  'Auto-saves your workouts to persistent storage (Documents/IronLog). Even if you delete and reinstall the app, IronLog will detect your backup and ask to restore your progress.',
-                  style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                GlassButton(
-                  text: 'Load Full 1,300+ Exercise Library',
-                  icon: Icons.library_add_rounded,
-                  style: GlassButtonStyle.secondary,
-                  onPressed: () async {
-                    AppHaptics.tap();
-                    final added = await ref.read(exerciseRepositoryProvider).seedOpenGymCatalog();
-                    await _loadStats();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(added > 0
-                              ? 'Successfully added $added new movements! Total exercises: $_totalExercisesCount'
-                              : 'All 1,324 movements are already present in your catalog.'),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-                GlassButton(
-                  text: 'Backup Now to Persistent Storage',
-                  icon: Icons.save_alt_rounded,
-                  style: GlassButtonStyle.primary,
-                  isLoading: _isBackingUp,
-                  onPressed: _backupToPhoneStorage,
-                ),
-                const SizedBox(height: 8),
-                GlassButton(
-                  text: 'Restore from Persistent Storage',
-                  icon: Icons.settings_backup_restore_rounded,
-                  style: GlassButtonStyle.secondary,
-                  isLoading: _isRestoring,
-                  onPressed: _restoreFromPhoneStorage,
-                ),
-                const SizedBox(height: 8),
-                Row(
+                trailing: Icon(Icons.chevron_right_rounded, size: 18, color: context.textTertiary),
+                onTap: () async {
+                  AppHaptics.tap();
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+                  );
+                  _loadAiConfig();
+                },
+              ),
+              _buildDivider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
                   children: [
                     Expanded(
-                      child: GlassButton(
-                        text: 'Export Backup',
-                        icon: Icons.share_rounded,
-                        style: GlassButtonStyle.secondary,
-                        onPressed: _exportBackupFile,
+                      child: _buildCompactActionButton(
+                        text: 'Open Chat',
+                        icon: Icons.chat_bubble_outline_rounded,
+                        isPrimary: true,
+                        onPressed: () => AiAssistantSheet.show(context),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: GlassButton(
-                        text: 'Import File',
-                        icon: Icons.file_upload_outlined,
-                        style: GlassButtonStyle.secondary,
-                        onPressed: _importBackupFile,
+                      child: _buildCompactActionButton(
+                        text: 'Test Alert',
+                        icon: Icons.notifications_active_outlined,
+                        onPressed: () async {
+                          AppHaptics.step();
+                          await AppNotificationService.instance.sendContextualAiSuggestion(
+                            ref.read(workoutRepositoryProvider),
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('AI Coaching suggestion sent! Check notification shade.'),
+                                backgroundColor: context.isDark ? const Color(0xFF2B2B2B) : const Color(0xFF3F3F46),
+                              ),
+                            );
+                          }
+                        },
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                GlassButton(
-                  text: 'Import CSV (Hevy / Strong / FitNotes)',
-                  icon: Icons.table_chart_outlined,
-                  style: GlassButtonStyle.secondary,
-                  onPressed: () {
-                    AppHaptics.tap();
-                    CsvImportSheet.show(context).then((_) => _loadStats());
-                  },
-                ),
-                const SizedBox(height: 12),
-                GlassButton(
-                  text: 'Remove Test Data / Clear History',
-                  icon: Icons.delete_sweep_rounded,
-                  style: GlassButtonStyle.danger,
-                  isLoading: _isClearing,
-                  onPressed: _showClearConfirmationDialog,
-                ),
-              ],
-            ),
+              ),
+              _buildDivider(),
+              _buildSwitchRow(
+                title: 'AI Background Alerts',
+                subtitle: 'Notify when AI completes while app is minimized',
+                value: _aiNotificationsEnabled,
+                onChanged: (val) async {
+                  AppHaptics.tap();
+                  setState(() => _aiNotificationsEnabled = val);
+                  await ref.read(settingsRepositoryProvider).setAiNotificationsEnabled(val);
+                },
+              ),
+              _buildDivider(),
+              _buildSwitchRow(
+                title: 'Automatic AI Suggestions',
+                subtitle: 'Daily coach tips, streak motivation & workouts',
+                value: _aiSuggestionsEnabled,
+                onChanged: (val) async {
+                  AppHaptics.tap();
+                  setState(() => _aiSuggestionsEnabled = val);
+                  await ref.read(settingsRepositoryProvider).setAiSuggestionsEnabled(val);
+                  if (val) {
+                    await AppNotificationService.instance.scheduleDailyCoachSuggestion();
+                  } else {
+                    await AppNotificationService.instance.cancelDailyCoachSuggestion();
+                  }
+                },
+              ),
+              _buildDivider(),
+              _buildSwitchRow(
+                title: 'Rest Timer Notifications',
+                subtitle: 'Alert when rest countdown ends in background',
+                value: _restTimerNotifsEnabled,
+                onChanged: (val) async {
+                  AppHaptics.tap();
+                  setState(() => _restTimerNotifsEnabled = val);
+                  await ref.read(settingsRepositoryProvider).setRestTimerNotificationsEnabled(val);
+                },
+              ),
+            ],
           ),
 
-          const SizedBox(height: AppSpacing.lg),
-          const Text('ABOUT IRONLOG & UPDATES', style: AppTypography.labelSmall),
-          const SizedBox(height: AppSpacing.xs),
-          GlassTile(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          // ── Category 2: Workout & Training ───────────────────────
+          _buildSectionCard(
+            title: 'WORKOUT & TRAINING',
+            children: [
+              _buildRowItem(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: context.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.person_rounded, size: 18, color: context.accent),
+                ),
+                titleWidget: const Text(
+                  'Personal Profile',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                subtitleWidget: Text(
+                  '$_userAge yrs • $_userWeight ${unit.name} • $_userHeight cm • $_userGender • $_userGoal',
+                  style: TextStyle(fontSize: 11.5, color: context.textSecondary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Icon(Icons.chevron_right_rounded, size: 18, color: context.textTertiary),
+                onTap: () async {
+                  await showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (ctx) => const OnboardingSheet(),
+                  );
+                  _loadStats();
+                },
+              ),
+              _buildDivider(),
+              _buildRowItem(
+                titleWidget: const Text(
+                  'Weight Unit',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                subtitleWidget: Text(
+                  'Default unit used for logs and metrics',
+                  style: TextStyle(fontSize: 11.5, color: context.textTertiary),
+                ),
+                trailing: _buildUnitSegment(unit),
+              ),
+              _buildDivider(),
+              _buildSwitchRow(
+                title: 'Include Warm-ups in Volume',
+                subtitle: 'Count warm-up sets towards total volume',
+                value: _includeWarmup,
+                onChanged: (val) async {
+                  AppHaptics.step();
+                  setState(() => _includeWarmup = val);
+                  await ref.read(settingsRepositoryProvider).setIncludeWarmupInVolume(val);
+                },
+              ),
+              _buildDivider(),
+              _buildSwitchRow(
+                title: 'Keep Screen Awake',
+                subtitle: 'Prevent display from sleeping during workouts',
+                value: ref.watch(keepScreenAwakeProvider),
+                onChanged: (val) async {
+                  AppHaptics.step();
+                  await ref.read(keepScreenAwakeProvider.notifier).setEnabled(val);
+                },
+              ),
+            ],
+          ),
+
+          // ── Category 3: Appearance & Theme ───────────────────────
+          _buildSectionCard(
+            title: 'APPEARANCE & THEME',
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Theme Mode',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          currentTheme == ThemeMode.dark
+                              ? 'Dark'
+                              : (currentTheme == ThemeMode.light ? 'Light' : 'System'),
+                          style: TextStyle(fontSize: 12, color: context.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _buildThemeSegmentBar(currentTheme),
+                  ],
+                ),
+              ),
+              _buildDivider(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Accent Theme',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          AppColors.accentPresets[currentPreset]?.name ?? 'Cobalt',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: context.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: AccentPreset.values.map((preset) {
+                        final data = AppColors.accentPresets[preset]!;
+                        final isSelected = currentPreset == preset;
+                        final previewColor = context.isDark ? data.darkColor : data.lightColor;
+                        return GestureDetector(
+                          onTap: () {
+                            AppHaptics.mediumImpact();
+                            ref.read(accentPresetProvider.notifier).setPreset(preset);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? previewColor.withValues(alpha: context.isDark ? 0.22 : 0.14)
+                                  : context.chipBg,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? previewColor : context.chipBorder,
+                                width: isSelected ? 1.5 : 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: previewColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  data.name,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                    color: isSelected ? context.textPrimary : context.textSecondary,
+                                  ),
+                                ),
+                                if (isSelected) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.check_rounded, size: 12, color: previewColor),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // ── Category 4: Database & Performance ────────────────────
+          _buildSectionCard(
+            title: 'DATABASE & PERFORMANCE',
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.storage_rounded, size: 18, color: context.accent),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Local SQLite Database',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: context.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: context.isDark ? C.surfaceHi : const Color(0xFFF0F0F1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: context.isDark ? C.hairline : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Text(
+                            'Offline-First',
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: context.cardElevated,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: context.cardBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          _buildMiniStat('Workouts', '$_totalWorkoutsCount'),
+                          _buildMiniStatDivider(),
+                          _buildMiniStat('Logged Sets', '$_totalSetsCount'),
+                          _buildMiniStatDivider(),
+                          _buildMiniStat('Exercises', '$_totalExercisesCount'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _buildDivider(),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCompactActionButton(
+                            text: 'Backup to Phone',
+                            icon: Icons.save_alt_rounded,
+                            isPrimary: true,
+                            isLoading: _isBackingUp,
+                            onPressed: _backupToPhoneStorage,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildCompactActionButton(
+                            text: 'Restore Progress',
+                            icon: Icons.settings_backup_restore_rounded,
+                            isLoading: _isRestoring,
+                            onPressed: _restoreFromPhoneStorage,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCompactActionButton(
+                            text: 'Export Backup',
+                            icon: Icons.share_rounded,
+                            onPressed: _exportBackupFile,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildCompactActionButton(
+                            text: 'Import File',
+                            icon: Icons.file_upload_outlined,
+                            onPressed: _importBackupFile,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCompactActionButton(
+                            text: 'Import CSV',
+                            icon: Icons.table_chart_outlined,
+                            onPressed: () {
+                              AppHaptics.tap();
+                              CsvImportSheet.show(context).then((_) => _loadStats());
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildCompactActionButton(
+                            text: 'Load 1.3k Catalog',
+                            icon: Icons.library_add_rounded,
+                            onPressed: () async {
+                              AppHaptics.tap();
+                              final added = await ref.read(exerciseRepositoryProvider).seedOpenGymCatalog();
+                              await _loadStats();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(added > 0
+                                        ? 'Successfully added $added new movements! Total: $_totalExercisesCount'
+                                        : 'All 1,324 movements already present in catalog.'),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildCompactActionButton(
+                      text: 'Remove Test Data / Clear History',
+                      icon: Icons.delete_sweep_rounded,
+                      isDanger: true,
+                      isLoading: _isClearing,
+                      onPressed: _showClearConfirmationDialog,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // ── Category 5: About IronLog & Updates ───────────────────
+          _buildSectionCard(
+            title: 'ABOUT IRONLOG & UPDATES',
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: context.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.fitness_center_rounded, size: 20, color: context.accent),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Text('IronLog ${AppUpdateService.currentVersion}', style: AppTypography.titleMedium),
-                              const SizedBox(width: 8),
+                              Text(
+                                'IronLog ${AppUpdateService.currentVersion}',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                 decoration: BoxDecoration(
                                   color: context.accent,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   'Latest',
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9.5,
                                     fontWeight: FontWeight.w700,
                                     color: context.onAccent,
                                   ),
@@ -1109,22 +985,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '100% Offline-first gym tracker built with Flutter, Drift (SQLite), and glassmorphic UI.',
-                            style: AppTypography.labelSmall.copyWith(color: context.textSecondary),
+                            'Offline-first gym tracker • Drift SQLite',
+                            style: TextStyle(fontSize: 11.5, color: context.textTertiary),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
+              ),
+              _buildDivider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
                   children: [
                     Expanded(
-                      child: GlassButton(
-                        text: 'What\'s New',
+                      child: _buildCompactActionButton(
+                        text: "What's New",
                         icon: Icons.auto_awesome_rounded,
-                        style: GlassButtonStyle.primary,
+                        isPrimary: true,
                         onPressed: () {
                           AppHaptics.tap();
                           WhatsNewSheet.show(context);
@@ -1133,98 +1012,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: GlassButton(
+                      child: _buildCompactActionButton(
                         text: 'Check Update',
                         icon: Icons.refresh_rounded,
-                        style: GlassButtonStyle.secondary,
                         isLoading: _isCheckingUpdates,
-                        onPressed: () async {
-                          setState(() => _isCheckingUpdates = true);
-                          AppHaptics.tap();
-                          try {
-                            final res = await ref.read(appUpdateServiceProvider).checkForUpdates(isManual: true);
-                            if (mounted && context.mounted) {
-                              if (res.isUpdateAvailable) {
-                                WhatsNewSheet.show(context);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('IronLog is up to date (${AppUpdateService.currentVersion})!'),
-                                    backgroundColor: const Color(0xFF10B981),
-                                  ),
-                                );
-                              }
-                            }
-                          } finally {
-                            if (mounted) setState(() => _isCheckingUpdates = false);
-                          }
-                        },
+                        onPressed: _checkAppUpdates,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Auto-Check Updates',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                          Text(
-                            'Notify when new features and performance patches land',
-                            style: TextStyle(fontSize: 11, color: context.textTertiary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Switch(
-                      value: _autoCheckUpdates,
-                      activeThumbColor: context.accent,
-                      onChanged: (val) async {
-                        AppHaptics.selection();
-                        setState(() => _autoCheckUpdates = val);
-                        await ref.read(settingsRepositoryProvider).setAutoCheckUpdates(val);
-                      },
-                    ),
-                  ],
+              ),
+              _buildDivider(),
+              _buildSwitchRow(
+                title: 'Auto-Check Updates',
+                subtitle: 'Notify when feature updates and patches land',
+                value: _autoCheckUpdates,
+                onChanged: (val) async {
+                  AppHaptics.selection();
+                  setState(() => _autoCheckUpdates = val);
+                  await ref.read(settingsRepositoryProvider).setAutoCheckUpdates(val);
+                },
+              ),
+              _buildDivider(),
+              _buildRowItem(
+                titleWidget: const Text(
+                  'Replay Onboarding Guide',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 8),
-                const Divider(height: 1),
-                const SizedBox(height: 8),
-                GlassButton(
-                  text: 'Replay Onboarding Guide',
-                  icon: Icons.school_outlined,
-                  style: GlassButtonStyle.secondary,
-                  onPressed: () {
-                    AppHaptics.tap();
-                    showModalBottomSheet(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (ctx) => const OnboardingSheet(),
-                    );
-                  },
+                leading: Icon(Icons.school_outlined, size: 18, color: context.textSecondary),
+                trailing: Icon(Icons.chevron_right_rounded, size: 18, color: context.textTertiary),
+                onTap: () {
+                  AppHaptics.tap();
+                  showModalBottomSheet(
+                    context: context,
+                    useRootNavigator: true,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (ctx) => const OnboardingSheet(),
+                  );
+                },
+              ),
+              _buildDivider(),
+              _buildRowItem(
+                titleWidget: const Text(
+                  'Legal & Safety Disclaimers',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 8),
-                GlassButton(
-                  text: 'Legal & Safety Disclaimers',
-                  icon: Icons.gavel_rounded,
-                  style: GlassButtonStyle.secondary,
-                  onPressed: () {
-                    AppHaptics.tap();
-                    LegalDisclaimersSheet.show(context);
-                  },
-                ),
-              ],
-            ),
+                leading: Icon(Icons.gavel_rounded, size: 18, color: context.textSecondary),
+                trailing: Icon(Icons.chevron_right_rounded, size: 18, color: context.textTertiary),
+                onTap: () {
+                  AppHaptics.tap();
+                  LegalDisclaimersSheet.show(context);
+                },
+              ),
+            ],
           ),
 
-          const SizedBox(height: 120),
+          const SizedBox(height: 100),
         ],
       ),
     );
@@ -1238,74 +1082,326 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return content;
   }
 
-  Widget _buildStatPill(String label, String value) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: context.isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-          border: Border.all(color: context.cardBorder),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: AppTypography.fontFamily,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: context.textPrimary,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+  Widget _buildSectionCard({
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title,
+            style: AppTypography.labelSmall.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
+              fontSize: 11,
+              color: context.textTertiary,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.cardBorder),
+            boxShadow: context.isDark
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [
+                    const BoxShadow(
+                      color: Color(0x06000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: context.cardBorder.withValues(alpha: 0.6),
+      indent: 16,
+      endIndent: 16,
+    );
+  }
+
+  Widget _buildRowItem({
+    required Widget titleWidget,
+    Widget? subtitleWidget,
+    Widget? leading,
+    Widget? trailing,
+    VoidCallback? onTap,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+  }) {
+    final content = Padding(
+      padding: padding,
+      child: Row(
+        children: [
+          if (leading != null) ...[
+            leading,
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                titleWidget,
+                if (subtitleWidget != null) ...[
+                  const SizedBox(height: 2),
+                  subtitleWidget,
+                ],
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 10),
+            trailing,
+          ],
+        ],
+      ),
+    );
+
+    if (onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: content,
+        ),
+      );
+    }
+    return content;
+  }
+
+  Widget _buildSwitchRow({
+    required String title,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return _buildRowItem(
+      titleWidget: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: context.textPrimary,
+        ),
+      ),
+      subtitleWidget: subtitle != null
+          ? Text(
+              subtitle,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11.5,
                 color: context.textTertiary,
               ),
-            ),
-          ],
+            )
+          : null,
+      trailing: Transform.scale(
+        scale: 0.85,
+        alignment: Alignment.centerRight,
+        child: Switch.adaptive(
+          value: value,
+          activeTrackColor: context.accent,
+          activeThumbColor: context.isDark ? const Color(0xFF171717) : Colors.white,
+          inactiveThumbColor: context.textTertiary,
+          inactiveTrackColor: context.isDark ? const Color(0xFF383838) : const Color(0xFFE5E5E5),
+          onChanged: onChanged,
         ),
       ),
     );
   }
 
-  Widget _buildThemeOption({
-    required String label,
+  Widget _buildCompactActionButton({
+    required String text,
     required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
+    required VoidCallback? onPressed,
+    bool isPrimary = false,
+    bool isDanger = false,
+    bool isLoading = false,
   }) {
+    final Color bgColor;
+    final Color borderColor;
+    final Color textColor;
+
+    if (isPrimary) {
+      bgColor = context.accent.withValues(alpha: context.isDark ? 0.18 : 0.12);
+      borderColor = context.accent.withValues(alpha: 0.35);
+      textColor = context.accent;
+    } else if (isDanger) {
+      bgColor = AppColors.error.withValues(alpha: context.isDark ? 0.12 : 0.08);
+      borderColor = AppColors.error.withValues(alpha: 0.3);
+      textColor = context.isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
+    } else {
+      bgColor = context.cardElevated;
+      borderColor = context.cardBorder;
+      textColor = context.textPrimary;
+    }
+
+    return ScaleTap(
+      onPressed: isLoading ? null : onPressed,
+      scaleDown: 0.96,
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor, width: 1.0),
+        ),
+        child: Center(
+          child: isLoading
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(textColor),
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 16, color: textColor),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnitSegment(WeightUnit currentUnit) {
+    return Container(
+      height: 30,
+      decoration: BoxDecoration(
+        color: context.cardElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.cardBorder),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildUnitOption('KG', currentUnit == WeightUnit.kg),
+          _buildUnitOption('LB', currentUnit == WeightUnit.lb),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnitOption(String label, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        if (!isSelected) {
+          AppHaptics.step();
+          ref.read(weightUnitNotifierProvider.notifier).toggle();
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? context.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? context.onAccent : context.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeSegmentBar(ThemeMode currentTheme) {
+    return Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: context.cardElevated,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.cardBorder),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: [
+          _buildThemeSegment('Dark', Icons.dark_mode_rounded, currentTheme == ThemeMode.dark, () {
+            ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
+          }),
+          _buildThemeSegment('Light', Icons.light_mode_rounded, currentTheme == ThemeMode.light, () {
+            ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light);
+          }),
+          _buildThemeSegment('System', Icons.brightness_auto_rounded, currentTheme == ThemeMode.system, () {
+            ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system);
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeSegment(String label, IconData icon, bool isSelected, VoidCallback onTap) {
     return Expanded(
-      child: ScaleTap(
-        onPressed: onTap,
-        scaleDown: 0.94,
-        enableHaptic: false,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+      child: GestureDetector(
+        onTap: () {
+          AppHaptics.step();
+          onTap();
+        },
+        child: Container(
           decoration: BoxDecoration(
             color: isSelected
-                ? context.accent.withValues(alpha: context.isDark ? 0.16 : 0.10)
-                : context.chipBg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? context.accent : context.chipBorder,
-              width: isSelected ? 1.5 : 1.0,
-            ),
+                ? context.accent.withValues(alpha: context.isDark ? 0.22 : 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            border: isSelected ? Border.all(color: context.accent.withValues(alpha: 0.4), width: 1) : null,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: isSelected ? context.accent : context.textSecondary),
-              const SizedBox(height: 5),
+              Icon(
+                icon,
+                size: 15,
+                color: isSelected ? context.accent : context.textSecondary,
+              ),
+              const SizedBox(width: 5),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected ? context.textPrimary : context.textSecondary,
                 ),
@@ -1314,6 +1410,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMiniStat(String label, String value) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: context.textPrimary,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: context.textTertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStatDivider() {
+    return Container(
+      height: 22,
+      width: 1,
+      color: context.cardBorder,
     );
   }
 }
