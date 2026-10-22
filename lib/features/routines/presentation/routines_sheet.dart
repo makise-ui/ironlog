@@ -15,7 +15,6 @@ import '../../../core/widgets/glass_button.dart';
 import '../../../domain/services/plan_share_service.dart';
 import 'create_preset_sheet.dart';
 import '../../today/presentation/widgets/ai_assistant_sheet.dart';
-import '../../today/presentation/widgets/anatomical_routine_visual.dart';
 
 class RoutinesSheet extends ConsumerStatefulWidget {
   final String workoutId;
@@ -606,95 +605,91 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        child: Stack(
+      child: GlassTile(
+        onTap: _isSelectionMode ? () => _toggleSelectRoutine(r.id) : () => _confirmApplyRoutine(r),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            GlassTile(
-              onTap: _isSelectionMode ? () => _toggleSelectRoutine(r.id) : () => _confirmApplyRoutine(r),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      if (_isSelectionMode) ...[
-                        Checkbox(
-                          value: isSelected,
-                          activeColor: context.accent,
-                          onChanged: (_) => _toggleSelectRoutine(r.id),
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: context.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          border: Border.all(color: context.accent.withValues(alpha: 0.3)),
-                        ),
-                        child: Text(
-                          '${r.items.length} Exercises',
-                          style: TextStyle(
-                            fontFamily: AppTypography.fontFamily,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: context.accent,
-                          ),
-                        ),
-                      ),
-                      if (isCustom) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: context.isDark ? const Color(0x20FFFFFF) : const Color(0xFFE2E8F0),
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          ),
-                          child: Text(
-                            'CUSTOM',
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                              color: context.textPrimary,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                      const Spacer(),
-                      if (_isSelectionMode) ...[
-                        Text(
-                          isSelected ? 'Selected' : 'Tap to select',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? context.accent : context.textTertiary,
-                          ),
-                        ),
-                      ] else ...[
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                          onPressed: () => _confirmDeleteRoutine(r),
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'Delete preset',
-                        ),
-                        const SizedBox(width: 2),
-                        IconButton(
-                          icon: Icon(Icons.qr_code_2_rounded, size: 20, color: context.textSecondary),
-                          onPressed: () => _shareRoutineQr(r),
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'Share QR code',
-                        ),
-                        const SizedBox(width: 2),
-                        IconButton(
-                          icon: Icon(Icons.play_circle_fill_rounded, size: 22, color: context.accent),
-                          onPressed: () => _confirmApplyRoutine(r),
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'Load routine',
-                        ),
-                      ],
-                    ],
+            Row(
+              children: [
+                if (_isSelectionMode) ...[
+                  Checkbox(
+                    value: isSelected,
+                    activeColor: context.accent,
+                    onChanged: (_) => _toggleSelectRoutine(r.id),
                   ),
+                  const SizedBox(width: 4),
+                ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: context.accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    border: Border.all(color: context.accent.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    '${r.items.length} Exercises',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: context.accent,
+                    ),
+                  ),
+                ),
+                if (isCustom) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: context.isDark ? const Color(0x20FFFFFF) : const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    ),
+                    child: Text(
+                      'CUSTOM',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        color: context.textPrimary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                if (_isSelectionMode) ...[
+                  Text(
+                    isSelected ? 'Selected' : 'Tap to select',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? context.accent : context.textTertiary,
+                    ),
+                  ),
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                    onPressed: () => _confirmDeleteRoutine(r),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Delete preset',
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    icon: Icon(Icons.qr_code_2_rounded, size: 20, color: context.textSecondary),
+                    onPressed: () => _shareRoutineQr(r),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Share QR code',
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    icon: Icon(Icons.play_circle_fill_rounded, size: 22, color: context.accent),
+                    onPressed: () => _confirmApplyRoutine(r),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Load routine',
+                  ),
+                ],
+              ],
+            ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               r.name,
@@ -730,20 +725,6 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
           ],
         ),
       ),
-      Positioned(
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 140,
-        child: AnatomicalRoutineVisual(
-          routineName: r.name,
-          compact: true,
-          width: 140,
-        ),
-      ),
-    ],
-  ),
-),
-);
+    );
   }
 }
