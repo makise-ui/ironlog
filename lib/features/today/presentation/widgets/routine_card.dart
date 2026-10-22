@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/widgets/scale_tap.dart';
+import 'anatomical_routine_visual.dart';
 
 class RoutineCard extends StatelessWidget {
   const RoutineCard(
@@ -17,24 +18,8 @@ class RoutineCard extends StatelessWidget {
   final VoidCallback? onTap;
   final IconData? icon;
 
-  String? _resolvePresetImage() {
-    if (icon == Icons.add_rounded) return null;
-    final lower = name.toLowerCase();
-    if (lower.contains('push') || lower.contains('chest')) {
-      return 'assets/images/push_preset.jpg';
-    } else if (lower.contains('pull') || lower.contains('back')) {
-      return 'assets/images/pull_preset.jpg';
-    } else if (lower.contains('leg') || lower.contains('lower') || lower.contains('squat')) {
-      return 'assets/images/legs_preset.jpg';
-    } else if (lower.contains('upper')) {
-      return 'assets/images/push_preset.jpg';
-    }
-    return 'assets/images/hero_workout.jpg';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final imageAsset = _resolvePresetImage();
     final isNewPreset = icon == Icons.add_rounded;
 
     return ScaleTap(
@@ -59,38 +44,17 @@ class RoutineCard extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Partial preset image on the right fading towards the left
-              if (imageAsset != null)
+              // Biomechanical anatomical muscle heatmap visual on the right
+              if (!isNewPreset)
                 Positioned(
                   top: 0,
                   right: 0,
                   bottom: 0,
-                  width: 105,
-                  child: IgnorePointer(
-                    child: ShaderMask(
-                      shaderCallback: (bounds) {
-                        return LinearGradient(
-                          begin: Alignment.centerRight,
-                          end: Alignment.centerLeft,
-                          colors: [
-                            Colors.white.withValues(alpha: context.isDark ? 0.88 : 0.78),
-                            Colors.white.withValues(alpha: context.isDark ? 0.35 : 0.25),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.60, 1.0],
-                        ).createShader(bounds);
-                      },
-                      blendMode: BlendMode.dstIn,
-                      child: Opacity(
-                        opacity: context.isDark ? 0.88 : 0.72,
-                        child: Image.asset(
-                          imageAsset,
-                          fit: BoxFit.cover,
-                          alignment: const Alignment(0.3, 0.0),
-                          errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
-                        ),
-                      ),
-                    ),
+                  width: 95,
+                  child: AnatomicalRoutineVisual(
+                    routineName: name,
+                    compact: true,
+                    width: 95,
                   ),
                 ),
 

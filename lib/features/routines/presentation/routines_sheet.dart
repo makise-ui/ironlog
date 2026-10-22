@@ -15,6 +15,7 @@ import '../../../core/widgets/glass_button.dart';
 import '../../../domain/services/plan_share_service.dart';
 import 'create_preset_sheet.dart';
 import '../../today/presentation/widgets/ai_assistant_sheet.dart';
+import '../../today/presentation/widgets/anatomical_routine_visual.dart';
 
 class RoutinesSheet extends ConsumerStatefulWidget {
   final String workoutId;
@@ -599,23 +600,8 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
     );
   }
 
-  String? _resolvePresetImage(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('push')) {
-      return 'assets/images/push_preset.jpg';
-    } else if (lower.contains('pull')) {
-      return 'assets/images/pull_preset.jpg';
-    } else if (lower.contains('leg') || lower.contains('lower') || lower.contains('squat')) {
-      return 'assets/images/legs_preset.jpg';
-    } else if (lower.contains('upper')) {
-      return 'assets/images/push_preset.jpg';
-    }
-    return null;
-  }
-
   Widget _buildRoutineTile(RoutineModel r, {required bool isCustom}) {
     final exNames = r.items.map((i) => i.exercise.name).join(', ');
-    final imageAsset = _resolvePresetImage(r.name);
     final isSelected = _selectedRoutineIds.contains(r.id);
 
     return Container(
@@ -744,40 +730,17 @@ class _RoutinesSheetState extends ConsumerState<RoutinesSheet> {
           ],
         ),
       ),
-      if (imageAsset != null)
-        Positioned(
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 200,
-          child: IgnorePointer(
-            child: ShaderMask(
-              shaderCallback: (bounds) {
-                return LinearGradient(
-                  begin: Alignment.centerRight,
-                  end: Alignment.centerLeft,
-                  colors: [
-                    Colors.white.withValues(alpha: context.isDark ? 0.92 : 0.82),
-                    Colors.white.withValues(alpha: context.isDark ? 0.60 : 0.45),
-                    Colors.white.withValues(alpha: context.isDark ? 0.20 : 0.12),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.55, 0.85, 1.0],
-                ).createShader(bounds);
-              },
-              blendMode: BlendMode.dstIn,
-              child: Opacity(
-                opacity: context.isDark ? 0.90 : 0.70,
-                child: Image.asset(
-                  imageAsset,
-                  fit: BoxFit.cover,
-                  alignment: const Alignment(0.0, 0.0),
-                  errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
-                ),
-              ),
-            ),
-          ),
+      Positioned(
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 140,
+        child: AnatomicalRoutineVisual(
+          routineName: r.name,
+          compact: true,
+          width: 140,
         ),
+      ),
     ],
   ),
 ),
