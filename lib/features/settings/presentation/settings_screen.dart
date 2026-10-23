@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -380,18 +381,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               style: TextStyle(color: context.textSecondary, fontSize: 12),
             ),
             if (result.releaseNotes != null && result.releaseNotes!.isNotEmpty) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Container(
-                constraints: const BoxConstraints(maxHeight: 120),
-                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(maxHeight: 220),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: context.cardElevated,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: context.cardBorder, width: 0.8),
                 ),
                 child: SingleChildScrollView(
-                  child: Text(
-                    result.releaseNotes!,
-                    style: TextStyle(color: context.textSecondary, fontSize: 11),
+                  child: MarkdownBody(
+                    data: result.releaseNotes!,
+                    selectable: true,
+                    onTapLink: (text, href, title) {
+                      if (href != null) {
+                        launchUrl(Uri.parse(href), mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                      p: TextStyle(color: context.textSecondary, fontSize: 12, height: 1.45),
+                      h1: TextStyle(color: context.textPrimary, fontSize: 14.5, fontWeight: FontWeight.w700),
+                      h2: TextStyle(color: context.textPrimary, fontSize: 13.5, fontWeight: FontWeight.w700),
+                      h3: TextStyle(color: context.textPrimary, fontSize: 12.5, fontWeight: FontWeight.w600),
+                      strong: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700),
+                      em: TextStyle(color: context.textSecondary, fontStyle: FontStyle.italic),
+                      listBullet: TextStyle(color: context.accent, fontSize: 12),
+                      code: TextStyle(
+                        color: context.accent,
+                        backgroundColor: context.isDark ? const Color(0xFF1E2230) : const Color(0xFFE2E8F0),
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                      ),
+                      codeblockDecoration: BoxDecoration(
+                        color: context.isDark ? const Color(0xFF161922) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
                   ),
                 ),
               ),

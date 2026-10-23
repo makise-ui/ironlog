@@ -142,7 +142,7 @@ class WorkoutDetailSheet extends ConsumerWidget {
                             imagePath: exItem.exercise.imagePath,
                             muscleGroupId: exItem.exercise.muscleGroupId,
                             equipment: exItem.exercise.equipment.name,
-                            size: 40,
+                            size: 46,
                           ),
                           const SizedBox(width: 10),
                           Expanded(

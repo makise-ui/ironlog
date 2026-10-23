@@ -696,13 +696,13 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                 imagePath: ex.imagePath,
                 muscleGroupId: ex.muscleGroupId,
                 equipment: ex.equipment.name,
-                size: 34,
+                size: 46,
                 onTap: () {
                   AppHaptics.selection();
                   widget.onExerciseFocused?.call();
                 },
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -827,14 +827,14 @@ class _ExerciseTableCardState extends ConsumerState<ExerciseTableCard> {
                   imagePath: ex.imagePath,
                   muscleGroupId: ex.muscleGroupId,
                   equipment: ex.equipment.name,
-                  size: isCompact ? 30 : 38,
+                  size: isCompact ? 46 : 50,
                   onTap: () async {
                     AppHaptics.tap();
                     await ExerciseGuideSheet.show(context, ex, () {});
                     widget.onRefresh();
                   },
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
