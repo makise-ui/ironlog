@@ -1105,13 +1105,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            'Active Neuromuscular Regeneration • Streak Preserved',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 11.0,
-                              color: context.textSecondary,
-                              fontWeight: FontWeight.w600,
+                          Expanded(
+                            child: Text(
+                              'Active Neuromuscular Regeneration • Streak Preserved',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 11.0,
+                                color: context.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -1251,50 +1255,49 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     const SizedBox(height: 5),
 
                     // Muscle Group Chips & High Volume Callout
-                    Row(
+                    Wrap(
+                      spacing: 4.5,
+                      runSpacing: 4.0,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Wrap(
-                          spacing: 4.5,
-                          children: targetMuscles.map((m) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF141724) : const Color(0xFFF1F4FA),
-                                borderRadius: BorderRadius.circular(5),
-                                border: Border.all(
-                                  color: C.accent.withValues(alpha: isDark ? 0.22 : 0.15),
-                                  width: 0.6,
+                        ...targetMuscles.map((m) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF141724) : const Color(0xFFF1F4FA),
+                              borderRadius: BorderRadius.circular(5),
+                              border: Border.all(
+                                color: C.accent.withValues(alpha: isDark ? 0.22 : 0.15),
+                                width: 0.6,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 3.5,
+                                  height: 3.5,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: C.accent,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 3.5,
-                                    height: 3.5,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: C.accent,
-                                    ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  m.toUpperCase(),
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.3,
+                                    color: context.textPrimary,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    m.toUpperCase(),
-                                    style: TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 8.5,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.3,
-                                      color: context.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        if (isHeavyVolume) ...[
-                          const SizedBox(width: 5),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        if (isHeavyVolume)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
@@ -1323,7 +1326,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               ],
                             ),
                           ),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
