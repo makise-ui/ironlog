@@ -72,6 +72,7 @@ class TodayHeroSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final targetMuscles = _extractMuscleTags(title);
     final loadScore = _calculateLoadScore();
 
@@ -81,14 +82,23 @@ class TodayHeroSessionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: C.surface,
           borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: C.hairline),
-          boxShadow: context.isDark
-              ? null
+          border: Border.all(
+            color: isDark ? const Color(0xFF232733) : const Color(0xFFE2E5ED),
+            width: 1.0,
+          ),
+          boxShadow: isDark
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
               : [
                   const BoxShadow(
-                    color: Color(0x06000000),
-                    blurRadius: 10,
-                    offset: Offset(0, 3),
+                    color: Color(0x08000000),
+                    blurRadius: 14,
+                    offset: Offset(0, 4),
                   ),
                 ],
         ),
@@ -108,9 +118,12 @@ class TodayHeroSessionCard extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: C.surfaceHi,
+                          color: isDark ? const Color(0xFF161922) : const Color(0xFFF1F3F9),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: C.hairline),
+                          border: Border.all(
+                            color: C.accent.withValues(alpha: isDark ? 0.28 : 0.20),
+                            width: 0.8,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -139,7 +152,7 @@ class TodayHeroSessionCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left Column: Clean Title, Target Muscle Badges & Subtitle
+                  // Left Column: Clean Title, Target Muscle Badges & Readiness Subtitle
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,12 +176,12 @@ class TodayHeroSessionCard extends StatelessWidget {
                             runSpacing: 5,
                             children: targetMuscles.map((m) {
                               return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                padding: const EdgeInsets.symmetric(horizontal: 7.5, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: C.accent.withValues(alpha: 0.10),
+                                  color: isDark ? const Color(0xFF161924) : const Color(0xFFF1F4FA),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: C.accent.withValues(alpha: 0.22),
+                                    color: C.accent.withValues(alpha: isDark ? 0.24 : 0.16),
                                     width: 0.8,
                                   ),
                                 ),
@@ -181,15 +194,22 @@ class TodayHeroSessionCard extends StatelessWidget {
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: C.accent,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: C.accent.withValues(alpha: 0.60),
+                                            blurRadius: 3,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                     const SizedBox(width: 4.5),
                                     Text(
-                                      m,
+                                      m.toUpperCase(),
                                       style: TextStyle(
                                         fontFamily: 'Inter',
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.4,
                                         color: context.textPrimary,
                                       ),
                                     ),
@@ -201,15 +221,31 @@ class TodayHeroSessionCard extends StatelessWidget {
                           const SizedBox(height: 8),
                         ],
 
-                        Text(
-                          subtitle,
-                          style: T.body.copyWith(
-                            color: C.text2,
-                            fontSize: 12.5,
-                            height: 1.35,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        // Neuromuscular Readiness Insight with Telemetry Icon
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2, right: 6),
+                              child: Icon(
+                                Icons.bolt_rounded,
+                                size: 13,
+                                color: C.accent,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                subtitle,
+                                style: T.body.copyWith(
+                                  color: C.text2,
+                                  fontSize: 12,
+                                  height: 1.35,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -234,37 +270,40 @@ class TodayHeroSessionCard extends StatelessWidget {
               ),
               const SizedBox(height: S.lg),
 
-              // 3. Meta statistics capsule (Exercises & Duration)
+              // 3. Telemetry Metrics Segmented Strip (Movements & Duration)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7.5),
                 decoration: BoxDecoration(
-                  color: C.surfaceHi,
+                  color: isDark ? const Color(0xFF161922) : const Color(0xFFF4F6FB),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: C.hairline),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF262A36) : const Color(0xFFE2E6EF),
+                    width: 0.8,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildMetaItem(
                       Icons.fitness_center_rounded,
-                      '$exerciseCount ${exerciseCount == 1 ? "exercise" : "exercises"}',
+                      '$exerciseCount ${exerciseCount == 1 ? "Movement" : "Movements"}',
                     ),
                     Container(
                       height: 12,
                       width: 1,
                       margin: const EdgeInsets.symmetric(horizontal: 10),
-                      color: C.hairline,
+                      color: isDark ? const Color(0xFF2C3140) : const Color(0xFFD6DBE5),
                     ),
                     _buildMetaItem(
                       Icons.schedule_rounded,
-                      isActive && elapsedText != null ? elapsedText! : '~$estimatedMinutes min',
+                      isActive && elapsedText != null ? elapsedText! : '~$estimatedMinutes min duration',
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: S.lg),
 
-              // 4. Hero CTA Button
+              // 4. Luxury Tactile Hero CTA Button with Top Specular Hairline & Glow
               ScaleTap(
                 onPressed: onStartWorkout,
                 child: Container(
@@ -272,7 +311,20 @@ class TodayHeroSessionCard extends StatelessWidget {
                   height: 52,
                   decoration: BoxDecoration(
                     color: C.accent,
-                    borderRadius: BorderRadius.circular(R.button),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: C.accent.withValues(alpha: isDark ? 0.32 : 0.22),
+                        blurRadius: 16,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        width: 1.0,
+                      ),
+                    ),
                   ),
                   alignment: Alignment.center,
                   child: Row(
@@ -294,12 +346,13 @@ class TodayHeroSessionCard extends StatelessWidget {
                                 ? 'Reopen Workout Session'
                                 : (isActive
                                     ? (isPaused ? 'Resume Workout' : 'Continue Workout')
-                                    : (isRestDay ? 'Log Workout Anyway' : 'Start Workout')),
+                                    : (isRestDay ? 'Log Workout Anyway' : 'Start Workout Session')),
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 15.5,
                               fontWeight: FontWeight.w700,
                               color: C.onAccent,
+                              letterSpacing: -0.2,
                             ),
                           ),
                         ),
@@ -367,17 +420,23 @@ class TodayHeroSessionCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
+            width: 5.5,
+            height: 5.5,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: dotColor,
+              boxShadow: [
+                BoxShadow(
+                  color: dotColor.withValues(alpha: 0.6),
+                  blurRadius: 4,
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: T.label.copyWith(fontSize: 10, color: C.text2),
+            style: T.label.copyWith(fontSize: 10, color: C.text2, letterSpacing: 0.3),
           ),
         ],
       ),
@@ -388,12 +447,12 @@ class TodayHeroSessionCard extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: C.text2),
+        Icon(icon, size: 14, color: C.text2),
         const SizedBox(width: 5),
         Text(
           text,
           style: T.body.copyWith(
-            fontSize: 12.5,
+            fontSize: 12,
             color: C.text1,
             fontWeight: FontWeight.w600,
           ),

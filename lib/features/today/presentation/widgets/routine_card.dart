@@ -50,9 +50,18 @@ class RoutineCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: C.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: C.hairline),
+          border: Border.all(
+            color: context.isDark ? const Color(0xFF232733) : const Color(0xFFE2E5ED),
+            width: 1.0,
+          ),
           boxShadow: context.isDark
-              ? null
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
               : [
                   const BoxShadow(
                     color: Color(0x06000000),
