@@ -42,31 +42,48 @@ class RoutineCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isNewPreset = icon == Icons.add_rounded;
     final loadScore = _resolveRoutineLoad(name);
+    final isDark = context.isDark;
 
     return ScaleTap(
       onPressed: onTap,
       child: Container(
         width: 178,
         decoration: BoxDecoration(
-          color: C.surface,
+          gradient: isDark
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF161925),
+                    Color(0xFF0F1118),
+                  ],
+                )
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFFFFFFF),
+                    Color(0xFFF6F8FC),
+                  ],
+                ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: context.isDark ? const Color(0xFF232733) : const Color(0xFFE2E5ED),
+            color: isDark ? const Color(0xFF282D3D) : const Color(0xFFDFE3EC),
             width: 1.0,
           ),
-          boxShadow: context.isDark
+          boxShadow: isDark
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
                 ]
               : [
                   const BoxShadow(
-                    color: Color(0x06000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
+                    color: Color(0x08000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
                   ),
                 ],
         ),
@@ -76,21 +93,28 @@ class RoutineCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Top Row: Category icon on left, Biometric Telemetry Ring on right
+              // Top Row: Category icon on left, Biometric Micro-Chronograph Ring on right
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(6.5),
                     decoration: BoxDecoration(
-                      color: isNewPreset ? C.accent.withValues(alpha: 0.15) : C.surfaceHi,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: C.hairline),
+                      color: isNewPreset
+                          ? C.accent.withValues(alpha: 0.15)
+                          : (isDark ? const Color(0xFF1B1E2B) : const Color(0xFFEEF1F8)),
+                      borderRadius: BorderRadius.circular(8.5),
+                      border: Border.all(
+                        color: isNewPreset
+                            ? C.accent.withValues(alpha: 0.35)
+                            : (isDark ? const Color(0xFF2B3042) : const Color(0xFFE2E6F0)),
+                        width: 0.8,
+                      ),
                     ),
                     child: Icon(
                       icon ?? Icons.fitness_center_rounded,
-                      size: 14,
-                      color: isNewPreset ? C.accent : C.text2,
+                      size: 14.5,
+                      color: isNewPreset ? C.accent : context.textSecondary,
                     ),
                   ),
                   if (!isNewPreset)
@@ -101,11 +125,12 @@ class RoutineCard extends StatelessWidget {
                     )
                   else
                     Container(
-                      padding: const EdgeInsets.all(5),
+                      padding: const EdgeInsets.all(5.5),
                       decoration: BoxDecoration(
-                        color: C.surfaceHi,
+                        color: isDark ? const Color(0xFF1B1E2B) : const Color(0xFFEEF1F8),
                         shape: BoxShape.circle,
-                        border: Border.all(color: C.hairline),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF2B3042) : const Color(0xFFE2E6F0)),
                       ),
                       child: Icon(
                         Icons.add_rounded,
@@ -126,21 +151,21 @@ class RoutineCard extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: C.text1,
+                      fontWeight: FontWeight.w800,
+                      color: context.textPrimary,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 3.5),
                   Text(
                     detail,
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 11.5,
                       fontWeight: FontWeight.w500,
-                      color: C.text2,
+                      color: context.textSecondary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
