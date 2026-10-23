@@ -158,6 +158,16 @@ class ExerciseRepository {
     BackupService.scheduleAutoBackup(_db);
   }
 
+  Future<void> updateExerciseImageByName(String name, String? imagePath) async {
+    final clean = name.trim().toLowerCase();
+    await (_db.update(_db.exercises)..where((t) => t.name.lower().equals(clean))).write(
+      ExercisesCompanion(
+        imagePath: Value(imagePath),
+      ),
+    );
+    BackupService.scheduleAutoBackup(_db);
+  }
+
   Future<void> updateExerciseTrackingType(String id, ExerciseTrackingType trackingType) async {
     await (_db.update(_db.exercises)..where((t) => t.id.equals(id))).write(
       ExercisesCompanion(

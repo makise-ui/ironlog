@@ -8,6 +8,7 @@ import '../../../core/widgets/glass_button.dart';
 import '../../../core/widgets/scale_tap.dart';
 import '../../../domain/models/exercise_model.dart';
 import '../../../domain/services/weight_step_learner.dart';
+import '../../../domain/services/exercise_auto_image_service.dart';
 import '../../../data/providers.dart';
 import 'custom_exercise_dialog.dart';
 import 'edit_exercise_dialog.dart';
@@ -75,6 +76,28 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
         _allExercises = exercises;
         _isLoading = false;
       });
+
+      // Background prefetch for top initial exercises lacking images
+      final unassigned = exercises
+          .where((e) => (e.imagePath == null || e.imagePath!.isEmpty))
+          .take(15)
+          .map((e) => (name: e.name, id: e.id as String?))
+          .toList();
+      if (unassigned.isNotEmpty) {
+        ExerciseAutoImageService.prefetchBatch(unassigned, ref.read(databaseProvider));
+      }
+    }
+  }
+
+  void _prefetchSearchResults() {
+    final filtered = _getFilteredExercises();
+    final toPrefetch = filtered
+        .where((e) => e.imagePath == null || e.imagePath!.isEmpty)
+        .take(10)
+        .map((e) => (name: e.name, id: e.id as String?))
+        .toList();
+    if (toPrefetch.isNotEmpty) {
+      ExerciseAutoImageService.prefetchBatch(toPrefetch, ref.read(databaseProvider));
     }
   }
 
@@ -282,7 +305,10 @@ class _ExercisePickerSheetState extends ConsumerState<ExercisePickerSheet> {
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) {
+                  setState(() {});
+                  _prefetchSearchResults();
+                },
               ),
             ),
           ),

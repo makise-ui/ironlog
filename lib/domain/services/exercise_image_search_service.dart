@@ -23,7 +23,7 @@ class ExerciseImageCandidate {
 }
 
 class ExerciseImageSearchService {
-  static const Map<String, String> _webHeaders = {
+  static const Map<String, String> webHeaders = {
     'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     'Accept':
@@ -141,7 +141,7 @@ class ExerciseImageSearchService {
 
     // 1. Instant static lookup for top common movements (0ms)
     for (final entry in _instantStaticImageMap.entries) {
-      if (cacheKey == entry.key || cacheKey.contains(entry.key) || entry.key.contains(cacheKey)) {
+      if (cacheKey == entry.key) {
         final instant = [
           ExerciseImageCandidate(
             title: '$clean Form',
@@ -181,61 +181,98 @@ class ExerciseImageSearchService {
       }
     } catch (_) {}
 
-    // 4. Fast network search with reduced 3.5s timeout
-    final query = '$clean gym exercise form';
+    // 4. Fast network search with reliable 8s timeout
+    final cleanQuery = clean
+        .replaceAll(RegExp(r'\([^)]*\)'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final query = '$cleanQuery gym exercise form';
     final url = Uri.parse(
       'https://www.bing.com/images/search?q=${Uri.encodeComponent(query)}&FORM=HDRSC2',
     );
 
     try {
       final response = await http
-          .get(url, headers: _webHeaders)
-          .timeout(const Duration(milliseconds: 3500));
+          .get(url, headers: webHeaders)
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final html = response.body;
-        final murlRegex = RegExp(r'&quot;murl&quot;:&quot;(https://[^&]+)&quot;');
-        final titleRegex = RegExp(r'&quot;t&quot;:&quot;([^&]+)&quot;');
 
-        final murlMatches = murlRegex.allMatches(html).toList();
+        // Bing image search encodes JSON blobs with murl (publisher URL), turl (CDN thumb URL), and t (title)
+        final pairRegex = RegExp(r'&quot;murl&quot;:&quot;([^&"]+)&quot;.*?&quot;turl&quot;:&quot;([^&"]+(?:&amp;[^&"]+)*)&quot;');
+        final pairMatches = pairRegex.allMatches(html).toList();
+
+        final titleRegex = RegExp(r'&quot;t&quot;:&quot;([^&]+)&quot;');
         final titleMatches = titleRegex.allMatches(html).toList();
 
         final List<ExerciseImageCandidate> candidates = [];
         final Set<String> seenUrls = {};
 
-        for (int i = 0; i < murlMatches.length && candidates.length < 6; i++) {
-          final imgUrl = murlMatches[i].group(1);
-          if (imgUrl == null || seenUrls.contains(imgUrl)) continue;
+        if (pairMatches.isNotEmpty) {
+          for (int i = 0; i < pairMatches.length && candidates.length < 8; i++) {
+            final murl = pairMatches[i].group(1);
+            final rawTurl = pairMatches[i].group(2);
+            if (murl == null && rawTurl == null) continue;
 
-          final lower = imgUrl.toLowerCase();
-          if (lower.endsWith('.svg') ||
-              lower.contains('logo') ||
-              lower.contains('avatar') ||
-              lower.contains('icon') ||
-              lower.contains('tracker')) {
-            continue;
+            final effectiveTurl = rawTurl?.replaceAll('&amp;', '&');
+            final effectiveFullUrl = murl ?? effectiveTurl;
+            final effectiveThumbUrl = effectiveTurl ?? murl;
+            if (effectiveThumbUrl == null || seenUrls.contains(effectiveThumbUrl)) continue;
+
+            final lower = (murl ?? '').toLowerCase();
+            if (lower.endsWith('.svg') ||
+                lower.contains('logo') ||
+                lower.contains('avatar') ||
+                lower.contains('icon') ||
+                lower.contains('tracker')) {
+              continue;
+            }
+
+            seenUrls.add(effectiveThumbUrl);
+            String title = i < titleMatches.length
+                ? (titleMatches[i].group(1) ?? '$clean Form')
+                : '$clean Form';
+            title = title
+                .replaceAll('&quot;', '"')
+                .replaceAll('&#39;', "'")
+                .replaceAll('&amp;', '&');
+
+            final tag = candidates.isEmpty ? 'STARTING POSITION' : 'FORM DEMONSTRATION';
+
+            candidates.add(
+              ExerciseImageCandidate(
+                title: title,
+                thumbnailUrl: effectiveThumbUrl,
+                fullUrl: effectiveFullUrl!,
+                source: 'Web Search',
+                positionTag: tag,
+              ),
+            );
           }
+        } else {
+          // Fallback regex in case HTML attributes appear in reverse order
+          final turlRegex = RegExp(r'&quot;turl&quot;:&quot;(https:[^&"]+?(?:&amp;[^&"]*)*)&quot;');
+          final murlRegex = RegExp(r'&quot;murl&quot;:&quot;(https://[^&"]+)&quot;');
+          final turls = turlRegex.allMatches(html).map((m) => m.group(1)?.replaceAll('&amp;', '&')).whereType<String>().toList();
+          final murls = murlRegex.allMatches(html).map((m) => m.group(1)).whereType<String>().toList();
 
-          seenUrls.add(imgUrl);
-          String title = i < titleMatches.length
-              ? (titleMatches[i].group(1) ?? '$clean Form')
-              : '$clean Form';
-          title = title
-              .replaceAll('&quot;', '"')
-              .replaceAll('&#39;', "'")
-              .replaceAll('&amp;', '&');
+          for (int i = 0; i < turls.length && candidates.length < 8; i++) {
+            final turl = turls[i];
+            final murl = i < murls.length ? murls[i] : turl;
+            if (seenUrls.contains(turl)) continue;
+            seenUrls.add(turl);
 
-          final tag = candidates.isEmpty ? 'STARTING POSITION' : 'FORM DEMONSTRATION';
-
-          candidates.add(
-            ExerciseImageCandidate(
-              title: title,
-              thumbnailUrl: imgUrl,
-              fullUrl: imgUrl,
-              source: 'Web Search',
-              positionTag: tag,
-            ),
-          );
+            candidates.add(
+              ExerciseImageCandidate(
+                title: '$clean Form',
+                thumbnailUrl: turl,
+                fullUrl: murl,
+                source: 'Web Search',
+                positionTag: candidates.isEmpty ? 'STARTING POSITION' : 'FORM DEMONSTRATION',
+              ),
+            );
+          }
         }
 
         if (candidates.isNotEmpty) {
@@ -247,7 +284,7 @@ class ExerciseImageSearchService {
       }
     } catch (_) {}
 
-    // Fallback: Wikimedia Commons query with reduced 3.5s timeout
+    // Fallback: Wikimedia Commons query with 6s timeout
     final fallbackCandidates = await _searchWikimediaPositionImages(clean);
     if (fallbackCandidates.isNotEmpty) {
       _memorySearchCache[cacheKey] = fallbackCandidates;
@@ -392,11 +429,11 @@ class ExerciseImageSearchService {
     required String imageUrl,
   }) async {
     try {
-      final response = await http.get(Uri.parse(imageUrl), headers: _webHeaders).timeout(
-        const Duration(seconds: 10),
+      final response = await http.get(Uri.parse(imageUrl), headers: webHeaders).timeout(
+        const Duration(seconds: 12),
       );
 
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
 
       final appDir = await getApplicationDocumentsDirectory();
       final imagesDir = Directory('${appDir.path}/exercise_images');
@@ -405,13 +442,14 @@ class ExerciseImageSearchService {
       }
 
       final ext = imageUrl.toLowerCase().contains('.png') ? 'png' : 'jpg';
-      final fileName = '${exerciseId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final cleanId = exerciseId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final fileName = '${cleanId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final localFile = File('${imagesDir.path}/$fileName');
 
       await localFile.writeAsBytes(response.bodyBytes);
       return localFile.path;
     } catch (_) {
-      return imageUrl;
+      return null;
     }
   }
 

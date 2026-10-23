@@ -114,7 +114,7 @@ class ExerciseMediaService {
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
 
-      if (clean == keyClean || clean.contains(keyClean) || keyClean.contains(clean)) {
+      if (clean == keyClean) {
         return ExerciseMediaInfo(
           source: entry.value,
           isLocalAsset: true,

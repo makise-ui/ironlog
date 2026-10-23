@@ -8,6 +8,7 @@ import 'repositories/settings_repository.dart';
 import '../domain/models/exercise_model.dart';
 import '../domain/models/routine_model.dart';
 import '../domain/services/rest_timer_service.dart';
+import '../domain/services/exercise_auto_image_service.dart';
 import '../core/utils/unit_converter.dart';
 import '../core/utils/date_utils.dart';
 import '../core/theme/app_colors.dart';
@@ -18,6 +19,7 @@ final selectedWorkoutDateProvider = StateProvider<DateTime>((ref) {
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
+  ExerciseAutoImageService.init(db);
   ref.onDispose(() => db.close());
   return db;
 });

@@ -10,6 +10,7 @@ import '../../../../core/widgets/scale_tap.dart';
 import '../../../../data/providers.dart';
 import '../../../../domain/models/exercise_model.dart';
 import '../../../../domain/services/exercise_image_search_service.dart';
+import '../../../../domain/services/exercise_auto_image_service.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 
 class ExerciseImagePickerSheet extends ConsumerStatefulWidget {
@@ -160,6 +161,9 @@ class _ExerciseImagePickerSheetState extends ConsumerState<ExerciseImagePickerSh
         widget.exercise.id,
         finalPath,
       );
+      final updatedMap = Map<String, String>.from(ExerciseAutoImageService.resolvedImagesNotifier.value);
+      updatedMap[widget.exercise.name.toLowerCase().trim()] = finalPath;
+      ExerciseAutoImageService.resolvedImagesNotifier.value = updatedMap;
       widget.onImageSelected?.call(finalPath);
     }
 
@@ -175,6 +179,9 @@ class _ExerciseImagePickerSheetState extends ConsumerState<ExerciseImagePickerSh
       widget.exercise.id,
       null,
     );
+    final updatedMap = Map<String, String>.from(ExerciseAutoImageService.resolvedImagesNotifier.value);
+    updatedMap.remove(widget.exercise.name.toLowerCase().trim());
+    ExerciseAutoImageService.resolvedImagesNotifier.value = updatedMap;
     widget.onImageSelected?.call(null);
     if (mounted) {
       Navigator.of(context).pop(null);

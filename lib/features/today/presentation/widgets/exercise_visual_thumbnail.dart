@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../domain/services/exercise_media_service.dart';
 import '../../../../domain/services/exercise_auto_image_service.dart';
+import '../../../../domain/services/exercise_image_search_service.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import 'exercise_diagram_painter.dart';
 
@@ -50,9 +51,10 @@ class ExerciseVisualThumbnail extends StatelessWidget {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return Image.network(
         path,
+        headers: ExerciseImageSearchService.webHeaders,
         fit: fit,
-        cacheWidth: (size * 2).toInt(),
-        cacheHeight: (size * 2).toInt(),
+        cacheWidth: (size * 2).clamp(80, 240).toInt(),
+        cacheHeight: (size * 2).clamp(80, 240).toInt(),
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
           return ShimmerLoading(
@@ -61,7 +63,15 @@ class ExerciseVisualThumbnail extends StatelessWidget {
             borderRadius: BorderRadius.circular(9),
           );
         },
-        errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
+        errorBuilder: (context, error, stackTrace) {
+          if (exerciseName != null) {
+            ExerciseAutoImageService.retryFetch(
+              exerciseName: exerciseName!,
+              exerciseId: exerciseId,
+            );
+          }
+          return _buildFallbackVector(isDark);
+        },
       );
     }
     final file = File(path);
@@ -69,17 +79,25 @@ class ExerciseVisualThumbnail extends StatelessWidget {
       return Image.file(
         file,
         fit: fit,
-        cacheWidth: (size * 2).toInt(),
-        cacheHeight: (size * 2).toInt(),
-        errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
+        cacheWidth: (size * 2).clamp(80, 240).toInt(),
+        cacheHeight: (size * 2).clamp(80, 240).toInt(),
+        errorBuilder: (context, error, stackTrace) {
+          if (exerciseName != null) {
+            ExerciseAutoImageService.retryFetch(
+              exerciseName: exerciseName!,
+              exerciseId: exerciseId,
+            );
+          }
+          return _buildFallbackVector(isDark);
+        },
       );
     }
     if (path.startsWith('assets/')) {
       return Image.asset(
         path,
         fit: fit,
-        cacheWidth: (size * 2).toInt(),
-        cacheHeight: (size * 2).toInt(),
+        cacheWidth: (size * 2).clamp(80, 240).toInt(),
+        cacheHeight: (size * 2).clamp(80, 240).toInt(),
         errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
       );
     }
@@ -98,9 +116,24 @@ class ExerciseVisualThumbnail extends StatelessWidget {
       listenable: ExerciseAutoImageService.resolvedImagesNotifier,
       builder: (context, _) {
         final autoResolved = ExerciseAutoImageService.getResolvedPath(exerciseName);
-        final effectiveImagePath = (imagePath != null && imagePath!.isNotEmpty)
+        String? effectiveImagePath = (imagePath != null && imagePath!.isNotEmpty)
             ? imagePath
             : autoResolved;
+
+        // If path is a local file that does not exist on disk, fall back to auto-resolved or null
+        if (effectiveImagePath != null &&
+            !effectiveImagePath.startsWith('http://') &&
+            !effectiveImagePath.startsWith('https://') &&
+            !effectiveImagePath.startsWith('assets/')) {
+          if (!File(effectiveImagePath).existsSync()) {
+            effectiveImagePath = (autoResolved != null &&
+                    (autoResolved.startsWith('http') ||
+                        autoResolved.startsWith('assets/') ||
+                        File(autoResolved).existsSync()))
+                ? autoResolved
+                : null;
+          }
+        }
 
         // If no image is available yet and not a verified GIF, trigger background fetch
         if (effectiveImagePath == null && mediaInfo == null && exerciseName != null) {
@@ -136,15 +169,16 @@ class ExerciseVisualThumbnail extends StatelessWidget {
                           ? Image.asset(
                               mediaInfo.source,
                               fit: BoxFit.contain,
-                              cacheWidth: (size * 2).toInt(),
-                              cacheHeight: (size * 2).toInt(),
+                              cacheWidth: (size * 2).clamp(80, 240).toInt(),
+                              cacheHeight: (size * 2).clamp(80, 240).toInt(),
                               errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
                             )
                           : Image.network(
                               mediaInfo.source,
+                              headers: ExerciseImageSearchService.webHeaders,
                               fit: BoxFit.contain,
-                              cacheWidth: (size * 2).toInt(),
-                              cacheHeight: (size * 2).toInt(),
+                              cacheWidth: (size * 2).clamp(80, 240).toInt(),
+                              cacheHeight: (size * 2).clamp(80, 240).toInt(),
                               errorBuilder: (context, error, stackTrace) => _buildFallbackVector(isDark),
                             ),
                     )
