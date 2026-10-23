@@ -119,6 +119,23 @@ class _WhatsNewSheetState extends ConsumerState<WhatsNewSheet> {
               'Your Current Version: ${result.currentVersion}',
               style: TextStyle(color: context.textSecondary, fontSize: 12),
             ),
+            if (result.releaseNotes != null && result.releaseNotes!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: context.cardElevated,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    result.releaseNotes!,
+                    style: TextStyle(color: context.textSecondary, fontSize: 11),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         actions: [

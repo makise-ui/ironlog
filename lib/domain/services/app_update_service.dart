@@ -45,6 +45,7 @@ class UpdateCheckResult {
   final String latestVersion;
   final AppReleaseInfo releaseInfo;
   final String? downloadUrl;
+  final String? releaseNotes;
 
   const UpdateCheckResult({
     required this.isUpdateAvailable,
@@ -52,6 +53,7 @@ class UpdateCheckResult {
     required this.latestVersion,
     required this.releaseInfo,
     this.downloadUrl,
+    this.releaseNotes,
   });
 }
 
@@ -184,25 +186,48 @@ class AppUpdateService {
   /// Check whether the app has an available update
   Future<UpdateCheckResult> checkForUpdates({bool isManual = false}) async {
     try {
-      // Check GitHub releases endpoint with a fast timeout
-      final uri = Uri.parse('https://api.github.com/repos/ironlog/ironlog/releases/latest');
+      // Check GitHub releases endpoint for the official repository
+      final uri = Uri.parse('https://api.github.com/repos/makise-ui/ironlog/releases/latest');
       final response = await http.get(uri, headers: {
         'Accept': 'application/vnd.github.v3+json',
         'User-Agent': 'IronLog-App',
-      }).timeout(const Duration(seconds: 4));
+      }).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final tagName = data['tag_name'] as String? ?? currentVersion;
         final htmlUrl = data['html_url'] as String?;
+        final body = data['body'] as String?;
         final isNewer = _isVersionNewer(tagName, currentVersion);
+
+        // Extract direct APK asset download URL if available
+        String? downloadUrl;
+        final assets = (data['assets'] as List<dynamic>?) ?? [];
+        for (final asset in assets) {
+          final name = (asset['name'] as String? ?? '').toLowerCase();
+          if (name.contains('arm64') && name.endsWith('.apk')) {
+            downloadUrl = asset['browser_download_url'] as String?;
+            break;
+          }
+        }
+        if (downloadUrl == null) {
+          for (final asset in assets) {
+            final name = (asset['name'] as String? ?? '').toLowerCase();
+            if (name.endsWith('.apk')) {
+              downloadUrl = asset['browser_download_url'] as String?;
+              break;
+            }
+          }
+        }
+        downloadUrl ??= htmlUrl;
 
         return UpdateCheckResult(
           isUpdateAvailable: isNewer,
           currentVersion: currentVersion,
           latestVersion: tagName,
           releaseInfo: currentRelease,
-          downloadUrl: htmlUrl,
+          downloadUrl: downloadUrl,
+          releaseNotes: body,
         );
       }
     } catch (_) {

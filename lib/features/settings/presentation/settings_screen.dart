@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/haptics.dart';
@@ -337,7 +338,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final res = await ref.read(appUpdateServiceProvider).checkForUpdates(isManual: true);
       if (mounted && context.mounted) {
         if (res.isUpdateAvailable) {
-          WhatsNewSheet.show(context);
+          _showUpdateAvailableDialog(res);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -350,6 +351,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } finally {
       if (mounted) setState(() => _isCheckingUpdates = false);
     }
+  }
+
+  void _showUpdateAvailableDialog(UpdateCheckResult result) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.system_update_rounded, color: context.accent, size: 24),
+            const SizedBox(width: 10),
+            const Text('Update Available!', style: AppTypography.titleMedium),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'A new version (${result.latestVersion}) of IronLog is ready to install.',
+              style: TextStyle(color: context.textPrimary, fontSize: 13.5),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Your Current Version: ${result.currentVersion}',
+              style: TextStyle(color: context.textSecondary, fontSize: 12),
+            ),
+            if (result.releaseNotes != null && result.releaseNotes!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: context.cardElevated,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    result.releaseNotes!,
+                    style: TextStyle(color: context.textSecondary, fontSize: 11),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Later', style: TextStyle(color: context.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.accent,
+              foregroundColor: context.onAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              if (result.downloadUrl != null) {
+                launchUrl(Uri.parse(result.downloadUrl!), mode: LaunchMode.externalApplication);
+              }
+            },
+            child: const Text('Download Update'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
