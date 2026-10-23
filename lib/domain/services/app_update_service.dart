@@ -64,13 +64,34 @@ final appUpdateServiceProvider = Provider<AppUpdateService>((ref) {
 class AppUpdateService {
   final SettingsRepository _settingsRepo;
 
-  static const String currentVersion = 'v1.6.0';
-  static const int currentBuildNumber = 9;
+  static const String currentVersion = 'v1.6.1';
+  static const int currentBuildNumber = 10;
 
   AppUpdateService(this._settingsRepo);
 
   /// Current and historical release notes
   static const List<AppReleaseInfo> releases = [
+    AppReleaseInfo(
+      version: 'v1.6.1',
+      buildNumber: 10,
+      releaseDate: 'October 2026',
+      title: 'High-Res CDN Thumbnails & Offline Visual Caching',
+      summary: 'Automatic background fetching of exercise visuals via high-speed CDN, persistent SQLite image caching, and seamless offline thumbnail support.',
+      highlights: [
+        ReleaseNoteItem(
+          title: 'Auto-Fetch Exercise Visuals',
+          description: 'Instant, silent background resolution of verified exercise movement demonstrations with Bing CDN integration.',
+          icon: Icons.image_rounded,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: 'Persistent Offline Visual Cache',
+          description: 'Thumbnails are cached locally to disk and recorded in SQLite for zero-latency offline viewing across Today cards and exercise pickers.',
+          icon: Icons.offline_pin_rounded,
+          tag: 'PERFORMANCE',
+        ),
+      ],
+    ),
     AppReleaseInfo(
       version: 'v1.6.0',
       buildNumber: 9,

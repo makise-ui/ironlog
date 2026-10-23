@@ -20,15 +20,14 @@ void main() {
 
   group('AppUpdateService Tests', () {
     test('Current release has valid highlights and metadata', () {
-      expect(AppUpdateService.currentVersion, 'v1.6.0');
-      expect(AppUpdateService.currentBuildNumber, 9);
+      expect(AppUpdateService.currentVersion, 'v1.6.1');
+      expect(AppUpdateService.currentBuildNumber, 10);
 
       final release = AppUpdateService.currentRelease;
-      expect(release.version, 'v1.6.0');
+      expect(release.version, 'v1.6.1');
       expect(release.highlights, isNotEmpty);
-      expect(release.highlights.any((h) => h.title.contains('Strain Waveform')), isTrue);
-      expect(release.highlights.any((h) => h.title.contains('Luxury History Telemetry')), isTrue);
-      expect(release.highlights.any((h) => h.title.contains('Markdown Changelogs')), isTrue);
+      expect(release.highlights.any((h) => h.title.contains('Auto-Fetch Exercise Visuals')), isTrue);
+      expect(release.highlights.any((h) => h.title.contains('Persistent Offline Visual Cache')), isTrue);
     });
 
     test('shouldShowWhatsNew returns true on first run and false after seen', () async {
