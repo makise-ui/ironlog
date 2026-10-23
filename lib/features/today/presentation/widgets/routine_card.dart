@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/widgets/scale_tap.dart';
-import 'workout_telemetry_dial.dart';
+import 'workout_strain_waveform.dart';
 
 class RoutineCard extends StatelessWidget {
   const RoutineCard(
@@ -93,7 +93,7 @@ class RoutineCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Top Row: Category icon on left, Biometric Micro-Chronograph Ring on right
+              // Top Row: Category icon on left, Biometric Micro-Strain Waveform on right
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -118,10 +118,10 @@ class RoutineCard extends StatelessWidget {
                     ),
                   ),
                   if (!isNewPreset)
-                    WorkoutTelemetryDial.compact(
-                      progress: loadScore,
-                      valueText: '${(loadScore * 100).toInt()}%',
-                      size: 38.0,
+                    WorkoutStrainWaveform.compact(
+                      loadScore: loadScore,
+                      width: 44.0,
+                      height: 20.0,
                     )
                   else
                     Container(

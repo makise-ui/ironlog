@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/widgets/scale_tap.dart';
-import 'workout_telemetry_dial.dart';
+import 'workout_strain_waveform.dart';
 
-/// Ultra-Luxury Hero Workout Session Card for Today Screen.
+/// Ultra-Luxury Hero Workout Session Card for Today Screen (Model 2: Editorial Strain Waveform).
 ///
 /// Features:
 /// - Stepped obsidian luminance gradient with physical milled bevel border
-/// - Cockpit Dual-Zone architecture: Left 65% typography & telemetry chips, Right 35% horology dial
+/// - Editorial Typographic Hierarchy with generous negative space (Oura & Bevel standard)
+/// - The Centerpiece: Dynamic Harmonic Kinetic Strain Waveform with glowing peak glint
+/// - Tabular Hero Strain Index (e.g. 84 / 100 OPTIMAL LOAD ZONE)
 /// - Laser-etched muscle group micro-badges with glowing indicator LEDs
 /// - High-precision biometric telemetry readout dock with exercises, duration, and CNS readiness
 /// - Tactile luxury CTA button with top specular glass highlight and soft photon shadow
@@ -185,131 +187,193 @@ class TodayHeroSessionCard extends StatelessWidget {
               ),
               const SizedBox(height: S.lg),
 
-              // 2. Cockpit Zone: Left 65% Typography & Badges | Right 35% Biometric Chronograph Dial
-              Row(
+              // 2. Title & Target Muscle Chips
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left Column: Title, Target Muscle Badges & Readiness Subtitle
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 20.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                            color: context.textPrimary,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8.5),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 21.0,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: context.textPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8.5),
 
-                        // Muscle Target Telemetry Badges
-                        if (!isRestDay && targetMuscles.isNotEmpty) ...[
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 5,
-                            children: targetMuscles.map((m) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7.5, vertical: 3),
+                  // Muscle Target Telemetry Badges
+                  if (!isRestDay && targetMuscles.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 5,
+                      children: targetMuscles.map((m) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7.5, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF141724) : const Color(0xFFF1F4FA),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: C.accent.withValues(alpha: isDark ? 0.25 : 0.16),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 4.5,
+                                height: 4.5,
                                 decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF141724) : const Color(0xFFF1F4FA),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: C.accent.withValues(alpha: isDark ? 0.25 : 0.16),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 4.5,
-                                      height: 4.5,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: C.accent,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: C.accent.withValues(alpha: 0.65),
-                                            blurRadius: 3.5,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      m.toUpperCase(),
-                                      style: TextStyle(
-                                        fontFamily: 'Inter',
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.4,
-                                        color: context.textPrimary,
-                                      ),
+                                  shape: BoxShape.circle,
+                                  color: C.accent,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: C.accent.withValues(alpha: 0.65),
+                                      blurRadius: 3.5,
                                     ),
                                   ],
                                 ),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 9),
-                        ],
-
-                        // Neuromuscular Readiness Insight with Vertical Telemetry Bar
-                        Container(
-                          padding: const EdgeInsets.only(left: 8.0, top: 1.0, bottom: 1.0),
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              left: BorderSide(
-                                color: Color(0xFF00E5FF),
-                                width: 2.0,
                               ),
-                            ),
+                              const SizedBox(width: 5),
+                              Text(
+                                m.toUpperCase(),
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                  color: context.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            subtitle,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              color: context.textSecondary,
-                              fontSize: 12.0,
-                              height: 1.38,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                        );
+                      }).toList(),
                     ),
-                  ),
+                    const SizedBox(height: 9),
+                  ],
 
-                  // Right Column: Dedicated Biometric Telemetry Dial
-                  if (!isRestDay) ...[
-                    const SizedBox(width: 14),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: WorkoutTelemetryDial(
-                        progress: isFinished ? 1.0 : loadScore,
-                        readinessProgress: 0.94,
-                        valueText: isFinished ? '100%' : '${(loadScore * 100).toInt()}%',
-                        label: isFinished
-                            ? 'COMPLETE'
-                            : (isActive ? 'IN SESSION' : 'TARGET LOAD'),
-                        subLabel: isFinished ? '● 100% DONE' : '● 94% READY',
-                        size: 88.0,
+                  // Neuromuscular Readiness Insight with Vertical Telemetry Bar
+                  Container(
+                    padding: const EdgeInsets.only(left: 8.0, top: 1.0, bottom: 1.0),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: Color(0xFF00E5FF),
+                          width: 2.0,
+                        ),
                       ),
                     ),
-                  ],
+                    child: Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: context.textSecondary,
+                        fontSize: 12.0,
+                        height: 1.38,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: S.lg),
 
-              // 3. Telemetry Metrics Segmented Strip (Movements, Duration, CNS Readiness)
+              // 3. Editorial Centerpiece: Hero Strain Index & Dynamic Kinetic Waveform
+              if (!isRestDay) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF121520) : const Color(0xFFF2F5FB),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF232738) : const Color(0xFFDFE4EE),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Hero Typographic Strain Score (Oura / Bevel Editorial Standard)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                isFinished ? '100' : '${(loadScore * 100).toInt()}',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1.0,
+                                  color: context.textPrimary,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '/ 100',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: context.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF00E5FF),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isFinished
+                                    ? 'COMPLETED'
+                                    : (isActive ? 'IN SESSION' : 'OPTIMAL LOAD ZONE'),
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.8,
+                                  color: context.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+
+                      // Dynamic Kinetic Strain Waveform (Energy Spectrogram)
+                      WorkoutStrainWaveform(
+                        loadScore: isFinished ? 1.0 : loadScore,
+                        width: 140,
+                        height: 48,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: S.lg),
+              ],
+
+              // 4. Telemetry Metrics Segmented Strip (Movements, Duration, CNS Readiness)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.0),
                 decoration: BoxDecoration(
@@ -368,7 +432,7 @@ class TodayHeroSessionCard extends StatelessWidget {
               ),
               const SizedBox(height: S.lg),
 
-              // 4. Luxury Tactile Hero CTA Button with Top Specular Hairline & Glow
+              // 5. Luxury Tactile Hero CTA Button with Top Specular Hairline & Glow
               ScaleTap(
                 onPressed: onStartWorkout,
                 child: Container(
