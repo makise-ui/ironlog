@@ -64,13 +64,52 @@ final appUpdateServiceProvider = Provider<AppUpdateService>((ref) {
 class AppUpdateService {
   final SettingsRepository _settingsRepo;
 
-  static const String currentVersion = 'v1.4.1';
-  static const int currentBuildNumber = 7;
+  static const String currentVersion = 'v1.6.0';
+  static const int currentBuildNumber = 9;
 
   AppUpdateService(this._settingsRepo);
 
   /// Current and historical release notes
   static const List<AppReleaseInfo> releases = [
+    AppReleaseInfo(
+      version: 'v1.6.0',
+      buildNumber: 9,
+      releaseDate: 'October 2026',
+      title: 'Editorial Strain Waveform & Luxury Telemetry',
+      summary: 'Dynamic kinetic strain waveform, 5-tier luxury history telemetry, in-app markdown updates, and enhanced compact workout mode.',
+      highlights: [
+        ReleaseNoteItem(
+          title: 'Editorial Kinetic Strain Waveform (Model 2)',
+          description: 'Centerpiece harmonic strain waveform and tabular hero load index with laser-etched muscle indicator chips inspired by Oura & Bevel.',
+          icon: Icons.show_chart_rounded,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: '5-Tier Luxury History Telemetry',
+          description: 'Horizon Telemetry Dock, Stepped Obsidian session cards, dynamic volume heatmap calendar, unified instant search, and active rest state.',
+          icon: Icons.auto_graph_rounded,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: 'In-App GitHub Updates & Markdown Changelogs',
+          description: 'Direct APK downloads, automatic repository release checks, and rich Markdown rendering for release notes.',
+          icon: Icons.system_update_rounded,
+          tag: 'NEW',
+        ),
+        ReleaseNoteItem(
+          title: 'Enhanced Compact Workout Mode',
+          description: 'Crisp 46px anatomical thumbnails with quick exercise jump strip and high-density set tracking.',
+          icon: Icons.density_small_rounded,
+          tag: 'IMPROVED',
+        ),
+        ReleaseNoteItem(
+          title: 'AI Endpoint & Model Selector',
+          description: 'Direct endpoint model enumeration without requiring /v1 suffix, interactive generation stop button, and resilient streaming.',
+          icon: Icons.smart_toy_outlined,
+          tag: 'IMPROVED',
+        ),
+      ],
+    ),
     AppReleaseInfo(
       version: 'v1.4.1',
       buildNumber: 7,
